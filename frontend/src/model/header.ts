@@ -1,6 +1,6 @@
 // Header KPIs and the Next decision strip.
 
-import { at, dh, pcTxt, sgn } from './format';
+import { at, dh, pcWithOdds, sgn } from './format';
 import { waitDv, windowIndex } from './replay';
 import type { NeedRow, Snapshot } from './run';
 import { C } from './theme';
@@ -53,19 +53,21 @@ export interface NextDecision {
   text: string;
   /** Event to open, when a decision is due. */
   eventId: number | null;
+  /** That event is already open in the workspace. */
+  showing: boolean;
 }
 
 /** The most urgent Decide event with a plan, or a calm message when none is due. */
-export function buildNext(snap: Snapshot, budget: number): NextDecision {
+export function buildNext(snap: Snapshot, budget: number, sel: number | null = null): NextDecision {
   const urgent: NeedRow | undefined = snap.needs.find((x) => x.plan);
   if (!urgent || !urgent.plan) {
-    return { tone: 'clear', label: 'No decision due', text: snap.open.length + ' events open; none needs a decision at this run.', eventId: null };
+    return { tone: 'clear', label: 'No decision due', text: snap.open.length + ' events open; none needs a decision at this run.', eventId: null, showing: false };
   }
   const { e, s, plan } = urgent;
   const w0 = waitDv(plan.c, windowIndex(plan.c, plan.age));
-  const head = '#' + e.id + ' · ' + e.sat + ' vs ' + e.obj.toLowerCase() + ' · Pc ' + pcTxt(s.last[1]) + '. ';
+  const head = '#' + e.id + ' · ' + e.sat + ' vs ' + e.obj.toLowerCase() + ' · Pc ' + pcWithOdds(s.last[1]) + '. ';
   const tail = plan.overNow
     ? 'Already above the ' + budget + ' mm/s budget: decide now or accept a larger burn.'
     : 'Decide within ' + dh(plan.left) + ' (by ' + at(plan.dlAbs) + ') to stay inside the ' + budget + ' mm/s budget. Lowest burn now: ' + (w0 != null ? w0.toFixed(1) + ' mm/s.' : 'above 80 mm/s.');
-  return { tone: 'decide', label: 'Next decision', text: head + tail, eventId: e.id };
+  return { tone: 'decide', label: 'Next decision', text: head + tail, eventId: e.id, showing: sel === e.id };
 }

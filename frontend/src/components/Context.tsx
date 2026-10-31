@@ -3,7 +3,7 @@ import type { GlobeView } from '../model/globe';
 
 export function OrbitContext({ g }: { g: GlobeView }) {
   return (
-    <section aria-label="Orbit context" className="card side-card">
+    <section aria-label="Orbit context" className="card side-card orbit-card">
       <div className="card-head">
         <h2>Orbit context</h2>
         <span className="meta">orientation illustrative</span>
@@ -11,7 +11,7 @@ export function OrbitContext({ g }: { g: GlobeView }) {
       <div className="globe">
         <svg viewBox="0 0 900 900" className="fill" role="img" aria-label="Selected satellite orbit, open conjunctions, debris track and proposed path">
           <path d={g.backDim} fill="none" stroke="#E6EBF0" strokeWidth="1.5" />
-          <path d={g.backSel} fill="none" stroke="#0F766E" strokeWidth="1.5" strokeOpacity="0.3" />
+          <path d={g.backSel} fill="none" stroke="#0F172A" strokeWidth="1.5" strokeOpacity="0.25" />
           <circle cx="450" cy="450" r="268.4" fill="#EDF1F5" stroke="#CBD5E1" strokeWidth="2" />
           <path d={g.grat} fill="none" stroke="#D7DFE7" strokeWidth="1.5" />
           <path d={g.frontDim} fill="none" stroke="#AAB7C6" strokeWidth="1.5" />
@@ -19,9 +19,9 @@ export function OrbitContext({ g }: { g: GlobeView }) {
           <path d={g.dots[1]} fill="#2563EB" />
           <path d={g.dots[2]} fill="#B45309" />
           <path d={g.dots[3]} fill="#C2410C" />
-          <path d={g.frontSel} fill="none" stroke="#0F766E" strokeWidth="3" />
+          <path d={g.frontSel} fill="none" stroke="#0F172A" strokeWidth="3" />
           <path d={g.chaser} fill="none" stroke="#C2410C" strokeWidth="5" strokeDasharray="0.1 12" strokeLinecap="round" />
-          <path d={g.ahead} fill="none" stroke="#0F766E" strokeWidth="5" strokeDasharray="16 11" strokeLinecap="round" />
+          <path d={g.ahead} fill="none" stroke="#0F172A" strokeWidth="5" strokeDasharray="16 11" strokeLinecap="round" />
           <path d={g.prop} fill="none" stroke="#6D28D9" strokeWidth="5" strokeDasharray="14 10" strokeLinecap="round" />
           <path d={g.icoPanels} fill="#FFFFFF" stroke="#64748B" strokeWidth="1.5" strokeLinejoin="round" />
           <path d={g.icoBody} fill="#64748B" />
@@ -33,7 +33,7 @@ export function OrbitContext({ g }: { g: GlobeView }) {
       </div>
       <div className="key">
         <span>
-          <i style={{ borderTopColor: '#0F766E' }} />
+          <i style={{ borderTopColor: '#0F172A' }} />
           path ahead
         </span>
         <span>
@@ -51,7 +51,7 @@ export function OrbitContext({ g }: { g: GlobeView }) {
 
 export function SinceLastRun({ d, onPick }: { d: DigestView; onPick: (id: number) => void }) {
   return (
-    <section aria-label="Since last run" className="card side-card" style={{ gap: 8 }}>
+    <section aria-label="Since last run" className="card side-card digest-card" style={{ gap: 8 }}>
       <div className="card-head">
         <h2>Since last run</h2>
         <span className="meta">{d.meta}</span>
@@ -69,7 +69,7 @@ export function SinceLastRun({ d, onPick }: { d: DigestView; onPick: (id: number
                 </span>{' '}
                 <span style={{ color: 'var(--muted)' }}>{it.sat}</span>
               </span>
-              <span className="mono" style={{ color: 'var(--slate)' }}>
+              <span className="mono" style={{ color: 'var(--slate)' }} title={it.title}>
                 {it.v}
               </span>
             </button>
@@ -83,7 +83,7 @@ export function SinceLastRun({ d, onPick }: { d: DigestView; onPick: (id: number
 
 export function DecisionLog({ rows }: { rows: LogRow[] }) {
   return (
-    <section aria-label="Decision log" className="card side-card">
+    <section aria-label="Decision log" className="card side-card log-card">
       <div className="card-head">
         <h2>Decision log</h2>
         <span className="meta">this replay</span>

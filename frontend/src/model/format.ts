@@ -18,6 +18,38 @@ export function sci(p: number): string {
 /** Pc text from a log10 Pc value. */
 export const pcTxt = (risk: number) => sci(Math.pow(10, risk));
 
+/** Rounds to two significant figures. */
+function sig2(n: number): number {
+  const mag = Math.pow(10, Math.floor(Math.log10(n)) - 1);
+  return Number((Math.round(n / mag) * mag).toPrecision(2));
+}
+
+/**
+ * Pc as odds, "1 in 4,000", with N to two significant figures. It uses the same truncated value sci() shows,
+ * so "1.3e-5" always reads "1 in 77,000". Below 1e-9: "under 1 in a billion". Null at the 1e-30 floor.
+ */
+export function odds(p: number): string | null {
+  if (!(p > 0) || p <= 1.0001e-30) return null;
+  const e = Math.floor(Math.log10(p));
+  const shown = (Math.floor((p / Math.pow(10, e)) * 10) / 10) * Math.pow(10, e);
+  if (shown < 0.999e-9) return 'under 1 in a billion';
+  const n = sig2(1 / shown);
+  if (n >= 1e9) return '1 in a billion';
+  if (n >= 1e6) return '1 in ' + Number((n / 1e6).toPrecision(2)) + ' million';
+  return '1 in ' + n.toLocaleString('en-US');
+}
+
+/** Odds from a log10 Pc value. */
+export const pcOdds = (risk: number) => odds(Math.pow(10, risk));
+
+/** "2.5e-4 (1 in 4,000)", or the e-notation alone at the floor. */
+export function withOdds(p: number): string {
+  const o = odds(p);
+  return sci(p) + (o ? ' (' + o + ')' : '');
+}
+
+export const pcWithOdds = (risk: number) => withOdds(Math.pow(10, risk));
+
 /** Duration in hours as "2d 05h". */
 export function dh(h: number): string {
   const a = Math.round(Math.abs(h));

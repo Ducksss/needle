@@ -16,10 +16,14 @@ export function MessageHistory({ h }: { h: HistoryView }) {
         <text x="36" y="22" textAnchor="end" fontSize="9" fill="#C2410C" fontFamily={MONO}>
           1e-4
         </text>
+        <line x1="40" x2="316" y1="32.7" y2="32.7" stroke="#B45309" strokeDasharray="3 3" />
+        <text x="36" y="35.4" textAnchor="end" fontSize="9" fill="#B45309" fontFamily={MONO}>
+          1e-6
+        </text>
         <text x="36" y="89" textAnchor="end" fontSize="9" fill="#94A3B8" fontFamily={MONO}>
           ≤1e-14
         </text>
-        <line x1={h.nowX} x2={h.nowX} y1="4" y2="88" stroke="#0F766E" strokeDasharray="2 3" />
+        <line x1={h.nowX} x2={h.nowX} y1="4" y2="88" stroke="#334155" strokeDasharray="2 3" />
         <polyline points={h.pcPts} fill="none" stroke="#0F172A" strokeWidth="1.6" strokeLinejoin="round" />
         <path d={h.pcDots} fill="#0F172A" />
         <path d={h.pcHot} fill="#C2410C" />
@@ -41,7 +45,7 @@ export function MessageHistory({ h }: { h: HistoryView }) {
         <text x="316" y="82" textAnchor="end" fontSize="9" fill="#94A3B8" fontFamily={MONO}>
           TCA
         </text>
-        <line x1={h.nowX} x2={h.nowX} y1="4" y2="72" stroke="#0F766E" strokeDasharray="2 3" />
+        <line x1={h.nowX} x2={h.nowX} y1="4" y2="72" stroke="#334155" strokeDasharray="2 3" />
         <polyline points={h.missPts} fill="none" stroke="#0F172A" strokeWidth="1.6" strokeLinejoin="round" />
         <path d={h.missDots} fill="#0F172A" />
       </svg>
@@ -60,13 +64,21 @@ export function EncounterPlane({ bp }: { bp: EncounterPlaneView }) {
         <svg viewBox="0 0 300 300" className="fill" role="img" aria-label="Uncertainty ellipse, 1 km ring, and where the debris passes now and after the selected burn">
           <line x1="150" x2="150" y1="8" y2="292" stroke="#EEF2F5" />
           <line x1="8" x2="292" y1="150" y2="150" stroke="#EEF2F5" />
-          <ellipse cx="150" cy="150" rx={bp.rx3} ry={bp.ry3} transform={`rotate(${bp.rot} 150 150)`} fill="#0F766E" fillOpacity="0.06" stroke="#0F766E" strokeOpacity="0.35" strokeDasharray="3 3" />
-          <ellipse cx="150" cy="150" rx={bp.rx1} ry={bp.ry1} transform={`rotate(${bp.rot} 150 150)`} fill="#0F766E" fillOpacity="0.16" stroke="#0F766E" strokeOpacity="0.6" />
+          <ellipse cx="150" cy="150" rx={bp.rx3} ry={bp.ry3} transform={`rotate(${bp.rot} 150 150)`} fill="#475569" fillOpacity="0.06" stroke="#475569" strokeOpacity="0.4" strokeDasharray="3 3" />
+          <ellipse cx="150" cy="150" rx={bp.rx1} ry={bp.ry1} transform={`rotate(${bp.rot} 150 150)`} fill="#475569" fillOpacity="0.16" stroke="#475569" strokeOpacity="0.6" />
           <circle cx="150" cy="150" r={bp.ring} fill="none" stroke="#C2410C" strokeWidth="1.2" strokeDasharray="5 4" />
           <line x1={bp.bx} y1={bp.by} x2={bp.ax} y2={bp.ay} stroke="#6D28D9" strokeWidth="1.5" strokeDasharray="4 3" />
           <circle cx="150" cy="150" r={bp.hbr} fill="#0F172A" />
           <circle cx={bp.bx} cy={bp.by} r="5.5" fill="#C2410C" stroke="#FFFFFF" strokeWidth="2" />
           <circle cx={bp.ax} cy={bp.ay} r="5.5" fill="#6D28D9" stroke="#FFFFFF" strokeWidth="2" />
+          <g stroke="#334155" strokeWidth="1.5">
+            <line x1="14" x2={14 + Number(bp.scale.len)} y1="284" y2="284" />
+            <line x1="14" x2="14" y1="279" y2="289" />
+            <line x1={14 + Number(bp.scale.len)} x2={14 + Number(bp.scale.len)} y1="279" y2="289" />
+          </g>
+          <text x="14" y="273" fontSize="11" fill="#334155" fontFamily={MONO}>
+            {bp.scale.label}
+          </text>
         </svg>
         {bp.labels.map((l) => (
           <span key={l.text} className="plane-label" style={{ left: l.left, top: l.top, transform: l.transform, background: l.tone.bg, color: l.tone.fg }}>
@@ -75,7 +87,7 @@ export function EncounterPlane({ bp }: { bp: EncounterPlaneView }) {
         ))}
       </div>
       <span className="meta">
-        Shaded: combined 1σ and 3σ ({bp.sigTxt}). Dashed ring: 1 km. Plot half-width {bp.scaleTxt}.
+        Shaded: combined 1σ and 3σ ({bp.sigTxt}). Dashed ring: 1 km.
       </span>
     </figure>
   );
@@ -94,16 +106,28 @@ export function CostOfWaiting({ wc, budget }: { wc: CostOfWaitingView; budget: n
           <line x1="36" x2="312" y1="10" y2="10" stroke="#EEF2F5" />
           <line x1="36" x2="312" y1="126" y2="126" stroke="#CBD5E1" />
           <line x1="36" x2="312" y1={wc.budgetY} y2={wc.budgetY} stroke="#C2410C" strokeDasharray="4 3" />
-          <line x1={wc.nowX} x2={wc.nowX} y1="8" y2="128" stroke="#0F766E" strokeDasharray="2 3" />
+          <line x1={wc.nowX} x2={wc.nowX} y1="8" y2="128" stroke="#334155" strokeDasharray="2 3" />
+          <line x1={wc.deadline.x} x2={wc.deadline.x} y1="8" y2="126" stroke="#DC2626" strokeWidth="1.2" />
           <path d={wc.path} fill="none" stroke="#0F172A" strokeWidth="1.8" />
           <path d={wc.over} fill="#C2410C" />
+          <text x={wc.deadline.tx} y="22" textAnchor={wc.deadline.anchor} fontSize="8.5" fill="#B91C1C" fontFamily={MONO} stroke="#FFFFFF" strokeWidth="3" paintOrder="stroke">
+            {wc.deadline.label}
+          </text>
           <text x="32" y="129" textAnchor="end" fontSize="9" fill="#94A3B8" fontFamily={MONO}>
             0
           </text>
-          <text x="36" y="142" fontSize="9" fill="#94A3B8" fontFamily={MONO}>
+          {wc.ticks.map((t) => (
+            <g key={t.label}>
+              <line x1={t.x} x2={t.x} y1="126" y2="130" stroke="#CBD5E1" />
+              <text x={t.x} y="138" textAnchor="middle" fontSize="8" fill="#94A3B8" fontFamily={MONO}>
+                {t.label}
+              </text>
+            </g>
+          ))}
+          <text x="36" y="148" fontSize="8.5" fill="#94A3B8" fontFamily={MONO}>
             planning message
           </text>
-          <text x="312" y="142" textAnchor="end" fontSize="9" fill="#94A3B8" fontFamily={MONO}>
+          <text x="312" y="148" textAnchor="end" fontSize="8.5" fill="#94A3B8" fontFamily={MONO}>
             TCA − 3 h
           </text>
         </svg>

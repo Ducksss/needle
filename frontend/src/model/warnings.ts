@@ -1,7 +1,7 @@
 // Next 24 h warnings (contracts/README.md § 24 h warnings): passes in [T, T + 24 h], how many come within the
 // dangerous distance, and up to three insights generated from the counts.
 
-import { at, dh, mTxt, pcTxt, plural } from './format';
+import { at, dh, mTxt, pcOdds, pcTxt, plural } from './format';
 import { type KnownState, type Tier, PC_ACTION, PC_WATCH, TIER_TIP, isKnown, stateAt, tierOf } from './replay';
 import { type Chip, type RunCtx, type Snapshot, approvedAt, queueChip } from './run';
 import { BUCKET_COLOR, C, type Tone } from './theme';
@@ -22,6 +22,7 @@ export interface WarningRow {
   miss: string;
   missM: number;
   pc: string;
+  pcTitle: string | undefined;
   pcColor: string;
   tier: Tier;
   tierTone: Tone;
@@ -113,6 +114,7 @@ export function buildWarnings(ctx: RunCtx, snap: Snapshot, sel: number | null): 
       miss: mTxt(miss(x)),
       missM: miss(x),
       pc: pcTxt(risk(x)),
+      pcTitle: pcOdds(risk(x)) ?? undefined,
       pcColor: BUCKET_COLOR[x.s.bucket] ?? C.slate,
       tier,
       tierTone: TIER_TONE[tier],

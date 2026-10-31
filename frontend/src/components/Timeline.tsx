@@ -4,6 +4,8 @@ import { Hover, TipCard, noBreak, sideStyle } from './Hover';
 
 interface TimelineProps {
   dock: DockView;
+  /** Highlight bars whose state changed since the previous run. */
+  flash: boolean;
   legend: LegendItem[];
   clock: string;
   run: number;
@@ -25,7 +27,7 @@ const SWATCH: Record<string, string> = {
   band: 'sw sw-band',
 };
 
-export function Timeline({ dock, legend, clock, run, runs, playing, onPlay, onStep, onRun, onPick }: TimelineProps) {
+export function Timeline({ dock, flash, legend, clock, run, runs, playing, onPlay, onStep, onRun, onPick }: TimelineProps) {
   return (
     <section aria-label="Replay timeline" className="card dock">
       <div className="dock-bar">
@@ -59,9 +61,12 @@ export function Timeline({ dock, legend, clock, run, runs, playing, onPlay, onSt
       <div className="dock-body">
         <div className="lane-names" aria-hidden="true">
           <div style={{ height: 22 }} />
-          <div style={{ height: 34, display: 'flex', alignItems: 'center', fontSize: 11, color: 'var(--muted)' }}>Open events</div>
+          <div className="strip-label">
+            <span>Open events</span>
+            <span className="strip-decide">to decide</span>
+          </div>
           {dock.lanes.map((ln) => (
-            <div key={ln.sat} className="lane-name" style={{ height: ln.h, color: ln.selected ? 'var(--ok)' : 'var(--body)' }}>
+            <div key={ln.sat} className={'lane-name' + (ln.selected ? ' on' : '') + (ln.empty ? ' empty' : '')} style={{ height: ln.h }}>
               {ln.sat}
             </div>
           ))}
@@ -84,16 +89,22 @@ export function Timeline({ dock, legend, clock, run, runs, playing, onPlay, onSt
             {dock.density.map((d) => (
               <span key={d.run} className="tw" style={{ left: d.left, width: d.w }}>
                 <span className={'dens-open' + (d.current ? ' now' : '')} style={{ height: d.h }} />
-                <span className="dens-pc" style={{ height: d.nh }} />
                 <TipCard title={d.title} lines={[d.l1, d.l2]} side={d.side} />
               </span>
             ))}
+            {dock.decideLine && (
+              <svg className="decide-line" viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">
+                <path d={dock.decideLine} fill="none" stroke="#F97316" strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
+              </svg>
+            )}
+            <span className="decide-max">{dock.decideMax ? 'max ' + dock.decideMax : 'none to decide'}</span>
           </div>
           {dock.lanes.map((ln) => (
-            <div key={ln.sat} className="lane" style={{ height: ln.h }}>
-              {ln.bars.map((b) => (
-                <Bar key={b.id} b={b} onPick={onPick} />
-              ))}
+            <div key={ln.sat} className={'lane' + (ln.empty ? ' empty' : '')} style={{ height: ln.h }}>
+              {ln.bars.map((b) => {
+                const lit = flash && b.changed;
+                return <Bar key={lit ? b.id + ':' + run : b.id} b={b} lit={lit} onPick={onPick} />;
+              })}
               {ln.marks.map((m) => (
                 <Mark key={m.kind + m.left} m={m} />
               ))}
@@ -113,11 +124,11 @@ export function Timeline({ dock, legend, clock, run, runs, playing, onPlay, onSt
   );
 }
 
-function Bar({ b, onPick }: { b: EventBar; onPick: (id: number) => void }) {
+function Bar({ b, lit, onPick }: { b: EventBar; lit: boolean; onPick: (id: number) => void }) {
   const id = useId();
   return (
     <>
-      <span className="tw ev" style={{ left: b.left, width: b.w, top: b.top }}>
+      <span className={'tw ev' + (b.passed ? ' ev-passed' : '') + (lit ? ' flash' : '')} style={{ left: b.left, width: b.w, top: b.top }}>
         {b.future && <span className="ev-ahead" style={{ left: b.kw }} />}
         <button type="button" className="ev-btn" style={{ width: b.kw }} aria-pressed={b.selected} aria-label={b.aria} aria-describedby={id} onClick={() => onPick(b.id)}>
           {b.segs.map((sg, i) => (

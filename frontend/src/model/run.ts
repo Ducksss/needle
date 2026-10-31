@@ -165,4 +165,19 @@ export function queueChip(ctx: RunCtx, e: ReplayEvent, s: KnownState): Chip {
   return queueOf(ctx, e, s) === 'Quiet' ? chip('QUIET', TONE.passed) : chipFor(ctx, e, s);
 }
 
+/**
+ * Events whose chip changed since the previous run, including events first reported or passed at this run.
+ * Drives the short highlight during playback.
+ */
+export function changedSincePrev(ctx: RunCtx, snap: Snapshot): Set<number> {
+  const out = new Set<number>();
+  if (ctx.run === 0) return out;
+  const prev: RunCtx = { ...ctx, run: ctx.run - 1, T: ctx.T - ctx.replay.runH };
+  for (const r of snap.rows) {
+    if (!isKnown(r.s)) continue;
+    if (!isKnown(r.p) || chipFor(prev, r.e, r.p).label !== chipFor(ctx, r.e, r.s).label) out.add(r.e.id);
+  }
+  return out;
+}
+
 export const OPTION_NAMES: Record<OptionKey, string> = { coa1: 'Recommended', coa2: 'More margin', coa3: 'Wait 24 h' };

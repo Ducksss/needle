@@ -26,7 +26,8 @@ export function Workspace({ ws, budget, onOpt, onReview, onDefer }: WorkspacePro
       <div className="ws-head">
         <div className="ws-title">
           <span className="meta">
-            {h.sat} vs {h.obj}
+            {h.sat}
+            {h.orbit && <span className="mono"> · {h.orbit}</span>} · vs {h.obj}
           </span>
           <div className="ws-title-row">
             <h2>
@@ -42,6 +43,7 @@ export function Workspace({ ws, budget, onOpt, onReview, onDefer }: WorkspacePro
           <div>
             <dt>{h.pcLabel}</dt>
             <dd style={{ color: h.color }}>{h.pc}</dd>
+            {h.odds && <dd className="odds">{h.odds}</dd>}
           </div>
           <div>
             <dt>Miss</dt>
@@ -94,7 +96,9 @@ function Options({ opts, onOpt, onReview, onDefer }: { opts: OptionsView; onOpt:
               <span>{o.dir}</span>
             </span>
             <span className="mono">{o.dvTxt}</span>
-            <span className="mono">{o.pcAfter}</span>
+            <span className="mono" title={o.pcAfterTitle}>
+              {o.pcAfter}
+            </span>
             <span className="mono">{o.missAfter}</span>
           </button>
         ))}
@@ -153,7 +157,7 @@ function MessagesReceived({ rows }: { rows: MsgRow[] }) {
               {r.n}
             </span>
             <span role="cell">{r.before}</span>
-            <span role="cell" style={{ color: r.pcColor }}>
+            <span role="cell" style={{ color: r.pcColor }} title={r.pcTitle}>
               {r.pc}
             </span>
             <span role="cell">{r.miss}</span>

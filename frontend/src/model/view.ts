@@ -8,7 +8,7 @@ import { dirShort, dh } from './format';
 import { type GlobeView, buildGlobe } from './globe';
 import { type Kpi, type NextDecision, buildKpis, buildNext } from './header';
 import { type QueueTab, type QueueView, buildQueue } from './queue';
-import { type Decisions, type LogEntry, OPTION_NAMES, runCtx, snapshot } from './run';
+import { type Decisions, type LogEntry, OPTION_NAMES, changedSincePrev, runCtx, snapshot } from './run';
 import { type WarningsView, buildWarnings } from './warnings';
 import { type WorkspaceView, buildWorkspace } from './workspace';
 
@@ -56,7 +56,8 @@ export function buildView(data: ConsoleData, ui: UiState): ConsoleView {
   const snap = snapshot(ctx);
   const facts = factsOf(data);
   const selRow = snap.rows.find((r) => r.e.id === ui.sel) ?? null;
-  const ws = buildWorkspace(ctx, selRow?.e ?? null, ui.opt, facts);
+  const changed = changedSincePrev(ctx, snap);
+  const ws = buildWorkspace(ctx, selRow?.e ?? null, ui.opt, facts, selRow ? fleet.missions[selRow.e.mi] : undefined);
   const opt = ws.kind === 'event' && ws.planner ? ws.planner.opt : null;
   const day = Math.floor(ctx.T / 24) + 1;
   const hh = String(ctx.T % 24).padStart(2, '0');
@@ -66,13 +67,13 @@ export function buildView(data: ConsoleData, ui: UiState): ConsoleView {
     clock: 'Run ' + (ui.run + 1) + ' of ' + replay.runs + ' · Day ' + day + ', ' + hh + ':00',
     budget: ui.budget,
     kpis: buildKpis(snap),
-    next: buildNext(snap, ui.budget),
-    queue: buildQueue(ctx, snap, ui.tab, ui.sel),
+    next: buildNext(snap, ui.budget, ui.sel),
+    queue: buildQueue(ctx, snap, ui.tab, ui.sel, changed),
     ws,
     globe: buildGlobe({ missions: fleet.missions, open: snap.open, sel: selRow, opt }),
     digest: buildDigest(snap),
     log: buildLog(ui.dec.log),
-    dock: buildDock(ctx, ui.sel, selRow?.e.sat ?? null, ui.opt),
+    dock: buildDock(ctx, ui.sel, selRow?.e.sat ?? null, ui.opt, changed),
     legend: buildLegend(ui.budget),
     warnings: buildWarnings(ctx, snap, ui.sel),
     facts,

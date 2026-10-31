@@ -1,5 +1,7 @@
-import type { Kpi } from '../model/header';
 import { useId } from 'react';
+import markUrl from '../assets/needle-mark.svg';
+import type { ReplayFacts } from '../model/facts';
+import type { Kpi } from '../model/header';
 import { Hover, TipCard } from './Hover';
 
 /** Budget values the stepper moves through, mm/s. */
@@ -11,16 +13,14 @@ interface HeaderProps {
   kpis: Kpi[];
   budget: number;
   onBudget: (v: number) => void;
+  facts?: ReplayFacts;
 }
 
-export function Header({ kpis, budget, onBudget }: HeaderProps) {
+export function Header({ kpis, budget, onBudget, facts }: HeaderProps) {
   return (
     <header className="header">
       <div className="brand">
-        <svg width="24" height="24" viewBox="0 0 26 26" fill="none" stroke="#0F766E" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <circle cx="13" cy="13" r="10.5" />
-          <line x1="6.5" y1="19.5" x2="19.5" y2="6.5" />
-        </svg>
+        <img src={markUrl} width={28} height={28} alt="" />
         <span className="brand-name">Needle</span>
         <span style={{ color: 'var(--muted)' }}>Conjunction triage · 19 ESA satellites</span>
       </div>
@@ -31,7 +31,17 @@ export function Header({ kpis, budget, onBudget }: HeaderProps) {
       </dl>
       <div className="header-right">
         <BudgetControl budget={budget} onBudget={onBudget} />
-        <span className="badge">Demo replay · real CDMs · simulated calendar · high-risk events about 7× over-sampled</span>
+        <Hover
+          className="help badge"
+          title="Demo replay"
+          side={{ edge: 'right', px: 0 }}
+          lines={[
+            'Real ESA training-set CDM histories, with message timing kept relative to closest approach, on a simulated 21-day calendar of 8 h screening runs.',
+            (facts ? facts.escalated + ' of ' + facts.events + ' replay events' : 'Replay events') + ' reach Pc ≥ 1e-4, against about 1.2% of events in ESA’s training data, so high-risk events are over-sampled about 7×.',
+          ]}
+        >
+          <span className="dotted">Demo replay · high-risk 7× over-sampled</span>
+        </Hover>
       </div>
     </header>
   );

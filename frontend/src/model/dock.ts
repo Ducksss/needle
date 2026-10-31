@@ -1,7 +1,7 @@
 // Replay timeline dock: fleet density per run, one lane per satellite with Pc >= 1e-4 events, deadlines, burns and the 24 h band.
 
 import type { CoaOption, OptionKey, Replay, ReplayEvent } from '../data/types';
-import { at, clamp, dh, dirShort, mTxt, pcTxt, sci } from './format';
+import { at, clamp, dh, dirShort, mTxt, pcWithOdds, withOdds } from './format';
 import { PC_ACTION, isKnown, planOf, stateAt } from './replay';
 import { type RunCtx, OPTION_NAMES, approvedAt, chipFor } from './run';
 import { C } from './theme';
@@ -30,7 +30,6 @@ export interface DensityBar {
   left: string;
   w: string;
   h: string;
-  nh: string;
   current: boolean;
   side: TipSide;
   title: string;
@@ -65,6 +64,10 @@ export interface EventBar {
   aria: string;
   selected: boolean;
   future: boolean;
+  /** Closest approach has passed: drawn faded. */
+  passed: boolean;
+  /** Chip changed since the previous run. */
+  changed: boolean;
   side: TipSide;
   tipTitle: string;
   tip: TipLine[];
@@ -91,6 +94,8 @@ export interface LaneMark {
 export interface Lane {
   sat: string;
   h: number;
+  /** No event of this satellite reported yet: the lane stays, collapsed, so lanes do not jump during playback. */
+  empty: boolean;
   selected: boolean;
   bars: EventBar[];
   marks: LaneMark[];
@@ -99,6 +104,9 @@ export interface Lane {
 export interface DockView {
   ticks: Tick[];
   density: DensityBar[];
+  /** Step line of the to-decide count per run, in a 100 × 34 view box, on its own scale. */
+  decideLine: string;
+  decideMax: number;
   lanes: Lane[];
   playLeft: string;
   playLabel: string;
@@ -155,7 +163,26 @@ export function assignTracks(items: ReplayEvent[]): { trackOf: Record<number, nu
   return { trackOf, count: Math.max(1, trackEnd.length) };
 }
 
-export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null, optKey: OptionKey): DockView {
+/** Height of a lane with nothing reported yet, px. */
+export const EMPTY_LANE_H = 14;
+
+/** Open events at Pc >= 1e-4 with no approved burn, per run: the "To decide" KPI at every run. */
+export function decideCounts(ctx: RunCtx): number[] {
+  const { replay, dec } = ctx;
+  const counts = densityCounts(replay).map((c) => c[1]);
+  const byId = new Map(replay.events.map((e) => [e.id, e]));
+  for (const [id, a] of Object.entries(dec.approved)) {
+    const e = byId.get(Number(id));
+    if (!e) continue;
+    for (let r = 0; r < replay.runs; r++) {
+      const s = stateAt(e, r * replay.runH, replay.runH);
+      if (s.phase === 'open' && s.bucket === 'pc' && a <= r + 1) counts[r]--;
+    }
+  }
+  return counts;
+}
+
+export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null, optKey: OptionKey, changed: Set<number> = new Set()): DockView {
   const { replay, T, run, budget } = ctx;
   const runH = replay.runH;
   const DOM = dockHours(replay);
@@ -167,20 +194,29 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
   const counts = densityCounts(replay);
   const maxO = Math.max(1, ...counts.map((c) => c[0]));
   const barW = ((runH / DOM) * 100 * 0.78).toFixed(3) + '%';
+  const decide = decideCounts(ctx);
+  const decideMax = Math.max(0, ...decide);
   const density = counts.map(
     (c, r): DensityBar => ({
       run: r,
       left: pctH(r * runH),
       w: barW,
       h: ((c[0] / maxO) * 100).toFixed(1) + '%',
-      nh: c[1] ? Math.max(10, (c[1] / maxO) * 100).toFixed(1) + '%' : '0%',
       current: r === run,
       side: r > replay.runs * 0.625 ? { edge: 'right', px: 0 } : { edge: 'left', px: 0 },
       title: 'Run ' + (r + 1) + ' · ' + at(r * runH),
-      l1: c[0] + ' events open (bar height)',
-      l2: c[1] + ' at Pc ≥ 1e-4 (orange part)',
+      l1: c[0] + ' events open (grey bar, true scale)',
+      l2: decide[r] + ' to decide (orange line, scale 0 to ' + decideMax + ')',
     }),
   );
+  let decideLine = '';
+  if (decideMax > 0) {
+    const step = (runH / DOM) * 100;
+    decide.forEach((n, r) => {
+      const y = (33 - (n / decideMax) * 29).toFixed(2);
+      decideLine += (r === 0 ? 'M' + (r * step).toFixed(3) + ' ' + y : 'V' + y) + 'H' + ((r + 1) * step).toFixed(3);
+    });
+  }
 
   const ticks: Tick[] = [];
   const days = Math.round(DOM / 24);
@@ -221,7 +257,7 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
       const tip: TipLine[] = [
         { t: chip.label + ': ' + chip.tip, c: '#E2E8F0' },
         { t: 'First message ' + at(start) + ' · ' + (s.k + 1) + (s.k ? ' messages' : ' message') + ' so far', c: '#CBD5E1' },
-        { t: 'Latest Pc ' + pcTxt(s.last[1]) + ' · miss ' + mTxt(s.last[2]), c: '#CBD5E1' },
+        { t: 'Latest Pc ' + pcWithOdds(s.last[1]) + ' · miss ' + mTxt(s.last[2]), c: '#CBD5E1' },
       ];
       if (hiH > 0) tip.push({ t: 'Orange: ' + (hiH < 1 ? 'under 1' : Math.round(hiH)) + ' h of ' + Math.round(kEnd - start) + ' h at Pc ≥ 1e-4', c: '#FDBA74' });
       tip.push({ t: done ? 'Closest approach ' + at(e.tca) + ', ' + dh(T - e.tca) + ' ago' : 'Dashed: ' + dh(e.tca - T) + ' to closest approach, ' + at(e.tca), c: '#CBD5E1' });
@@ -237,6 +273,8 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
         aria: 'Event ' + e.id + ', ' + chip.label.toLowerCase() + '. Select to open in the workspace.',
         selected: sel === e.id,
         future: !done,
+        passed: done,
+        changed: changed.has(e.id),
         side: sideOf(start),
         tipTitle: '#' + e.id + ' · ' + e.sat + ' vs ' + e.obj.toLowerCase(),
         tip,
@@ -256,7 +294,7 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
               side: sideOf(e.tca),
               title: 'Closest approach · ' + at(e.tca),
               lines: [
-                'Final Pc ' + pcTxt(s.last[1]) + ' · miss ' + mTxt(s.last[2]) + '.',
+                'Final Pc ' + pcWithOdds(s.last[1]) + ' · miss ' + mTxt(s.last[2]) + '.',
                 appr != null
                   ? 'Teal: a burn was approved at run ' + appr + '.'
                   : s.last[1] >= PC_ACTION
@@ -294,7 +332,7 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
             title: 'Proposed burn · ' + OPTION_NAMES[o.key],
             lines: [
               o.dv.toFixed(1) + ' mm/s ' + dirShort(o.alpha).toLowerCase() + (o.key === 'coa3' ? ', 24 h after message ' : ', planned at message ') + (pl.key + 1) + '.',
-              'Pc after ' + sci(o.pcAfter) + ' · miss after ' + mTxt(o.missAfter) + '.',
+              'Pc after ' + withOdds(o.pcAfter) + ' · miss after ' + mTxt(o.missAfter) + '.',
               pl.overNow ? 'Past the ' + budget + ' mm/s deadline.' : 'Decide by ' + at(pl.dlAbs) + ', in ' + dh(pl.left) + '.',
               'Not approved yet. Click the bar to review.',
             ],
@@ -302,18 +340,18 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
         }
       }
     }
-    return { sat, h: 6 + count * 22, selected: selSat === sat, bars, marks };
+    return { sat, h: items.length ? 6 + count * 22 : EMPTY_LANE_H, empty: !items.length, selected: selSat === sat, bars, marks };
   });
 
   const day = Math.floor(T / 24) + 1;
   const hh = String(T % 24).padStart(2, '0');
-  return { ticks, density, lanes, playLeft: pctH(T), playLabel: 'Day ' + day + ' · ' + hh + ':00', band: { left: pctH(T), w: wH(T, T + 24) } };
+  return { ticks, density, decideLine, decideMax, lanes, playLeft: pctH(T), playLabel: 'Day ' + day + ' · ' + hh + ':00', band: { left: pctH(T), w: wH(T, T + 24) } };
 }
 
 export function buildLegend(budget: number): LegendItem[] {
   return [
-    { key: 'bar', label: 'known', name: 'Event bar', tip: 'From the event’s first message to now. Each event is its own stream of messages, about one every 8 h.' },
-    { key: 'pc', label: 'Pc ≥ 1e-4', name: 'Orange stretch', tip: 'Time when the latest message had Pc at or above 1e-4, the action threshold.' },
+    { key: 'bar', label: 'known', name: 'Event bar', tip: 'From the event’s first message to now. Each event is its own stream of messages, about one every 8 h. Faded: closest approach has passed.' },
+    { key: 'pc', label: 'Pc ≥ 1e-4', name: 'Orange stretch', tip: 'Time when the latest message had Pc at or above 1e-4, the action threshold. In the open-events strip, the orange line is the count to decide at each run, on its own scale.' },
     { key: 'ahead', label: 'to closest approach', name: 'Dashed outline', tip: 'Time left until closest approach. Those messages have not arrived yet.' },
     { key: 'burn', label: 'proposed burn', name: 'Proposed burn', tip: 'The planner’s lowest-Δv option that brings Pc below 1e-4 and the miss above 1 km. It waits for approval.' },
     { key: 'deadline', label: 'decision deadline', name: 'Decision deadline', tip: 'After this, the cheapest burn needs more than the ' + budget + ' mm/s Δv budget.' },

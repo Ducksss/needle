@@ -1,7 +1,7 @@
 // Workspace for the selected event: header, message history, and either the burn planner or the messages table.
 
-import type { CoaOption, OptionKey, ReplayEvent } from '../data/types';
-import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, pcTxt, sci } from './format';
+import type { CoaOption, Mission, OptionKey, ReplayEvent } from '../data/types';
+import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, sci } from './format';
 import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, TIER_TIP, bucketOf, isKnown, planOf, stateAt, tierOf, waitDv, windowIndex } from './replay';
 import { type Chip, type RunCtx, OPTION_NAMES, approvedAt, chipFor, isDeferredNow } from './run';
 import { BUCKET_COLOR, C, TONE, type Tone } from './theme';
@@ -9,10 +9,13 @@ import { BUCKET_COLOR, C, TONE, type Tone } from './theme';
 export interface EventHeader {
   id: number;
   sat: string;
+  /** Mean altitude and inclination of the satellite, from fleet.json. */
+  orbit: string | null;
   obj: string;
   chip: Chip;
   pcLabel: string;
   pc: string;
+  odds: string | null;
   color: string;
   miss: string;
   tcaLabel: string;
@@ -50,6 +53,7 @@ export interface MsgRow {
   n: string;
   before: string;
   pc: string;
+  pcTitle: string | undefined;
   pcColor: string;
   miss: string;
   tier: Tier;
@@ -58,9 +62,18 @@ export interface MsgRow {
   queue: string;
 }
 
+export interface AxisTick {
+  x: string;
+  label: string;
+}
+
 export interface CostOfWaitingView {
   path: string;
   over: string;
+  /** Every 24 h after the planning message. */
+  ticks: AxisTick[];
+  /** Decision deadline line and its label. */
+  deadline: { x: string; label: string; anchor: 'start' | 'end'; tx: string };
   budgetY: string;
   budgetPct: string;
   topTxt: string;
@@ -92,7 +105,8 @@ export interface EncounterPlaneView {
   ax: string;
   ay: string;
   sigTxt: string;
-  scaleTxt: string;
+  /** Scale bar in the bottom-left corner: a round length near a quarter of the plot width. */
+  scale: { len: string; label: string };
   labels: PlaneLabel[];
 }
 
@@ -102,6 +116,7 @@ export interface OptionRow {
   dir: string;
   dvTxt: string;
   pcAfter: string;
+  pcAfterTitle: string | undefined;
   missAfter: string;
   on: boolean;
 }
@@ -145,7 +160,9 @@ export interface ModalView {
   missNow: string;
   missAfter: string;
   pcNow: string;
+  pcNowOdds: string | null;
   pcAfter: string;
+  pcAfterOdds: string | null;
   rationale: string;
   approveLabel: string;
   att: Attitude;
@@ -210,7 +227,7 @@ export function buildHistory(e: ReplayEvent, s: KnownState, T: number): HistoryV
   };
 }
 
-function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | null): EventHeader {
+function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | null, mission: Mission | undefined): EventHeader {
   const resolved = s.phase === 'resolved';
   const appr = approvedAt(ctx, e.id);
   let status: string;
@@ -228,10 +245,12 @@ function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | nu
   return {
     id: e.id,
     sat: e.sat,
+    orbit: mission ? mission.alt + ' km · ' + mission.inc.toFixed(1) + '°' : null,
     obj: e.obj.toLowerCase(),
     chip: chipFor(ctx, e, s),
     pcLabel: resolved ? 'Final Pc' : 'Pc',
     pc: pcTxt(s.last[1]),
+    odds: pcOdds(s.last[1]),
     color: resolved ? C.slate : (BUCKET_COLOR[s.bucket] ?? C.slate),
     miss: mTxt(s.last[2]),
     tcaLabel: resolved ? 'Since TCA' : 'To TCA',
@@ -247,7 +266,7 @@ function buildOther(ctx: RunCtx, e: ReplayEvent, s: KnownState): { other: OtherV
     .map((v, i): MsgRow => {
       const t = tierOf(v);
       const b = bucketOf(v);
-      return { n: String(i + 1), before: dh(e.tca - v[0]), pc: pcTxt(v[1]), pcColor: BUCKET_COLOR[b] ?? C.slate, miss: mTxt(v[2]), tier: t, tierTone: TIER_TONE[t], tierTip: TIER_TIP[t], queue: QUEUE_NAME[b] };
+      return { n: String(i + 1), before: dh(e.tca - v[0]), pc: pcTxt(v[1]), pcTitle: pcOdds(v[1]) ?? undefined, pcColor: BUCKET_COLOR[b] ?? C.slate, miss: mTxt(v[2]), tier: t, tierTone: TIER_TONE[t], tierTip: TIER_TIP[t], queue: QUEUE_NAME[b] };
     })
     .reverse();
   const peak = Math.max(...vis.map((v) => v[1]));
@@ -322,10 +341,17 @@ function buildCostOfWaiting(ctx: RunCtx, plan: Plan, facts: WorkspaceFacts): Cos
   const w24 = waitDv(plan.c, wi + 4);
   const nowTxt = wNow != null ? wNow.toFixed(1) : 'over 80';
   const dayLater = w24 != null ? w24.toFixed(1) + ' mm/s' + (wNow ? ' (' + (w24 / wNow).toFixed(2) + '×)' : '') : 'not possible before closest approach';
+  const ticks: AxisTick[] = [];
+  for (let h = 24; h < H - 4; h += 24) ticks.push({ x: X(h).toFixed(1), label: '+' + h + ' h' });
+  const dlX = X(dlRel);
+  const right = dlX > 200;
+  const deadline = { x: dlX.toFixed(1), label: 'deadline ' + at(plan.dlAbs), anchor: right ? ('end' as const) : ('start' as const), tx: (right ? dlX - 4 : dlX + 4).toFixed(1) };
   const median = facts.medianWaitRatio24h != null ? ' Across all escalations, waiting 24 h costs a median ' + facts.medianWaitRatio24h.toFixed(2) + '× the Δv.' : '';
   return {
     path,
     over,
+    ticks,
+    deadline,
     budgetY: Y(budget).toFixed(1),
     budgetPct: (Y(budget) / 1.5).toFixed(2) + '%',
     topTxt: String(yTop),
@@ -348,6 +374,7 @@ function buildEncounterPlane(plan: Plan, opt: CoaOption): EncounterPlaneView {
   const P2 = (v: [number, number]) => [150 + v[1] * sc, 150 - v[0] * sc] as const;
   const b0 = P2(m0);
   const a1 = P2(m1);
+  const len = scaleBarM(75 / sc);
   return {
     rx1: Math.max(1.5, cev.ell.a * sc).toFixed(1),
     ry1: Math.max(1.5, cev.ell.b * sc).toFixed(1),
@@ -361,12 +388,20 @@ function buildEncounterPlane(plan: Plan, opt: CoaOption): EncounterPlaneView {
     ax: a1[0].toFixed(1),
     ay: a1[1].toFixed(1),
     sigTxt: mTxt(cev.ell.a) + ' × ' + mTxt(cev.ell.b),
-    scaleTxt: mTxt(fit),
+    scale: { len: (len * sc).toFixed(1), label: len >= 1000 ? len / 1000 + ' km' : len + ' m' },
     labels: [
       { left: (b0[0] / 3).toFixed(2) + '%', top: (b0[1] / 3).toFixed(2) + '%', transform: 'translate(8px, -130%)', tone: TONE.decide, text: 'now ' + mTxt(cev.miss) },
       { left: (a1[0] / 3).toFixed(2) + '%', top: (a1[1] / 3).toFixed(2) + '%', transform: 'translate(8px, 30%)', tone: TONE.deferred, text: 'after ' + mTxt(opt.missAfter) },
     ],
   };
+}
+
+/** Scale-bar lengths, m. */
+export const SCALE_STEPS = [250, 500, 1000, 2000, 5000];
+
+/** The scale-bar length closest (on a log scale) to the target length. */
+export function scaleBarM(targetM: number): number {
+  return SCALE_STEPS.reduce((best, v) => (Math.abs(Math.log(v / targetM)) < Math.abs(Math.log(best / targetM)) ? v : best));
 }
 
 export function buildAttitude(alpha: number): Attitude {
@@ -429,7 +464,9 @@ function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: CoaOption): Mo
     missNow: mTxt(cev.miss),
     missAfter: mTxt(opt.missAfter),
     pcNow: pcTxt(cev.risk),
+    pcNowOdds: pcOdds(cev.risk),
     pcAfter: sci(opt.pcAfter),
+    pcAfterOdds: odds(opt.pcAfter),
     rationale:
       'The ' + (obj === 'unknown' ? 'unidentified object' : obj) + ' passes ' + mTxt(cev.miss) + ' away at ' + cev.relSpeed.toFixed(1) + ' km/s on a ' + Math.round(cev.crossDeg) +
       '° crossing. This ' + dirShort(opt.alpha).toLowerCase() + ' burn makes us ' + aheadTxt + ' by closest approach, which opens the encounter-plane miss to ' + mTxt(opt.missAfter) +
@@ -447,13 +484,13 @@ export function pickOption(plan: Plan | null, key: OptionKey): CoaOption | null 
   return feasible.find((o) => o.key === key) ?? feasible[0] ?? null;
 }
 
-export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: OptionKey, facts: WorkspaceFacts): WorkspaceView {
+export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: OptionKey, facts: WorkspaceFacts, mission?: Mission): WorkspaceView {
   if (!e) return { kind: 'empty', text: 'Select an event from the queue, the timeline or the run digest.' };
   const st = stateAt(e, ctx.T, ctx.replay.runH);
   if (!isKnown(st)) return { kind: 'empty', text: 'Event #' + e.id + ' has not been reported yet. Its first message arrives in ' + dh(e.m[0][0] - ctx.T) + '.' };
   const plan = planOf(e, st, ctx.T, ctx.budget);
   const opt = pickOption(plan, optKey);
-  const header = buildHeader(ctx, e, st, plan);
+  const header = buildHeader(ctx, e, st, plan, mission);
   const hist = buildHistory(e, st, ctx.T);
   if (plan && opt) {
     const appr = approvedAt(ctx, e.id);
@@ -466,6 +503,7 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
         dir: dirShort(o.alpha),
         dvTxt: o.dv.toFixed(1) + ' mm/s',
         pcAfter: sci(o.pcAfter),
+        pcAfterTitle: odds(o.pcAfter) ?? undefined,
         missAfter: mTxt(o.missAfter),
         on: o.key === opt.key,
       })),

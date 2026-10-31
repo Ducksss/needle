@@ -21,7 +21,8 @@ export const BUCKET_COLOR: Record<string, string> = {
   pc: C.risk,
   hidden: C.hidden,
   distance: C.watch,
-  elevated: C.ok,
+  // Teal is kept for approved and safe states, so the general watch bucket reads neutral.
+  elevated: '#334155',
   quiet: C.faint,
 };
 

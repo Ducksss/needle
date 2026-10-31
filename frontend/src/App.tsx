@@ -23,6 +23,8 @@ interface State {
   ui: UiState;
   playing: boolean;
   modal: boolean;
+  /** The run changed by stepping, scrubbing or playback, so changed rows get a short highlight. */
+  flash: boolean;
 }
 
 type Action =
@@ -45,16 +47,16 @@ function reducer(s: State, a: Action): State {
     case 'loaded': {
       const rp = a.data.replay;
       const start = initialSelection(rp.events, rp.runH, rp.runs);
-      return { ...s, status: 'ready', data: a.data, ui: { ...s.ui, run: start.run, sel: start.sel } };
+      return { ...s, status: 'ready', data: a.data, flash: false, ui: { ...s.ui, run: start.run, sel: start.sel } };
     }
     case 'failed':
       return { ...s, status: 'error' };
     case 'run':
-      return { ...s, playing: false, ui: { ...s.ui, run: Math.max(0, Math.min(lastRun(s), a.run)) } };
+      return { ...s, playing: false, flash: true, ui: { ...s.ui, run: Math.max(0, Math.min(lastRun(s), a.run)) } };
     case 'tick':
       if (!s.playing) return s;
       if (s.ui.run >= lastRun(s)) return { ...s, playing: false };
-      return { ...s, ui: { ...s.ui, run: s.ui.run + 1 } };
+      return { ...s, flash: true, ui: { ...s.ui, run: s.ui.run + 1 } };
     case 'play':
       return { ...s, playing: !s.playing };
     case 'tab':
@@ -73,7 +75,7 @@ function reducer(s: State, a: Action): State {
 }
 
 function initState(): State {
-  return { status: 'loading', data: null, playing: false, modal: false, ui: { run: 0, tab: 'needs', sel: null, opt: 'coa1', budget: readBudget(), dec: NO_DECISIONS } };
+  return { status: 'loading', data: null, playing: false, modal: false, flash: false, ui: { run: 0, tab: 'needs', sel: null, opt: 'coa1', budget: readBudget(), dec: NO_DECISIONS } };
 }
 
 /** Brings the workspace into view when a selection is made from further down the page. */
@@ -116,7 +118,7 @@ export function App() {
     return (
       <div className="page">
         <Header kpis={[]} budget={s.ui.budget} onBudget={(budget) => dispatch({ type: 'budget', budget })} />
-        <NextDecision next={{ tone: 'neutral', label: '', text: '', eventId: null }} loading={s.status === 'error' ? 'error' : 'loading'} onOpen={pick} />
+        <NextDecision next={{ tone: 'neutral', label: '', text: '', eventId: null, showing: false }} loading={s.status === 'error' ? 'error' : 'loading'} onOpen={pick} />
       </div>
     );
   }
@@ -126,10 +128,14 @@ export function App() {
   return (
     <>
       <div className="page">
-        <Header kpis={view.kpis} budget={view.budget} onBudget={(budget) => dispatch({ type: 'budget', budget })} />
+        <Header kpis={view.kpis} budget={view.budget} facts={view.facts} onBudget={(budget) => dispatch({ type: 'budget', budget })} />
         <NextDecision next={view.next} onOpen={(id) => pickAndReveal(id, 'needs')} />
         <div className="main">
-          <Queue q={view.queue} onTab={(tab) => dispatch({ type: 'tab', tab })} onPick={pick} />
+          <div className="col col-left">
+            <Queue q={view.queue} flash={s.flash} run={view.run} onTab={(tab) => dispatch({ type: 'tab', tab })} onPick={pick} />
+            <SinceLastRun d={view.digest} onPick={(id) => pickAndReveal(id)} />
+            <DecisionLog rows={view.log} />
+          </div>
           <Workspace
             ws={view.ws}
             budget={view.budget}
@@ -137,15 +143,14 @@ export function App() {
             onReview={() => dispatch({ type: 'modal', open: true })}
             onDefer={() => dispatch({ type: 'decide', dec: defer(s.ui, view) })}
           />
-          <aside aria-label="Context" className="context">
+          <aside aria-label="Outlook" className="col col-right">
+            <Warnings24h w={view.warnings} onPick={(id) => pickAndReveal(id)} />
             <OrbitContext g={view.globe} />
-            <SinceLastRun d={view.digest} onPick={(id) => pickAndReveal(id)} />
-            <DecisionLog rows={view.log} />
           </aside>
         </div>
-        <Warnings24h w={view.warnings} onPick={(id) => pickAndReveal(id)} />
         <Timeline
           dock={view.dock}
+          flash={s.flash}
           legend={view.legend}
           clock={view.clock}
           run={view.run}

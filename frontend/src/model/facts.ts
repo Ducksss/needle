@@ -4,6 +4,8 @@ import type { Metrics, Replay } from '../data/types';
 
 export interface ReplayFacts {
   events: number;
+  /** Replay events with at least one CDM at Pc >= 1e-4. */
+  escalated: number;
   /** CDMs with a burn plan (Pc >= 1e-4 and >= 3 h to TCA). */
   coaMessages: number;
   /** Of those, how many the Pc model reproduces within 0.1 orders of magnitude. */
@@ -32,6 +34,7 @@ export function replayFacts(replay: Replay, metrics: Metrics | null): ReplayFact
   const cls = metrics?.test?.methods?.find((m) => m.name === 'Needle classifier + miss');
   return {
     events: replay.events.length,
+    escalated: replay.events.filter((e) => e.m.some((m) => m[1] >= -4)).length,
     coaMessages: coas.length,
     pcModelWithin01: coas.filter((c) => c.pcModelOk).length,
     medianWaitRatio24h: median(ratios),

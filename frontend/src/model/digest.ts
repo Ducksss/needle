@@ -1,6 +1,6 @@
 // Since last run digest and the decision log.
 
-import { pcTxt, plural } from './format';
+import { pcOdds, pcTxt, plural } from './format';
 import { isKnown } from './replay';
 import type { KnownRow, LogEntry, Snapshot } from './run';
 import { C } from './theme';
@@ -9,6 +9,7 @@ export interface DigestItem {
   id: number;
   sat: string;
   v: string;
+  title: string | undefined;
 }
 
 export interface DigestGroup {
@@ -33,7 +34,7 @@ export function buildDigest(snap: Snapshot): DigestView {
   const down = known.filter((r) => r.s.phase === 'open' && r.s.bucket !== 'pc' && wasPc(r));
   const pas = known.filter((r) => r.s.phase === 'resolved' && r.p.phase === 'open');
   const newOnes = snap.open.filter((r) => r.s.isNew);
-  const item = (r: KnownRow, v: string): DigestItem => ({ id: r.e.id, sat: r.e.sat, v });
+  const item = (r: KnownRow, v: string): DigestItem => ({ id: r.e.id, sat: r.e.sat, v, title: pcOdds(r.s.last[1]) ?? undefined });
   const groups: DigestGroup[] = [];
   if (esc.length) groups.push({ title: 'Escalated to Pc ≥ 1e-4 · ' + esc.length, color: C.risk, items: esc.slice(0, DIGEST_LIMIT).map((r) => item(r, pcTxt(r.s.last[1]))) });
   if (down.length) groups.push({ title: 'Downgraded · ' + down.length, color: C.watch, items: down.slice(0, DIGEST_LIMIT).map((r) => item(r, pcTxt(r.s.last[1]))) });

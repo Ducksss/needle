@@ -134,6 +134,9 @@ export function ApprovalModal({ m, clock, onClose, onApprove }: ApprovalModalPro
                 <span className="mono">
                   <span style={{ color: 'var(--risk)' }}>{m.pcNow}</span> → <span style={{ color: 'var(--action)', fontSize: 16 }}>{m.pcAfter}</span>
                 </span>
+                <span className="odds">
+                  {m.pcNowOdds ?? 'at the floor'} → {m.pcAfterOdds ?? 'at the floor'}
+                </span>
               </div>
             </div>
             <span className="caps-8" style={{ marginTop: 4 }}>
