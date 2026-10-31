@@ -42,6 +42,23 @@ def choose_events(tr, rng):
     return chosen, high
 
 
+def risk_2dp(risk):
+    """log10 Pc rounded down to 2 decimals. The tier thresholds (-4, -6) are whole hundredths,
+    so rounding down never moves a value across one; rounding -4.04 to -4.0 did."""
+    return float(np.floor(float(risk) * 100) / 100)
+
+
+def miss_m(miss):
+    """Miss distance in whole metres, kept on the true side of the 1,000 m and 5,000 m tier thresholds."""
+    v = float(miss)
+    m = int(round(v))
+    if v < 1000 <= m:
+        m = 999
+    if v > 5000 >= m:
+        m = 5001
+    return m
+
+
 def build(tr, fleet, fc=None, log=print):
     """Build replay.json from train and the fleet labels. Seeded, so two builds match.
 
@@ -65,7 +82,7 @@ def build(tr, fleet, fc=None, log=print):
         msgs, rtn, coas = [], [], {}
         for k, (_, r) in enumerate(e.iterrows()):
             arr = tca_h - max(r.time_to_tca, 0) * 24
-            msgs.append([round(arr, 1), round(float(r.risk), 1), round(float(r.miss_distance))])
+            msgs.append([round(arr, 1), risk_2dp(r.risk), miss_m(r.miss_distance)])
             rtn.append([round(float(r.relative_position_r)), round(float(r.relative_position_t)),
                         round(float(r.relative_position_n))])
             if r.risk >= -4 and r.time_to_tca * 24 >= 3:
