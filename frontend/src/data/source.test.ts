@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { realData } from '../test/fixtures';
-import { checkForecast, dataUrls, isReplayEvent, loadConsoleData } from './source';
+import { checkForecast, dataUrls, isMission, isReplayEvent, loadConsoleData } from './source';
 
 describe('dataUrls', () => {
   it('reads the static copies when no API is set', () => {
@@ -58,6 +58,19 @@ describe('loadConsoleData', () => {
     await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/replay.json: missing events, runs or runH');
   });
 
+  it('fails into the error state when an event lacks its object type or has a malformed plan', async () => {
+    const good = { id: 1, sat: 'ESA-01', mi: 0, obj: 'Debris', inc: 97, tca: 30, m: [[10, -5, 900]], coa: {} };
+    for (const bad of [{ ...good, obj: undefined }, { ...good, coa: { '0': { opts: [] } } }, { ...good, coa: { '3': { opts: [], wait: [] } } }]) {
+      vi.stubGlobal('fetch', respond([], { ...BODY, 'replay.json': { runs: 64, runH: 8, events: [good, bad] } }));
+      await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/replay.json: event 1 is not in the contract shape');
+    }
+  });
+
+  it('fails into the error state when a fleet mission lacks its altitude', async () => {
+    vi.stubGlobal('fetch', respond([], { ...BODY, 'fleet.json': { missions: [{ label: 'ESA-01', alt: 700, inc: 98 }, { label: 'ESA-02', inc: 98 }] } }));
+    await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/fleet.json: mission 1 is not in the contract shape');
+  });
+
   it('fails into the error state when one event lacks its messages', async () => {
     const good = { id: 1, sat: 'ESA-01', mi: 0, obj: 'Debris', inc: 97, tca: 30, m: [[10, -5, 900]], coa: {} };
     vi.stubGlobal('fetch', respond([], { ...BODY, 'replay.json': { runs: 64, runH: 8, events: [good, { ...good, id: 2, m: undefined }] } }));
@@ -70,6 +83,7 @@ describe('contract checks', () => {
 
   it('accept the committed replay and forecast', () => {
     expect(data.replay.events.every(isReplayEvent)).toBe(true);
+    expect(data.fleet.missions.every(isMission)).toBe(true);
     const f = checkForecast(data.forecast)!;
     expect([f.pCriticalByPc != null, f.pcForecast != null, f.validation.pcForecast?.ceilingSamples]).toEqual([true, true, 4355]);
   });

@@ -59,5 +59,6 @@ describe('timeline forecast', () => {
     const plain = buildDock(ctx, null, null, 'coa4');
     expect(plain.forecastLine).toBe('');
     expect(plain.lanes.flatMap((l) => l.bars).every((b) => b.forecast === null)).toBe(true);
+    expect(plain.density.filter((d) => d.future).every((d) => d.l1 === 'No forecast')).toBe(true);
   });
 });

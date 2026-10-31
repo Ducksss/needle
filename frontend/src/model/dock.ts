@@ -101,8 +101,6 @@ export interface LaneMark {
   kind: MarkKind;
   top: number;
   left: string;
-  /** Keeps the pill inside the lane: the room left of the lane's right edge. */
-  maxW: string;
   side: TipSide;
   text: string;
   /** Pill text on narrow screens. */
@@ -239,7 +237,6 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
   const DOM = dockHours(replay);
   const pctH = (h: number) => ((clamp(h, 0, DOM) / DOM) * 100).toFixed(3) + '%';
   const wH = (a: number, b: number) => Math.max(0.4, ((clamp(b, 0, DOM) - clamp(a, 0, DOM)) / DOM) * 100).toFixed(3) + '%';
-  const roomRight = (h: number) => 'calc(' + (100 - (clamp(h, 0, DOM) / DOM) * 100).toFixed(3) + '% - 8px)';
   const sideOf = (h: number, near?: TipSide): TipSide => (clamp(h, 0, DOM) / DOM > 0.62 ? { edge: 'right', px: 0 } : (near ?? { edge: 'left', px: 0 }));
 
   const counts = densityCounts(replay);
@@ -277,12 +274,14 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
       future: true,
       side,
       title: at(r * runH) + '–' + clock((r + 1) * runH),
-      l1: w
-        ? plural(w.due, 'pass', 'passes') +
-          ' due, ' +
-          (w.expected < 0.05 ? 'none expected to end Critical' : 'about ' + w.expected.toFixed(1) + ' expected to end Critical') +
-          (w.unknown ? ' (' + w.unknown + ' with too little history, not counted)' : '')
-        : 'No forecast',
+      // Without forecast.json the windows are not counted, so the card says so rather than show zeros.
+      l1:
+        w && forecast
+          ? plural(w.due, 'pass', 'passes') +
+            ' due, ' +
+            (w.expected < 0.05 ? 'none expected to end Critical' : 'about ' + w.expected.toFixed(1) + ' expected to end Critical') +
+            (w.unknown ? ' (' + w.unknown + ' with too little history, not counted)' : '')
+          : 'No forecast',
       l2: 'Forecast from events already reported (dotted line). Click to jump to this run.',
     };
   });
@@ -411,13 +410,13 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
         // The approved burn sits at its own burn time, from the plan and option that were approved.
         const ap = ctx.dec.approvedPlan[e.id];
         const ao = ap && e.coa[String(ap.key)] ? approvedOption(e, planAt(e, ap.key, T, budget), ap) : null;
-        const hA = ao ? burnAt(e, ao) : (appr - 1) * runH;
+        // A window burn can happen any time in its window, but not before it was approved.
+        const hA = !ao ? (appr - 1) * runH : isWindow(ao) ? Math.max(burnAt(e, ao), (appr - 1) * runH) : burnAt(e, ao);
         marks.push({
           id: e.id,
           kind: 'approved',
           top: y - 1,
           left: pctH(hA),
-          maxW: roomRight(hA),
           side: sideOf(hA, { edge: 'left', px: 6 }),
           text: 'approved',
           short: 'approved',
@@ -441,7 +440,6 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
             kind: 'proposed',
             top: y - 1,
             left: pctH(hB),
-            maxW: roomRight(hB),
             side: sideOf(hB, { edge: 'left', px: 6 }),
             text: passed ? 'time passed' : o.dv.toFixed(1) + ' mm/s',
             short: passed ? 'passed' : o.dv.toFixed(1) + ' mm/s',
