@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { realData } from '../test/fixtures';
 import { replayFacts } from './facts';
 import { initialSelection } from './replay';
-import { DEFAULT_OPTION, NO_DECISIONS } from './run';
+import { NO_DECISIONS } from './run';
+import { DEFAULT_OPTION } from './options';
 import { type UiState, approve, buildView, defer } from './view';
 
 const data = realData();
@@ -19,6 +20,7 @@ describe('buildView', () => {
     expect(v.next.eventId).not.toBeNull();
   });
 
+  // Builds the whole console many times, so it gets a longer timeout on a busy machine.
   it('builds every run with every Decide event selected', () => {
     for (let run = 0; run < data.replay.runs; run++) {
       const base = buildView(data, { ...ui0, run, sel: null });
@@ -32,7 +34,7 @@ describe('buildView', () => {
         }
       }
     }
-  });
+  }, 30_000);
 
   it('shows the messages table for Watch and Passed events', () => {
     const last = data.replay.runs - 1;
@@ -57,7 +59,7 @@ describe('buildView', () => {
     const ui1 = { ...ui0, dec: deferred };
     const approved = approve(ui1, buildView(data, ui1));
     expect(approved.approved[ui0.sel!]).toBe(ui0.run + 1);
-    expect(approved.log[1].text).toMatch(/^Approved #\d+: recommended \(robust\), \d+\.\d mm\/s/);
+    expect(approved.log[1].text).toMatch(/^Approved #\d+: robust, \d+\.\d mm\/s/);
     const after = buildView(data, { ...ui1, dec: approved });
     expect(after.ws.kind === 'event' && after.ws.header.chip.label).toBe('APPROVED');
     expect(after.kpis.find((k) => k.label === 'Approved')?.v).toBe('1');

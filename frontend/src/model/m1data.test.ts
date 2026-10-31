@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { realData } from '../test/fixtures';
 import { replayFacts } from './facts';
-import { DEFAULT_OPTION, NO_DECISIONS } from './run';
+import { NO_DECISIONS } from './run';
+import { DEFAULT_OPTION } from './options';
 import { buildView } from './view';
 
 // After PR #10 (risk rounded down to 2 decimals) no Decide event lacks a plan days before closest approach.

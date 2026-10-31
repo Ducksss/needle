@@ -1,6 +1,6 @@
 // Everything the console renders for one UI state. The React components only lay this out.
 
-import type { ConsoleData, OptionKey } from '../data/types';
+import type { ConsoleData } from '../data/types';
 import { type DigestView, type LogRow, buildDigest, buildLog } from './digest';
 import { type DockView, type LegendItem, buildDock, buildLegend } from './dock';
 import { type ReplayFacts, replayFacts } from './facts';
@@ -10,7 +10,8 @@ import { type Lapse, lapseBetween } from './lapse';
 import { type Kpi, type NextDecision, buildKpis, buildNext } from './header';
 import { type QueueTab, type QueueView, buildQueue } from './queue';
 import { isKnown, stateAt } from './replay';
-import { type Decisions, type LogEntry, OPTION_NAMES, changedSincePrev, queueOf, runCtx, snapshot } from './run';
+import { type Decisions, type LogEntry, changedSincePrev, queueOf, runCtx, snapshot } from './run';
+import { OPTION_NAMES, type OptChoice, isWindow } from './options';
 import { type WarningsView, buildWarnings } from './warnings';
 import { type WorkspaceView, buildWorkspace } from './workspace';
 
@@ -20,7 +21,7 @@ export interface UiState {
   fromRun?: number;
   tab: QueueTab;
   sel: number | null;
-  opt: OptionKey;
+  opt: OptChoice;
   budget: number;
   dec: Decisions;
 }
@@ -87,7 +88,8 @@ export function buildView(data: ConsoleData, ui: UiState): ConsoleView {
     next: buildNext(snap, ui.budget, ui.sel, ctx),
     queue: buildQueue(ctx, snap, ui.tab, ui.sel, changed, data.forecast ?? null),
     ws,
-    globe: buildGlobeScene({ missions: fleet.missions, events: replay.events, T: ctx.T, lapse, open: snap.open, sel: selRow, opt }),
+    // "Burn this window" has no burn vector, so the globe draws no proposed path for it.
+    globe: buildGlobeScene({ missions: fleet.missions, events: replay.events, T: ctx.T, lapse, open: snap.open, sel: selRow, opt: opt && !isWindow(opt) ? opt : null }),
     digest: buildDigest(snap, ui.run),
     log: buildLog(ui.dec.log, ui.run + 1),
     dock: buildDock(ctx, ui.sel, selRow?.e.sat ?? null, ui.opt, changed, data.forecast ?? null),
@@ -103,15 +105,16 @@ export function approve(ui: UiState, view: ConsoleView): Decisions {
   const id = view.ws.header.id;
   const o = view.ws.planner.opt;
   const run1 = ui.run + 1;
-  const what = OPTION_NAMES[o.key] + ', ' + o.dv.toFixed(1) + ' mm/s ' + dirShort(o.alpha).toLowerCase() + '.';
+  const dir = isWindow(o) ? '' : ' ' + dirShort(o.alpha).toLowerCase();
+  const what = OPTION_NAMES[o.key] + ', ' + o.dv.toFixed(1) + ' mm/s' + dir + '.';
   // Lower-case only the first letter: "Minimum Δv" must not become "minimum δv".
   const name = OPTION_NAMES[o.key].charAt(0).toLowerCase() + OPTION_NAMES[o.key].slice(1);
-  const entry: LogEntry = { run: run1, id, kind: 'approve', text: 'Approved #' + id + ': ' + name + ', ' + o.dv.toFixed(1) + ' mm/s ' + dirShort(o.alpha).toLowerCase() + '.' };
+  const entry: LogEntry = { run: run1, id, kind: 'approve', text: 'Approved #' + id + ': ' + name + ', ' + o.dv.toFixed(1) + ' mm/s' + dir + '.' };
   return {
     ...ui.dec,
     approved: { ...ui.dec.approved, [id]: run1 },
     approvedTxt: { ...ui.dec.approvedTxt, [id]: what },
-    approvedPlan: { ...ui.dec.approvedPlan, [id]: { key: view.ws.planner.plan.key, opt: o.key } },
+    approvedPlan: { ...ui.dec.approvedPlan, [id]: { key: view.ws.planner.plan.key, opt: o.key, ...(isWindow(o) ? { wi: o.wi } : {}) } },
     log: [...ui.dec.log.filter((l) => !(l.id === id && l.kind === 'approve' && l.run >= run1)), entry],
   };
 }

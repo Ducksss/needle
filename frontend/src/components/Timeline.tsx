@@ -28,6 +28,7 @@ const SWATCH: Record<string, string> = {
   pc: 'sw sw-pc',
   ahead: 'sw sw-ahead',
   burn: 'sw sw-burn',
+  approved: 'sw sw-approved',
   deadline: 'sw sw-deadline',
   end: 'sw sw-end',
   band: 'sw sw-band',
@@ -68,18 +69,23 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
   const room = trackW - px(dock.playLeft) - px(dock.density[run]?.w ?? '0%') - 4 - 48;
   const forecastTag = room >= FORECAST_LONG.length * MONO10_CH ? FORECAST_LONG : room >= 8 * MONO10_CH ? 'forecast' : null;
 
-  // A burn pill starts at its burn time. When that would put it over the event's forecast ring, it moves left just
-  // enough to end before the ring; with no room for that it shrinks to a small capsule at the burn time. Its card
-  // still gives the burn time and Δv.
+  // A burn pill starts at its burn time, but never before the end of its bar's known part, so it never covers the bar.
+  // When the full pill would reach the forecast ring, the deadline tick or the next bar in the row, it shrinks to a small
+  // capsule; deadline ticks sit above pills and rings, so every tick stays hoverable. The card gives the time and Δv.
   const narrow = window.matchMedia('(max-width: 899px)').matches;
   const pillFit = (m: LaneMark, bars: EventBar[]): PillFit => {
-    const ring = bars.find((b) => b.id === m.id)?.forecast;
-    if (!ring) return { shift: 0, compact: false };
-    const start = px(m.left) + 6;
-    const end = px(ring.left) - 10;
+    const b = bars.find((x) => x.id === m.id);
+    const base = px(m.left) + 6;
+    if (!b) return { shift: 0, compact: false };
+    const start = Math.max(base, px(b.left) + (px(b.w) * parseFloat(b.kw)) / 100 + 2);
+    // A mark at or just behind the pill start still blocks it, since the pill would sit on top of it.
+    const ends = [
+      b.forecast ? px(b.forecast.left) - 10 : Infinity,
+      b.deadline ? px(b.deadline.left) - 7 : Infinity,
+      ...bars.filter((x) => x.top === b.top && x.id !== b.id).map((x) => px(x.left) - 3),
+    ].filter((v) => v > start - 16);
     const w = (narrow ? m.short : m.text).length * PILL_CH + 18;
-    if (start + w <= end) return { shift: 0, compact: false };
-    return w <= end ? { shift: start + w - end, compact: false } : { shift: 0, compact: true };
+    return { shift: start - base, compact: start + w > Math.min(Infinity, ...ends) };
   };
 
   // The density strip is one tab stop: arrow keys move between runs and show that run's card; Enter jumps to it.
@@ -277,14 +283,14 @@ function Bar({ b, lit, fits, onPick }: { b: EventBar; lit: boolean; fits: boolea
 }
 
 interface PillFit {
-  /** px to move the pill left so it ends before the forecast ring. */
+  /** px to move the pill right so it starts after its bar's known part. */
   shift: number;
-  /** No room even then: draw a small capsule at the burn time. */
+  /** No room for the full pill before the next mark: draw a small capsule. */
   compact: boolean;
 }
 
 function Mark({ m, fit }: { m: LaneMark; fit: PillFit }) {
-  const left = fit.shift > 0 ? 'calc(' + m.left + ' - ' + fit.shift.toFixed(1) + 'px)' : m.left;
+  const left = fit.shift > 0 ? 'calc(' + m.left + ' + ' + fit.shift.toFixed(1) + 'px)' : m.left;
   return (
     <Hover className="mark" style={{ left, top: m.top, maxWidth: m.maxW }} title={m.title} lines={m.lines} side={m.side}>
       <span className={'mark-pill mark-' + m.kind + (fit.compact ? ' compact' : '')}>

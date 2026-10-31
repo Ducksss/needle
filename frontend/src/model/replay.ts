@@ -1,6 +1,6 @@
 // Event state at a replay time, Needle buckets, brief tiers and burn plans.
 
-import type { Cdm, Coa, CoaOption, ReplayEvent, Rtn } from '../data/types';
+import type { Cdm, Coa, ReplayEvent, Rtn } from '../data/types';
 
 /** Action threshold: Pc 1e-4, as log10. */
 export const PC_ACTION = -4;
@@ -130,13 +130,13 @@ export function rtnAt(e: ReplayEvent, i: number): Rtn | null {
 }
 
 /** Replay hour of an option's burn: its lead time before closest approach. */
-export const burnAt = (e: ReplayEvent, o: CoaOption) => e.tca - o.leadH;
+export const burnAt = (e: ReplayEvent, o: { leadH: number }) => e.tca - o.leadH;
 
 /**
  * The option's burn window has gone by: the 6 h window that holds now is later than the one the plan put the burn in.
  * Its Δv is stale; the current window may need more.
  */
-export function burnPassed(e: ReplayEvent, plan: Plan, o: CoaOption): boolean {
+export function burnPassed(e: ReplayEvent, plan: Plan, o: { leadH: number }): boolean {
   const planned = Math.round((burnAt(e, o) - plan.msgT) / 6);
   return Math.floor(plan.age / 6) > planned;
 }

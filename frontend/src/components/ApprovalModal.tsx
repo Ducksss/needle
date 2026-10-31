@@ -69,32 +69,36 @@ export function ApprovalModal({ m, clock, onClose, onApprove }: ApprovalModalPro
             <span className="caps-8">Burn plan</span>
             <div className="plan-row">
               <div className="attitude">
-                <svg viewBox="0 0 220 220" className="fill" role="img" aria-label="Thruster attitude relative to the velocity and radial axes">
-                  <circle cx="110" cy="110" r="84" fill="#F8FAFB" stroke="#CBD5E1" />
-                  <line x1="20" x2="200" y1="110" y2="110" stroke="#CBD5E1" />
-                  <line x1="110" x2="110" y1="20" y2="200" stroke="#CBD5E1" />
-                  <g fontFamily="IBM Plex Mono, monospace" fontSize="9" fill="#64748B">
-                    <text x="204" y="106" textAnchor="end">
-                      VELOCITY
-                    </text>
-                    <text x="16" y="106">
-                      ANTI-VEL.
-                    </text>
-                    <text x="114" y="18">
-                      RADIAL OUT
-                    </text>
-                    <text x="114" y="212">
-                      RADIAL IN
-                    </text>
-                  </g>
-                  <line x1="110" y1="110" x2="186" y2="110" stroke="#0F766E" strokeWidth="2" strokeDasharray="4 3" />
-                  <path d={m.att.arc} fill="none" stroke="#6D28D9" strokeWidth="1.5" />
-                  <line x1="110" y1="110" x2={m.att.x} y2={m.att.y} stroke="#6D28D9" strokeWidth="4" strokeLinecap="round" />
-                  <path d={m.att.head} fill="#6D28D9" />
-                  <rect x="100" y="104" width="20" height="12" rx="2" fill="#0F172A" />
-                  <rect x="84" y="107" width="14" height="6" fill="#FFFFFF" stroke="#0F172A" />
-                  <rect x="122" y="107" width="14" height="6" fill="#FFFFFF" stroke="#0F172A" />
-                </svg>
+                {m.att ? (
+                  <svg viewBox="0 0 220 220" className="fill" role="img" aria-label="Thruster attitude relative to the velocity and radial axes">
+                    <circle cx="110" cy="110" r="84" fill="#F8FAFB" stroke="#CBD5E1" />
+                    <line x1="20" x2="200" y1="110" y2="110" stroke="#CBD5E1" />
+                    <line x1="110" x2="110" y1="20" y2="200" stroke="#CBD5E1" />
+                    <g fontFamily="IBM Plex Mono, monospace" fontSize="9" fill="#64748B">
+                      <text x="204" y="106" textAnchor="end">
+                        VELOCITY
+                      </text>
+                      <text x="16" y="106">
+                        ANTI-VEL.
+                      </text>
+                      <text x="114" y="18">
+                        RADIAL OUT
+                      </text>
+                      <text x="114" y="212">
+                        RADIAL IN
+                      </text>
+                    </g>
+                    <line x1="110" y1="110" x2="186" y2="110" stroke="#0F766E" strokeWidth="2" strokeDasharray="4 3" />
+                    <path d={m.att.arc} fill="none" stroke="#6D28D9" strokeWidth="1.5" />
+                    <line x1="110" y1="110" x2={m.att.x} y2={m.att.y} stroke="#6D28D9" strokeWidth="4" strokeLinecap="round" />
+                    <path d={m.att.head} fill="#6D28D9" />
+                    <rect x="100" y="104" width="20" height="12" rx="2" fill="#0F172A" />
+                    <rect x="84" y="107" width="14" height="6" fill="#FFFFFF" stroke="#0F172A" />
+                    <rect x="122" y="107" width="14" height="6" fill="#FFFFFF" stroke="#0F172A" />
+                  </svg>
+                ) : (
+                  <p className="attitude-none">Direction not computed for this window. Flight dynamics plans the burn vector.</p>
+                )}
               </div>
               <dl className="plan-facts">
                 <dt>Planned for</dt>
@@ -106,7 +110,7 @@ export function ApprovalModal({ m, clock, onClose, onApprove }: ApprovalModalPro
                 <dt>Thrust direction</dt>
                 <dd>{m.dirLong}</dd>
                 <dt>Out of plane</dt>
-                <dd>{m.beta}°</dd>
+                <dd>{m.beta}</dd>
                 <dt>Burn duration</dt>
                 <dd>{m.burn}</dd>
                 <dt>Propellant</dt>

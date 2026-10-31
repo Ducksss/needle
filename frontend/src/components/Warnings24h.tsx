@@ -12,7 +12,7 @@ export function Warnings24h({ w, onPick }: { w: WarningsView; onPick: (id: numbe
       <div className="w24-head">
         <h2>Next 24 h</h2>
         <span className="meta">
-          closest approach within the next 24 h <span className="nowrap">(time_to_tca ≤ 1 day)</span>
+          passes due in the next 24 h <span className="nowrap">(closest approach within 1 day)</span>
         </span>
         <span className="meta">
           <span className="mono nowrap">{w.window}</span> · <span className="nowrap">simulated calendar</span>
@@ -53,7 +53,7 @@ export function Warnings24h({ w, onPick }: { w: WarningsView; onPick: (id: numbe
                 </span>
               </span>
               <span className="w24-line">
-                <span className="mono w24-sub">
+                <span className="mono w24-sub w24-nums">
                   <span style={{ color: missColor(r.missM), fontWeight: r.missM < 1000 ? 600 : undefined }}>{r.miss}</span> · Pc{' '}
                   <span style={{ color: r.pcColor }} title={r.pcTitle}>
                     {r.pc}

@@ -101,7 +101,7 @@ describe('charts', () => {
     if (v.ws.kind !== 'event' || !v.ws.planner) throw new Error('expected a planner');
     const { wc } = v.ws.planner;
     expect(wc.ticks.map((t) => t.label).slice(0, 2)).toEqual(['+24 h', '+48 h']);
-    expect(wc.deadline.label).toMatch(/^deadline Day \d+ \d\d:\d\d$/);
+    expect(wc.deadline?.label).toMatch(/^deadline Day \d+ \d\d:\d\d$/);
     expect(v.ws.header.orbit).toMatch(/^\d+ km · \d+\.\d°$/);
     expect(v.ws.header.odds).toMatch(/^1 in /);
   });
@@ -176,7 +176,7 @@ describe('review fixes', () => {
     const e = ev(1, 300, [[0, -3.5, 400]], { coa: { '0': coa({ wait: [[0, 2], [6, 3], [12, 4], [18, 5], [24, null], [30, 9]] }) } });
     const data = { fleet: realData().fleet, replay: replayOf([e]), metrics: null };
     const v = buildView(data, { run: 0, tab: 'needs', sel: 1, opt: 'coa1', budget: 40, dec: NO_DECISIONS });
-    expect(v.ws.kind === 'event' && v.ws.planner?.wc.caption).toMatch(/One day later: over 80 mm\/s\./);
+    expect(v.ws.kind === 'event' && v.ws.planner?.wc.caption).toMatch(/One day from now: over 80 mm\/s\./);
   });
 
   it('keeps a Decide event without a plan in the Next decision bar', () => {

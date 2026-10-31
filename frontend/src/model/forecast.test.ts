@@ -4,7 +4,8 @@ import { binOf, forecastAt, forecastCard, forecastLine, inTen, pcBandOf, pctTxt,
 import { buildNext } from './header';
 import { buildQueue } from './queue';
 import { initialSelection, isKnown, stateAt } from './replay';
-import { DEFAULT_OPTION, NO_DECISIONS, runCtx, snapshot } from './run';
+import { NO_DECISIONS, runCtx, snapshot } from './run';
+import { DEFAULT_OPTION } from './options';
 import { buildView } from './view';
 
 describe('forecast lookup', () => {
@@ -40,7 +41,7 @@ describe('forecast lookup', () => {
     if (!isKnown(s)) throw new Error('unreported');
     const line = forecastLine(forecastAt(forecastOf(), e, s)!);
     expect([line.median, line.range, line.cover, line.pUnder1km, line.pCritical]).toEqual(['1.50 km', '900 m–2.70 km', '8 in 10', '15%', '30%']);
-    expect(line.tip[0]).toBe('8 in 10 similar events ended inside this band. Checked on forecasts for 2,529 held-out events: held 79.9% of the time.');
+    expect(line.tip[0]).toBe('8 in 10 similar events ended inside this band. Checked on forecasts for 2,529 past events kept out of training: held 79.9% of the time.');
     expect(line.tip[1]).toMatch(/; n = 100 similar events\.$/);
   });
 
@@ -65,7 +66,7 @@ describe('forecast lookup', () => {
     if (!isKnown(s)) throw new Error('unreported');
     const c = forecastCard(forecastAt(forecastOf(), e, s)!);
     const pos = (x: string) => Number(x.replace('%', ''));
-    expect(c.lead).toBe('Predicted from today’s message, 2d 12h before closest approach');
+    expect(c.lead).toBe('Predicted from the latest message, sent 2d 12h before closest approach');
     expect(pos(c.band.left)).toBeLessThan(pos(c.oneKm));
     expect(pos(c.now.left)).toBeGreaterThan(pos(c.oneKm));
     expect(c.risk).not.toBeNull();
@@ -74,8 +75,9 @@ describe('forecast lookup', () => {
     expect(c.pCriticalBasis).toBe('50 similar past events at this risk level');
     expect(c.pCriticalTip[1]).toMatch(/\(Pc ≥ 1e-4\)\.$/);
     expect(c.pred.label).toBe('likely final distance 1.50 km');
-    expect(c.band.label).toBe('8 out of 10 similar events ended between 900 m and 2.70 km');
-    expect(c.footnote).toMatch(/8 in 10 similar events ended inside this band\. Checked on forecasts for 2,529 held-out events: held 79\.9% of the time\./);
+    expect(c.footnote).toMatch(/Checked on forecasts for 2,529 past events kept out of training: the band held 79\.9% of the time\./);
+    expect(c.footnote).not.toMatch(/ended inside this band/);
+    expect(c.band.label).toBe('8 in 10 similar events ended between 900 m and 2.70 km');
   });
 
   it('formats ranges and shares', () => {
@@ -96,7 +98,8 @@ describe('forecast in the console', () => {
   it('fans the miss chart and puts the forecast card first for an open event', () => {
     const v = buildView(data, ui);
     if (v.ws.kind !== 'event') throw new Error('expected an event');
-    expect(v.ws.hist.fan?.label).toMatch(/^forecast · likely final /);
+    expect(v.ws.hist.fan?.label).toMatch(/^8 in 10 end /);
+    expect(v.ws.hist.fan?.median).toMatch(/^likely final distance /);
     expect(v.ws.forecast?.kind).toBe('open');
   });
 
@@ -104,7 +107,7 @@ describe('forecast in the console', () => {
     const v = buildView(data, { ...ui, run: 4, sel: 37 });
     if (v.ws.kind !== 'event' || v.ws.forecast?.kind !== 'open') throw new Error('expected an open forecast');
     expect(v.ws.header.pc).toBe('4.5e-4');
-    expect(v.ws.forecast.card.lead).toBe('Predicted from today’s message, 5d 22h before closest approach');
+    expect(v.ws.forecast.card.lead).toMatch(/^Predicted from the latest message, sent \dd \d\dh before closest approach$/);
     expect(v.ws.forecast.card.pCritical).toBe('20%');
     expect(v.ws.forecast.card.pCriticalBasis).toBe('20 similar past events at this risk level');
   });
@@ -127,7 +130,7 @@ describe('forecast in the console', () => {
     });
     expect(ps.length).toBeGreaterThan(5);
     expect(ps).toEqual([...ps].sort((a, b) => b - a));
-    expect(q.col).toBe('P(final Crit.)');
+    expect(q.col).toBe('Chance Critical');
   });
 });
 
@@ -146,12 +149,13 @@ describe('robust burn option', () => {
   it('lists the robust option first, by default, with its target', () => {
     const v = buildView(data, ui);
     if (v.ws.kind !== 'event' || !v.ws.planner) throw new Error('expected a planner');
-    expect(v.ws.planner.opts.rows.map((r) => [r.name, r.on])).toEqual([
-      ['Recommended (robust)', true],
-      ['Minimum Δv', false],
-      ['More margin', false],
+    expect(v.ws.planner.opts.rows.map((r) => [r.name, r.on, r.rec])).toEqual([
+      ['Robust', true, true],
+      ['Minimum Δv', false, false],
+      ['More margin', false, false],
     ]);
-    expect(v.ws.planner.opts.rows[0].dir).toBe('keeps ≥ 1 km at the pessimistic end, target 1.33 km');
+    expect(v.ws.planner.opts.rows[0].dir).toBe('stays over 1 km even if the miss shrinks like the worst 1 in 10 past events (aims for 1.33 km)');
+    expect(v.ws.planner.modal.optName).toBe('Robust (recommended)');
     expect(v.dock.lanes.flatMap((l) => l.marks).map((m) => m.text)).toEqual(['2.0 mm/s']);
     expect(buildNext(snapshot(runCtx(data.replay, 0, 10, NO_DECISIONS)), 10).text).toMatch(/Recommended burn: 2\.0 mm\/s \(robust\)\.$/);
   });

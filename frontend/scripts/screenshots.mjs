@@ -176,9 +176,9 @@ await page.getByRole('button', { name: /^Watch/ }).click();
 await page.locator('.qrow', { hasText: '#' + (process.env.NEEDLE_FORECAST_EVENT ?? '7678') }).click();
 await page.waitForTimeout(100);
 await shot(page, '13-forecast-watch-event.png', { fullPage: true, clip: await pageBox(page, ['section[aria-label="Workspace"]', 'section[aria-label="Queue"]']) });
-await page.locator('.fan-label').hover();
+await page.locator('.fan-keys .tw').first().hover();
 await page.waitForTimeout(150);
-await shot(page, '13b-forecast-hover.png', { fullPage: true, clip: await pageBox(page, ['.fan-wrap', '.fan-row', '.fan-label > .tt'], 14) });
+await shot(page, '13b-forecast-hover.png', { fullPage: true, clip: await pageBox(page, ['.fan-wrap', '.fan-keys', '.fan-keys .tw > .tt'], 14) });
 await page.close();
 
 // Time-lapse: frames about 0, 200 and 500 ms after a step, then during and after a long slider jump.
@@ -220,6 +220,38 @@ await page.emulateMedia({ reducedMotion: 'reduce' });
 await page.waitForTimeout(200);
 await shot(page, '12-globe-reduced-motion.png', { fullPage: true, clip: await pageBox(page, globe) });
 await page.close();
+
+// QA pass 2 cases: #7465 at run 14 (floor Pc, Watch), #6341 at run 12 and #8783 at run 23 ("Burn this window"
+// recommended once the planned burn times have passed, with its modal), #10384 at run 33 (options at the 1e-4 line).
+async function pickAnywhere(page, id) {
+  for (const tab of ['Decide', 'Watch', 'Passed']) {
+    await page.getByRole('button', { name: new RegExp('^' + tab) }).click();
+    const row = page.locator('.qrow', { hasText: '#' + id });
+    if (await row.count()) {
+      await row.first().click();
+      return;
+    }
+  }
+}
+for (const [id, run, name] of [
+  [7465, 13, '22-7465-run14.png'],
+  [6341, 11, '22b-6341-run12.png'],
+  [8783, 22, '22c-8783-run23.png'],
+  [10384, 32, '22e-10384-run33.png'],
+]) {
+  page = await open(1440, 1000);
+  await setRun(page, run);
+  await pickAnywhere(page, id);
+  await page.waitForTimeout(2800);
+  await page.mouse.move(5, 5);
+  await shot(page, name, { fullPage: true });
+  if (id === 8783) {
+    await page.getByRole('button', { name: 'Review and approve' }).click();
+    await page.waitForTimeout(300);
+    await shot(page, '22d-8783-run23-modal.png');
+  }
+  await page.close();
+}
 
 // Pc outlook on the Pc chart at Run 5: #6341 (Pc at or above 1e-4), its ceiling card, and a Watch event at the floor.
 page = await open(1440, 1000, 2);

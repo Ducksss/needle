@@ -10,10 +10,11 @@ import { Timeline } from './components/Timeline';
 import { Warnings24h } from './components/Warnings24h';
 import { Workspace } from './components/Workspace';
 import { loadConsoleData } from './data/source';
-import type { ConsoleData, OptionKey } from './data/types';
+import type { ConsoleData } from './data/types';
 import type { QueueTab } from './model/queue';
 import { initialSelection } from './model/replay';
-import { DEFAULT_OPTION, type Decisions, NO_DECISIONS } from './model/run';
+import { type Decisions, NO_DECISIONS } from './model/run';
+import { DEFAULT_OPTION, type PlanKey } from './model/options';
 import { type UiState, approve, buildView, defer, queueTabFor } from './model/view';
 
 const PLAY_MS = 1200;
@@ -39,7 +40,7 @@ type Action =
   | { type: 'play' }
   | { type: 'tab'; tab: QueueTab }
   | { type: 'pick'; id: number; tab?: QueueTab }
-  | { type: 'opt'; opt: OptionKey }
+  | { type: 'opt'; opt: PlanKey }
   | { type: 'modal'; open: boolean }
   | { type: 'decide'; dec: Decisions }
   | { type: 'budget'; budget: number };

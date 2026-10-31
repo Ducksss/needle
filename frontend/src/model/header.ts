@@ -1,8 +1,9 @@
 // Header KPIs and the Next decision strip.
 
 import { at, dh, pcWithOdds, sgn } from './format';
+import { OPTION_SHORT, meetsTargets, recommended } from './options';
 import { PLAN_CUTOFF_H, burnPassed, waitDv, windowIndex } from './replay';
-import { type NeedRow, type RunCtx, type Snapshot, isDeferredNow, orderedFeasible } from './run';
+import { type NeedRow, type RunCtx, type Snapshot, isDeferredNow } from './run';
 import { C } from './theme';
 
 export interface Kpi {
@@ -92,16 +93,20 @@ export function buildNext(snap: Snapshot, budget: number, sel: number | null = n
   const { e, plan } = urgent;
   const w0 = waitDv(plan.c, windowIndex(plan.c, plan.age));
   const nowTxt = w0 != null ? w0.toFixed(1) + ' mm/s' : 'over 80 mm/s';
-  // Recommend only an option whose burn time is still ahead.
-  const rec = orderedFeasible(plan.c.opts).find((o) => !burnPassed(e, plan, o));
+  // The same recommendation as the workspace: still ahead and meeting both targets; "Burn this window" once Robust has passed.
+  const rec = recommended(e, plan);
   // The budget sets the deadline; the robust burn may cost more for margin, so say so and give the minimum.
-  const minDv = plan.c.opts.find((o) => o.key === 'coa1' && o.feasible && !burnPassed(e, plan, o))?.dv;
-  const over = !rec || rec.dv <= budget ? '' : rec.key === 'coa4' && minDv != null && minDv < rec.dv ? ', over budget for margin; minimum Δv ' + minDv.toFixed(1) + ' mm/s' : ', over budget';
+  const minDv = plan.c.opts.find((o) => o.key === 'coa1' && o.feasible && !burnPassed(e, plan, o) && meetsTargets(o))?.dv;
+  const overBudget = rec != null && rec.dv > budget;
+  const over = !overBudget ? '' : rec.key === 'coa4' && minDv != null && minDv < rec.dv ? ', over budget for margin; minimum Δv ' + minDv.toFixed(1) + ' mm/s' : ', over budget';
   const burn = rec
-    ? 'Recommended burn: ' + rec.dv.toFixed(1) + ' mm/s (' + (rec.key === 'coa4' ? 'robust' : rec.key === 'coa1' ? 'minimum Δv' : rec.key === 'coa3' ? 'wait 24 h' : 'more margin') + over + ').'
+    ? 'Recommended burn: ' + rec.dv.toFixed(1) + ' mm/s (' + OPTION_SHORT[rec.key] + over + ').'
     : 'The planned burn times have passed; the current window needs ' + nowTxt + '. Re-plan at the next message.';
+  // Never "to stay inside the budget" beside a recommendation that is over it.
   const tail = plan.overNow
     ? 'Already above the ' + budget + ' mm/s budget: decide now or accept a larger burn.'
-    : 'Decide within ' + dh(plan.left) + ' (by ' + at(plan.dlAbs) + ') to stay inside the ' + budget + ' mm/s budget. ' + burn;
+    : overBudget
+      ? 'Decide by ' + at(plan.dlAbs) + ' (in ' + dh(plan.left) + '); after that even the cheapest burn needs more than the ' + budget + ' mm/s budget. ' + burn
+      : 'Decide within ' + dh(plan.left) + ' (by ' + at(plan.dlAbs) + ') to stay inside the ' + budget + ' mm/s budget. ' + burn;
   return { tone: 'decide', label: 'Next decision', text: head(urgent) + tail, eventId: e.id, showing: sel === e.id };
 }

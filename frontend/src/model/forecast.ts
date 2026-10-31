@@ -86,12 +86,20 @@ export const pctTxt = (p: number) => (p < 0.01 ? 'under 1%' : Math.round(p * 100
 
 export const NOT_ENOUGH = 'not enough history';
 
+/** One name for the forecast chance of ending in the brief's Critical tier, used on the card, ring, legend and queue. */
+export const CRIT_NAME = 'Chance it ends Critical';
+/** The Critical rule in plain words, for the hover cards. */
+export const CRIT_RULE = 'Critical means Pc at least 1e-4 or miss under 1 km at closest approach.';
+
 /** The Pc-conditioned chance of ending Critical, or "not enough history". */
 export const pCriticalTxt = (fc: MissForecast) => (fc.pCritical == null ? NOT_ENOUGH : pctTxt(fc.pCritical));
 
-/** How the miss band was checked: "8 in 10 similar events ended inside this band. Checked on forecasts for 2,529 held-out events: held 79.9% of the time." */
-export const bandCheckTxt = (fc: MissForecast) =>
-  inTen(fc.coverage) + ' similar events ended inside this band. Checked on forecasts for ' + fc.heldOut.toLocaleString('en-US') + ' held-out events: held ' + (fc.coverage * 100).toFixed(1) + '% of the time.';
+/** How the miss band was checked: "Checked on forecasts for 2,529 past events kept out of training: held 79.9% of the time." */
+export const bandHeldTxt = (fc: MissForecast) =>
+  'Checked on forecasts for ' + fc.heldOut.toLocaleString('en-US') + ' past events kept out of training: held ' + (fc.coverage * 100).toFixed(1) + '% of the time.';
+
+/** The band and its check: "8 in 10 similar events ended inside this band. Checked on …". */
+export const bandCheckTxt = (fc: MissForecast) => inTen(fc.coverage) + ' similar events ended inside this band. ' + bandHeldTxt(fc);
 
 export interface ForecastLine {
   median: string;
@@ -138,11 +146,12 @@ export function rangeAxis(values: number[]): RangeAxis {
 }
 
 export interface ForecastCard {
-  /** "Predicted from today's message, 5d 22h before closest approach". */
+  /** "Predicted from the latest message, sent 5d 22h before closest approach". */
   lead: string;
   ticks: { left: string; label: string }[];
-  now: { left: string; label: string };
-  pred: { left: string; label: string };
+  /** align keeps each label inside the card: it starts at the marker near the left end and ends at it near the right. */
+  now: { left: string; label: string; align: 'start' | 'end' };
+  pred: { left: string; label: string; align: 'start' | 'center' | 'end' };
   band: { left: string; width: string; label: string };
   /** The part of the band below 1 km, tinted in the risk colour. */
   risk: { left: string; width: string } | null;
@@ -177,18 +186,17 @@ export const chanceColor = (p: number | null) => (p == null ? C.muted : p >= 0.5
 
 const pct = (x: number) => (x * 100).toFixed(2) + '%';
 
-/** toTcaH: hours from now to closest approach, as the workspace header shows it. */
-export function forecastCard(fc: MissForecast, toTcaH = fc.leadDays * 24): ForecastCard {
+export function forecastCard(fc: MissForecast): ForecastCard {
   const ax = rangeAxis([fc.missM, fc.q10M, fc.q50M, fc.q90M]);
   const a = ax.at(fc.q10M);
   const b = ax.at(fc.q90M);
   const k = ax.at(1000);
   return {
-    lead: 'Predicted from today’s message, ' + dh(toTcaH) + ' before closest approach',
+    lead: 'Predicted from the latest message, sent ' + dh(fc.leadDays * 24) + ' before closest approach',
     ticks: ax.ticks.map((t) => ({ left: pct(t.pos), label: t.label })),
-    now: { left: pct(ax.at(fc.missM)), label: 'now ' + kmTxt(fc.missM) },
-    pred: { left: pct(ax.at(fc.q50M)), label: 'likely final distance ' + kmTxt(fc.q50M) },
-    band: { left: pct(a), width: pct(Math.max(0.004, b - a)), label: inTen(fc.coverage).replace(' in ', ' out of ') + ' similar events ended ' + betweenTxt(fc.q10M, fc.q90M) },
+    now: { left: pct(ax.at(fc.missM)), label: 'now ' + kmTxt(fc.missM), align: ax.at(fc.missM) > 0.75 ? 'end' : 'start' },
+    pred: { left: pct(ax.at(fc.q50M)), label: 'likely final distance ' + kmTxt(fc.q50M), align: ax.at(fc.q50M) < 0.3 ? 'start' : ax.at(fc.q50M) > 0.7 ? 'end' : 'center' },
+    band: { left: pct(a), width: pct(Math.max(0.004, b - a)), label: inTen(fc.coverage) + ' similar events ended ' + betweenTxt(fc.q10M, fc.q90M) },
     risk: fc.q10M < 1000 ? { left: pct(a), width: pct(Math.max(0.004, Math.min(b, k) - a)) } : null,
     oneKm: pct(k),
     pUnder1km: pctTxt(fc.cell.pUnder1km),
@@ -198,13 +206,11 @@ export function forecastCard(fc: MissForecast, toTcaH = fc.leadDays * 24): Forec
     pCriticalMissing: fc.pCritical == null,
     pUnder1kmColor: chanceColor(fc.cell.pUnder1km),
     pCriticalColor: chanceColor(fc.pCritical),
-    pUnder1kmTip: ['Technical: share of past events at the same lead time and miss distance whose final miss was under 1 km, the brief’s dangerous distance.'],
-    pCriticalTip: [
-      'Technical: chance the event ends Critical, the brief’s top tier (final Pc at least 1e-4 or miss under 1 km), when a burn is considered.',
-      'From past events at the same lead time and distance that also shared today’s Pc band (' + PC_BAND_TXT[fc.pcBand] + ').',
-    ],
+    pUnder1kmTip: ['Share of similar past events whose miss at closest approach was under 1 km, the brief’s dangerous distance.', 'From past events at the same lead time and miss distance.'],
+    pCriticalTip: [CRIT_RULE, 'From past events at the same lead time and distance that also shared today’s Pc band (' + PC_BAND_TXT[fc.pcBand] + ').'],
     footnote:
-      'Based on how similar past events moved from the same point. ' + bandCheckTxt(fc) + ' The brief scores predictions made 2 or more days out; Needle updates this at every message.',
+      // The band sentence is the key beside the bar, so the footnote gives only how it was checked.
+      'Based on how similar past events moved from the same point. ' + bandHeldTxt(fc).replace(': held ', ': the band held ') + ' The brief scores predictions made 2 or more days out; Needle updates this at every message.',
   };
 }
 
@@ -266,6 +272,15 @@ export interface PcOutlookText {
 
 export const PC_NOTE = 'Collision risk rarely goes up from here. It usually stays the same or drops as better tracking arrives.';
 
+/** The note under the Pc chart, matched to the drawn outlook: where the worst-likely line rises, it says so. */
+export function pcNoteFor(po: PcOutlook): string {
+  const d = po.cell.ceilingDelta;
+  if (po.pcBin === 0 || d == null) return 'A negligible risk rarely comes back as tracking improves.';
+  if (d > 0) return 'The risk may still rise a little before closest approach, up to the worst-likely line. Many events drop instead as better tracking arrives.';
+  if (d < 0) return 'Collision risk rarely goes up from here. It usually drops as better tracking arrives.';
+  return PC_NOTE;
+}
+
 /** Plain labels for the Pc outlook, with probabilities as odds. */
 export function pcOutlookText(po: PcOutlook): PcOutlookText {
   const c = po.cell;
@@ -280,9 +295,9 @@ export function pcOutlookText(po: PcOutlook): PcOutlookText {
       tip: [
         '9 in 10 similar events ended at or below this.' +
           (po.ceilingHeld != null && po.ceilingSamples != null
-            ? ' Checked on ' + po.ceilingSamples.toLocaleString('en-US') + ' forecasts for held-out events: held ' + (po.ceilingHeld * 100).toFixed(1) + '% of the time.'
+            ? ' Checked on ' + po.ceilingSamples.toLocaleString('en-US') + ' forecasts for past events kept out of training: held ' + (po.ceilingHeld * 100).toFixed(1) + '% of the time.'
             : ''),
-        'Technical: Pc ceiling ' + pcTxt(top) + ', today’s Pc ' + pcTxt(po.risk) + (c.ceilingDelta < 0 ? ' lowered' : ' raised') + ' by ' + Math.abs(c.ceilingDelta).toFixed(2) + ' orders of magnitude (ceilingDelta).',
+        'Technical: Pc ceiling ' + pcTxt(top) + ', today’s Pc ' + pcTxt(po.risk) + (c.ceilingDelta < 0 ? ' lowered' : ' raised') + ' by ' + Math.abs(c.ceilingDelta).toFixed(2) + ' orders of magnitude.',
       ],
     });
     keys.push({
@@ -309,7 +324,7 @@ export function pcOutlookText(po: PcOutlook): PcOutlookText {
   }
   return {
     keys,
-    note: PC_NOTE,
+    note: pcNoteFor(po),
     noteTip: [
       'Technical: from ' + n + ' past events with Pc ' + PC_BIN_TXT[po.pcBin] + ', ' + (c.pooledOverLead ? 'pooled over all lead times.' : po.leadTxt + ' before closest approach.'),
       pctTxt(c.pFloor) + ' ended too small to compute, ' + pctTxt(c.pBelow1e6) + ' below 1e-6 and ' + pctTxt(c.pAtLeast1e4) + ' at or above 1e-4.',

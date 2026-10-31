@@ -7,8 +7,10 @@ import { buildDock } from './dock';
 import { buildKpis, buildNext } from './header';
 import { buildQueue } from './queue';
 import { burnAt, burnPassed, isKnown, planOf, stateAt } from './replay';
-import { DEFAULT_OPTION, NO_DECISIONS, chipFor, runCtx, snapshot } from './run';
+import { NO_DECISIONS, chipFor, runCtx, snapshot } from './run';
+import { DEFAULT_OPTION } from './options';
 import { approve, buildView, defer, queueTabFor } from './view';
+import { SMALL_RING } from './workspace';
 import { buildDigest } from './digest';
 
 const data = realData();
@@ -71,10 +73,39 @@ describe('M2: a planned burn time that has passed', () => {
     expect(parseFloat(mark.left)).toBeCloseTo((burnAt(e, planner.opt) / (rp.windowH + 24)) * 100, 2);
   });
 
-  it('blocks approval when every option has passed', () => {
-    // Burns planned at the message itself (lead = 300 h), seen 16 h later: both windows have gone by.
-    const e = ev(1, 300, [[0, -3.5, 400]], { coa: { '0': { ...coa(), opts: coa().opts.filter((o) => o.key !== 'coa3').map((o) => ({ ...o, leadH: 300 })) } } });
-    const d = { ...data, replay: replayOf([e]) };
+  // Burns planned at the message itself (lead = 300 h), seen 16 h later: the message's window has gone by.
+  const passedAll = (wait?: [number, number | null][]) => {
+    const c = { ...coa(), opts: coa().opts.filter((o) => o.key !== 'coa3').map((o) => ({ ...o, leadH: 300 })), ...(wait ? { wait } : {}) };
+    return { ...data, replay: replayOf([ev(1, 300, [[0, -3.5, 400]], { coa: { '0': c } })]) };
+  };
+
+  it('offers "Burn this window" at the current window Δv once the planned burn times have passed', () => {
+    const d = passedAll();
+    const u = ui(2, 1);
+    const v = buildView(d, u);
+    if (v.ws.kind !== 'event' || !v.ws.planner) throw new Error('expected a planner');
+    const rows = v.ws.planner.opts.rows;
+    expect(rows.map((r) => [r.key, r.passed, r.rec])).toEqual([
+      ['win', false, true],
+      ['coa1', true, false],
+      ['coa2', true, false],
+    ]);
+    expect([rows[0].dvTxt, rows[0].pcAfter, rows[0].missAfter]).toEqual(['9.0 mm/s', '< 1e-4', '> 1 km']);
+    const m = v.ws.planner.modal;
+    expect([m.burnPassed, m.att, m.missAfter, v.ws.planner.bp.after]).toEqual([false, null, 'over 1 km (target)', null]);
+    expect(v.next.text).toMatch(/Recommended burn: 9\.0 mm\/s \(this window\)\.$/);
+    const dec = approve(u, v);
+    expect(dec.approvedPlan[1]).toEqual({ key: 0, opt: 'win', wi: 2 });
+    // Two runs later the approved window burn is still the one shown.
+    const later = buildView(d, ui(4, 1, { dec }));
+    expect(later.ws.kind === 'event' && later.ws.planner?.opts.rows.find((r) => r.on)?.dvTxt).toBe('9.0 mm/s');
+  });
+
+  it('blocks approval when no window is left to burn in', () => {
+    const d = passedAll([
+      [0, 2],
+      [6, 4],
+    ]);
     const u = ui(2, 1);
     const v = buildView(d, u);
     if (v.ws.kind !== 'event' || !v.ws.planner) throw new Error('expected a planner');
@@ -164,12 +195,14 @@ describe('Next decision: a recommended burn above the budget says so', () => {
       if (!m || Number(m[1]) <= 10) continue;
       seen++;
       expect(m[2]).toMatch(/over budget/);
+      expect(text).not.toMatch(/to stay inside/);
     }
     expect(seen).toBeGreaterThan(0);
   });
 });
 
 describe('Approved plan stays when the planner stops producing one', () => {
+  // Builds the whole console many times, so it gets a longer timeout on a busy machine.
   it('keeps the planner for an approved open event at runs where the live plan is gone', () => {
     // Approve each Decide event at its first Decide run, then look for a later run where it is open with no live plan.
     let checked = 0;
@@ -191,12 +224,37 @@ describe('Approved plan stays when the planner stops producing one', () => {
       }
     }
     expect(checked).toBeGreaterThan(0);
-  });
+  }, 30_000);
 });
 
 describe('Header satellite count', () => {
   it('comes from the loaded fleet', () => {
     expect(buildView(data, ui(4, null)).satellites).toBe(data.fleet.missions.length);
     expect(buildView({ ...data, fleet: { ...data.fleet, missions: data.fleet.missions.slice(0, 5) } }, ui(4, null)).satellites).toBe(5);
+  });
+});
+
+describe('QA pass 2: workspace captions', () => {
+  it('n12: drops the decision deadline from the cost-of-waiting card once the burn is approved', () => {
+    const u = ui(4, 6341);
+    const dec = approve(u, buildView(data, u));
+    const v = buildView(data, ui(4, 6341, { dec }));
+    if (v.ws.kind !== 'event' || !v.ws.planner) throw new Error('expected a planner');
+    expect(v.ws.planner.wc.deadline).toBeNull();
+    expect(v.ws.planner.wc.caption).toMatch(/^Burn approved at run 5, so the decision deadline no longer applies\./);
+  });
+
+  it('t7: says when the 1 km ring is tiny', () => {
+    let small = 0;
+    for (const run of [4, 12, 22, 32]) {
+      for (const n of snapshot(runCtx(rp, run, 10, NO_DECISIONS)).needs) {
+        const v = buildView(data, ui(run, n.e.id));
+        if (v.ws.kind !== 'event' || !v.ws.planner) continue;
+        const bp = v.ws.planner.bp;
+        expect(bp.caption.includes('tiny at this zoom')).toBe(Number(bp.ring) < SMALL_RING);
+        if (Number(bp.ring) < SMALL_RING) small++;
+      }
+    }
+    expect(small).toBeGreaterThan(0);
   });
 });

@@ -1,10 +1,11 @@
 // Workspace for the selected event: header, message history, and either the burn planner or the messages table.
 
-import type { CoaOption, Forecast, Mission, OptionKey, ReplayEvent } from '../data/types';
+import type { Forecast, Mission, ReplayEvent } from '../data/types';
 import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, sci } from './format';
 import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, PLAN_CUTOFF_H, TIER_TIP, bucketOf, burnAt, burnPassed, isKnown, planAt, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
-import { type ForecastCard, type MissForecast, type PcOutlook, type PcOutlookKey, PC_NOTE, forecastAt, forecastCard, forecastLine, pcForecastAt, pcOutlookText, rangeTxt } from './forecast';
-import { type Chip, type RunCtx, OPTION_NAMES, approvedAt, chipFor, isDeferredNow, orderedFeasible } from './run';
+import { type ForecastCard, type MissForecast, type PcOutlook, type PcOutlookKey, PC_NOTE, forecastAt, forecastCard, forecastLine, inTen, kmTxt, pcForecastAt, pcOutlookText, rangeTxt } from './forecast';
+import { type Chip, type RunCtx, approvedAt, chipFor, isDeferredNow } from './run';
+import { type OptChoice, type PlanKey, type PlanOption, type WindowOption, OPTION_NAMES, approvedOption, isWindow, meetsTargets, pickOption, planOptions, recommended } from './options';
 import { TONE, type Tone, missColor, pcColor } from './theme';
 
 export interface EventHeader {
@@ -40,10 +41,15 @@ export interface RtnView {
 /** Forecast fan on the miss chart, from the now line to closest approach. */
 export interface FanView {
   cone: string;
-  median: string;
+  medianPath: string;
   /** y of the 1 km line: the cone below it is tinted. */
   clipY: string;
+  /** "8 in 10 end 231 m–2.08 km": the cone. */
   label: string;
+  /** "likely final distance 378 m": the dashed median line, as on the forecast card. */
+  median: string;
+  /** The cone reaches below 1 km, so the tinted part needs its key. */
+  under1km: boolean;
   tip: string[];
 }
 
@@ -62,6 +68,8 @@ export interface HistoryView {
   /** Relative position against time to TCA; null until replay.json carries r, t, n. */
   rtn: RtnView | null;
   fan: FanView | null;
+  /** Closest approach has passed: the current-time line sits at it and is labelled so. */
+  passed: boolean;
   /** Pc outlook right of the now line; null for passed events or without pcForecast. */
   pcFc: PcFanView | null;
   /** The note under the Pc chart, with the sample behind the outlook; null for a passed event when pcForecast exists. */
@@ -74,8 +82,8 @@ export interface PcFanView {
   ceiling: string | null;
   /** Soft grey wedge from the now point down to the chart floor at closest approach; at the floor, a band along it. */
   fade: string;
-  /** Ring at closest approach on the 1e-4 line, filled to the chance of ending at or above 1e-4. */
-  ring: { cx: number; cy: number; r: number; wedge: string };
+  /** Ring at closest approach on the 1e-4 line, filled to the chance of ending at or above 1e-4; drawn only when its key is (1% and up). */
+  ring: { cx: number; cy: number; r: number; wedge: string } | null;
   keys: PcOutlookKey[];
 }
 
@@ -114,8 +122,8 @@ export interface CostOfWaitingView {
   over: string;
   /** Every 24 h after the planning message. */
   ticks: AxisTick[];
-  /** Decision deadline line and its label. */
-  deadline: { x: string; label: string; anchor: 'start' | 'end'; tx: string };
+  /** Decision deadline line and its label; null once a burn is approved, when the deadline no longer applies. */
+  deadline: { x: string; label: string; anchor: 'start' | 'end'; tx: string } | null;
   budgetY: string;
   budgetPct: string;
   topTxt: string;
@@ -144,16 +152,19 @@ export interface EncounterPlaneView {
   hbr: string;
   bx: string;
   by: string;
-  ax: string;
-  ay: string;
-  sigTxt: string;
+  /** The after point; null for "Burn this window", whose burn vector is not computed. */
+  after: { x: string; y: string } | null;
+  /** Caption under the plot, in plain words. */
+  caption: string;
   /** Scale bar in the bottom-left corner: a round length near a quarter of the plot width. */
   scale: { len: string; label: string };
   labels: PlaneLabel[];
 }
 
 export interface OptionRow {
-  key: OptionKey;
+  key: PlanKey;
+  /** The option the console recommends: still ahead and meets both targets. */
+  rec: boolean;
   name: string;
   dir: string;
   dvTxt: string;
@@ -201,7 +212,8 @@ export interface ModalView {
   when: string;
   dv: string;
   dirLong: string;
-  beta: number;
+  /** Out-of-plane angle; null when the burn vector is not computed. */
+  beta: string;
   burn: string;
   prop: string;
   dA: string;
@@ -218,13 +230,14 @@ export interface ModalView {
   approveLabel: string;
   /** The planned burn time has gone by: approval is blocked. */
   burnPassed: boolean;
-  att: Attitude;
+  /** Thruster attitude; null for "Burn this window", whose direction is not computed. */
+  att: Attitude | null;
   checks: GateCheck[];
 }
 
 export interface PlannerView {
   plan: Plan;
-  opt: CoaOption;
+  opt: PlanOption;
   wc: CostOfWaitingView;
   bp: EncounterPlaneView;
   opts: OptionsView;
@@ -286,7 +299,9 @@ export function buildPcFan(po: PcOutlook, nowX: number, yPc: (r: number) => numb
     fade = 'M' + x0 + ',' + (FLOOR_Y - 3) + 'L316,' + (FLOOR_Y - 3) + 'L316,' + FLOOR_Y + 'L' + x0 + ',' + FLOOR_Y + 'Z';
   }
   const cy = yPc(PC_ACTION);
-  return { ceiling, fade, ring: { cx: 315, cy, r: 3.5, wedge: wedgePath(315, cy, 3.5, po.cell.pAtLeast1e4) }, keys: pcOutlookText(po).keys };
+  const keys = pcOutlookText(po).keys;
+  const ring = keys.some((k) => k.kind === 'ring') ? { cx: 315, cy, r: 3.5, wedge: wedgePath(315, cy, 3.5, po.cell.pAtLeast1e4) } : null;
+  return { ceiling, fade, ring, keys };
 }
 
 export function buildHistory(e: ReplayEvent, s: KnownState, T: number, fc: MissForecast | null = null, po: PcOutlook | null = null, pcForecastOn = false): HistoryView {
@@ -311,18 +326,21 @@ export function buildHistory(e: ReplayEvent, s: KnownState, T: number, fc: MissF
     const top = yMs(fc.q90M);
     fan = {
       cone: 'M' + x0.toFixed(1) + ',' + y0.toFixed(1) + 'L316,' + top.toFixed(1) + 'L316,' + yMs(fc.q10M).toFixed(1) + 'Z',
-      median: 'M' + x0.toFixed(1) + ',' + y0.toFixed(1) + 'L316,' + yMs(fc.q50M).toFixed(1),
+      medianPath: 'M' + x0.toFixed(1) + ',' + y0.toFixed(1) + 'L316,' + yMs(fc.q50M).toFixed(1),
       clipY: yMs(1000).toFixed(1),
-      label: 'forecast · likely final ' + rangeTxt(fc.q10M, fc.q90M),
+      label: inTen(fc.coverage) + ' end ' + rangeTxt(fc.q10M, fc.q90M),
+      median: 'likely final distance ' + kmTxt(fc.q50M),
+      under1km: fc.q10M < 1000,
       tip: forecastLine(fc).tip,
     };
   }
   const nowX = xp(Math.max(0, e.tca - T));
   return {
     fan,
+    passed: s.phase === 'resolved',
     pcFc: po ? buildPcFan(po, nowX, yPc) : null,
     // With pcForecast the note explains the outlook, so a passed event, which has none, gets no note.
-    pcNote: pcForecastOn ? (po ? { text: PC_NOTE, tip: pcOutlookText(po).noteTip } : null) : { text: PC_NOTE_OLD, tip: null },
+    pcNote: pcForecastOn ? (po ? { text: pcOutlookText(po).note, tip: pcOutlookText(po).noteTip } : null) : { text: PC_NOTE_OLD, tip: null },
     rtn: buildRtn(e, s, xp),
     pcPts: pcP.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '),
     pcDots: pcP.filter((p) => p[2] < PC_ACTION).map((p) => dotPath(p[0], p[1], 2.2)).join(''),
@@ -458,7 +476,8 @@ function buildOther(ctx: RunCtx, e: ReplayEvent, s: KnownState): { other: OtherV
   return { other, msgRows };
 }
 
-function buildCostOfWaiting(ctx: RunCtx, plan: Plan, facts: WorkspaceFacts): CostOfWaitingView {
+/** approvedRun: the run of an approved burn, when the deadline no longer applies. */
+function buildCostOfWaiting(ctx: RunCtx, plan: Plan, facts: WorkspaceFacts, approvedRun: number | null = null): CostOfWaitingView {
   const budget = ctx.budget;
   const w = plan.c.wait;
   const H = w.length ? w[w.length - 1][0] + 6 : 6;
@@ -481,6 +500,7 @@ function buildCostOfWaiting(ctx: RunCtx, plan: Plan, facts: WorkspaceFacts): Cos
   const wNow = waitDv(plan.c, wi);
   const later = plan.c.wait[wi + 4];
   const nowTxt = wNow != null ? wNow.toFixed(1) : 'over 80';
+  // Measured from now, not from the planning message as the "Wait 24 h" option is; the caption says so.
   // A missing window is past TCA − 3 h; a null Δv means the window needs over 80 mm/s.
   const dayLater = !later
     ? 'not possible before closest approach'
@@ -491,7 +511,8 @@ function buildCostOfWaiting(ctx: RunCtx, plan: Plan, facts: WorkspaceFacts): Cos
   for (let h = 24; h < H - 4; h += 24) ticks.push({ x: X(h).toFixed(1), label: '+' + h + ' h' });
   const dlX = X(dlRel);
   const right = dlX > 200;
-  const deadline = { x: dlX.toFixed(1), label: 'deadline ' + at(plan.dlAbs), anchor: right ? ('end' as const) : ('start' as const), tx: (right ? dlX - 4 : dlX + 4).toFixed(1) };
+  const deadline =
+    approvedRun != null ? null : { x: dlX.toFixed(1), label: 'deadline ' + at(plan.dlAbs), anchor: right ? ('end' as const) : ('start' as const), tx: (right ? dlX - 4 : dlX + 4).toFixed(1) };
   const median = facts.medianWaitRatio24h != null ? ' Across all escalations, waiting 24 h costs a median ' + facts.medianWaitRatio24h.toFixed(2) + '× the Δv.' : '';
   return {
     path,
@@ -503,44 +524,59 @@ function buildCostOfWaiting(ctx: RunCtx, plan: Plan, facts: WorkspaceFacts): Cos
     topTxt: String(yTop),
     nowX: X(plan.age).toFixed(1),
     dlX: X(dlRel).toFixed(1),
-    dlW: Math.max(0, X(H) - X(dlRel)).toFixed(1),
-    caption: plan.overNow
-      ? 'Past the ' + budget + ' mm/s deadline since ' + at(plan.dlAbs) + '. The current window needs ' + (wNow != null ? wNow.toFixed(1) + ' mm/s.' : 'over 80 mm/s.')
-      : 'Burn in the current window: ' + nowTxt + ' mm/s. One day later: ' + dayLater + '. Budget holds until ' + at(plan.dlAbs) + ', in ' + dh(plan.left) + '.',
-    note: 'Best burn time inside each window (orbital phase matters). Shaded: past the decision deadline.' + median,
+    dlW: approvedRun != null ? '0' : Math.max(0, X(H) - X(dlRel)).toFixed(1),
+    caption:
+      approvedRun != null
+        ? 'Burn approved at run ' + approvedRun + ', so the decision deadline no longer applies. The current window needs ' + nowTxt + ' mm/s.'
+        : plan.overNow
+          ? 'Past the ' + budget + ' mm/s deadline since ' + at(plan.dlAbs) + '. The current window needs ' + (wNow != null ? wNow.toFixed(1) + ' mm/s.' : 'over 80 mm/s.')
+          : 'Burn in the current window: ' + nowTxt + ' mm/s. One day from now: ' + dayLater + '. Budget holds until ' + at(plan.dlAbs) + ', in ' + dh(plan.left) + '.',
+    note: 'Best burn time inside each window (orbital phase matters).' + (approvedRun != null ? '' : ' Shaded: past the decision deadline.') + median,
   };
 }
 
-function buildEncounterPlane(plan: Plan, opt: CoaOption): EncounterPlaneView {
+function buildEncounterPlane(plan: Plan, opt: PlanOption): EncounterPlaneView {
   const cev = plan.c;
   const m0 = cev.m2;
-  const m1 = opt.m2After;
-  const fit = Math.max(Math.hypot(m0[0], m0[1]), Math.hypot(m1[0], m1[1]), 2.2 * cev.ell.a, 1300) * 1.12;
+  // "Burn this window" has no burn vector, so there is no after point to draw.
+  const m1 = isWindow(opt) ? null : opt.m2After;
+  const fit = Math.max(Math.hypot(m0[0], m0[1]), m1 ? Math.hypot(m1[0], m1[1]) : 0, 2.2 * cev.ell.a, 1300) * 1.12;
   const sc = 140 / fit;
   const P2 = (v: [number, number]) => [150 + v[1] * sc, 150 - v[0] * sc] as const;
   const b0 = P2(m0);
-  const a1 = P2(m1);
+  const a1 = m1 ? P2(m1) : null;
   const len = scaleBarM(75 / sc);
+  const ring = 1000 * sc;
+  // Labels sit beside their point, on the side toward the centre so they stay inside the plot, and above or below it
+  // as the edge allows.
+  const label = (x: number, y: number, up: boolean, tone: Tone, text: string): PlaneLabel => {
+    const above = up ? y > 26 : y > 274;
+    return { left: (x / 3).toFixed(2) + '%', top: (y / 3).toFixed(2) + '%', transform: (x > 150 ? 'translate(calc(-100% - 8px), ' : 'translate(8px, ') + (above ? '-130%)' : '30%)'), tone, text };
+  };
+  const labels = [label(b0[0], b0[1], true, TONE.decide, 'now ' + mTxt(cev.miss))];
+  if (a1 && !isWindow(opt)) labels.push(label(a1[0], a1[1], false, TONE.deferred, 'after ' + mTxt(opt.missAfter)));
   return {
     rx1: Math.max(1.5, cev.ell.a * sc).toFixed(1),
     ry1: Math.max(1.5, cev.ell.b * sc).toFixed(1),
     rx3: Math.max(3, 3 * cev.ell.a * sc).toFixed(1),
     ry3: Math.max(3, 3 * cev.ell.b * sc).toFixed(1),
     rot: (cev.ell.deg - 90).toFixed(1),
-    ring: (1000 * sc).toFixed(1),
+    ring: ring.toFixed(1),
     hbr: Math.max(2.5, cev.hbrEff * sc).toFixed(1),
     bx: b0[0].toFixed(1),
     by: b0[1].toFixed(1),
-    ax: a1[0].toFixed(1),
-    ay: a1[1].toFixed(1),
-    sigTxt: mTxt(cev.ell.a) + ' × ' + mTxt(cev.ell.b),
+    after: a1 ? { x: a1[0].toFixed(1), y: a1[1].toFixed(1) } : null,
     scale: { len: (len * sc).toFixed(1), label: len >= 1000 ? len / 1000 + ' km' : len + ' m' },
-    labels: [
-      { left: (b0[0] / 3).toFixed(2) + '%', top: (b0[1] / 3).toFixed(2) + '%', transform: 'translate(8px, -130%)', tone: TONE.decide, text: 'now ' + mTxt(cev.miss) },
-      { left: (a1[0] / 3).toFixed(2) + '%', top: (a1[1] / 3).toFixed(2) + '%', transform: 'translate(8px, 30%)', tone: TONE.deferred, text: 'after ' + mTxt(opt.missAfter) },
-    ],
+    labels,
+    caption:
+      'Shaded: where the object likely passes, inner band 1σ and outer 3σ (σ is one standard deviation of the position uncertainty, ' +
+      mTxt(cev.ell.a) + ' × ' + mTxt(cev.ell.b) + '). Dashed ring: 1 km' + (ring < SMALL_RING ? ', tiny at this zoom' : '') + '.' +
+      (isWindow(opt) ? ' No after point: the burn vector for this window is not computed.' : ''),
   };
 }
+
+/** Below this radius (plot units of 300) the 1 km ring hides under the point labels, so the caption says it is tiny. */
+export const SMALL_RING = 20;
 
 /** Scale-bar lengths, m. */
 export const SCALE_STEPS = [250, 500, 1000, 2000, 5000];
@@ -567,7 +603,7 @@ export function buildAttitude(alpha: number): Attitude {
   };
 }
 
-export function buildGateChecks(e: ReplayEvent, plan: Plan, opt: CoaOption, budget: number): GateCheck[] {
+export function buildGateChecks(e: ReplayEvent, plan: Plan, opt: PlanOption, budget: number): GateCheck[] {
   const cev = plan.c;
   const wNow = waitDv(cev, windowIndex(cev, plan.age));
   const T = plan.msgT + plan.age;
@@ -584,9 +620,10 @@ export function buildGateChecks(e: ReplayEvent, plan: Plan, opt: CoaOption, budg
     : inNow && wNow != null && opt.dv + 0.05 < wNow
       ? { ok: false, title: 'Δv below what the current window needs.', detail: opt.dv.toFixed(1) + ' mm/s planned; the current window needs ' + nowTxt + '.' }
       : { ok: true, title: 'Plan computed ' + Math.round(plan.age) + ' h ago.', detail: inNow ? 'Burn falls in the current window (' + nowTxt + ').' : 'Burn in ' + dh(burnAt(e, opt) - T) + '.' };
+  const target = 'Target of this window’s Δv; the after value is not computed here.';
   return [
-    { ok: opt.pcAfter < 1e-4, title: 'Pc after burn below 1e-4.', detail: sci(opt.pcAfter) + '.' },
-    { ok: opt.missAfter > 1000, title: 'Miss after burn above 1 km.', detail: mTxt(opt.missAfter) + '.' },
+    isWindow(opt) ? { ok: true, title: 'Pc after burn below 1e-4.', detail: target } : { ok: opt.pcAfter < 1e-4, title: 'Pc after burn below 1e-4.', detail: sci(opt.pcAfter) + '.' },
+    isWindow(opt) ? { ok: true, title: 'Miss after burn above 1 km.', detail: target } : { ok: opt.missAfter > 1000, title: 'Miss after burn above 1 km.', detail: mTxt(opt.missAfter) + '.' },
     {
       ok: cev.pcModelOk,
       title: cev.pcModelOk ? 'Model reproduces ESA’s Pc for this message.' : 'Model calibrated to ESA’s Pc.',
@@ -594,11 +631,14 @@ export function buildGateChecks(e: ReplayEvent, plan: Plan, opt: CoaOption, budg
     },
     { ok: opt.dv <= budget, title: opt.dv <= budget ? 'Within the Δv budget.' : 'Above the Δv budget.', detail: opt.dv.toFixed(1) + ' of ' + budget + ' mm/s.' },
     timing,
-    { ok: false, title: 'Not verified here:', detail: 'burn execution error, drag and J2, and re-screening the new orbit against the catalogue.' },
+    { ok: false, title: 'Not verified here:', detail: (isWindow(opt) ? 'the burn vector for this window, ' : '') + 'burn execution error, drag and J2, and re-screening the new orbit against the catalogue.' },
   ];
 }
 
-function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: CoaOption): ModalView {
+/** Burn duration and propellant from Δv alone, with the assumed 1,000 kg spacecraft, 1 N thruster and Isp 220 s. */
+const burnFacts = (dvMmS: number) => ({ burn: 'about ' + Math.max(1, Math.round(dvMmS)) + ' s at 1 N', prop: 'about ' + ((1000 * dvMmS) / 1000 / (220 * 9.80665) * 1000).toFixed(1) + ' g' });
+
+function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: PlanOption, rec: boolean): ModalView {
   const cev = plan.c;
   const approved = approvedAt(ctx, e.id) != null;
   const obj = e.obj.toLowerCase();
@@ -606,64 +646,78 @@ function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: CoaOption): Mo
   const T = plan.msgT + plan.age;
   // Pc now is ESA's Pc for the planning message, as everywhere else; the after value is the planner's model.
   const pcNow = e.m[plan.key][1];
-  const aheadTxt = 'arrive about ' + mTxt(opt.dT) + (opt.dT >= 0 ? ' earlier' : ' later') + ' along the track';
-  return {
+  const objTxt = (obj === 'unknown' ? 'unidentified object' : obj) + ' passes ' + mTxt(cev.miss) + ' away at ' + cev.relSpeed.toFixed(1) + ' km/s on a ' + Math.round(cev.crossDeg) + '° crossing.';
+  const common = {
     id: e.id,
     sat: e.sat,
     obj,
-    optName: OPTION_NAMES[opt.key],
+    optName: OPTION_NAMES[opt.key] + (rec ? ' (recommended)' : ''),
     approved,
     status: approved ? 'Approved · queued for upload' : 'Awaiting approval',
-    when:
-      'Message ' + (plan.key + 1) + (opt.key === 'coa3' ? ' + 24 h, ' : ' time, ') + Math.round(opt.leadH) + ' h before closest approach' +
-      (passed ? ' (passed ' + dh(T - burnAt(e, opt)) + ' ago)' : ''),
     dv: opt.dv.toFixed(1) + ' mm/s',
-    dirLong: dirLong(opt.alpha),
-    beta: opt.beta,
-    burn: 'about ' + Math.max(1, Math.round(opt.burnS)) + ' s at 1 N',
-    prop: 'about ' + opt.propG.toFixed(1) + ' g',
-    dA: 'semi-major axis ' + (opt.dA >= 0 ? '+' : '') + opt.dA.toFixed(1) + ' m',
     missNow: mTxt(cev.miss),
     missNowColor: missColor(cev.miss),
-    missAfter: mTxt(opt.missAfter),
     pcNow: pcTxt(pcNow),
     pcNowColor: pcColor(pcNow),
     pcNowOdds: pcOdds(pcNow),
+    approveLabel: approved ? 'Approved' : passed ? 'Burn time passed' : 'Approve and queue upload',
+    burnPassed: !approved && passed,
+    checks: buildGateChecks(e, plan, opt, ctx.budget),
+  };
+  if (isWindow(opt)) return { ...common, ...windowModal(e, opt, objTxt) };
+  const aheadTxt = 'arrive about ' + mTxt(opt.dT) + (opt.dT >= 0 ? ' earlier' : ' later') + ' along the track';
+  return {
+    ...common,
+    when:
+      'Message ' + (plan.key + 1) + (opt.key === 'coa3' ? ' + 24 h, ' : ' time, ') + Math.round(opt.leadH) + ' h before closest approach' +
+      (passed ? ' (passed ' + dh(T - burnAt(e, opt)) + ' ago)' : ''),
+    dirLong: dirLong(opt.alpha),
+    beta: opt.beta + '°',
+    burn: 'about ' + Math.max(1, Math.round(opt.burnS)) + ' s at 1 N',
+    prop: 'about ' + opt.propG.toFixed(1) + ' g',
+    dA: 'semi-major axis ' + (opt.dA >= 0 ? '+' : '') + opt.dA.toFixed(1) + ' m',
+    missAfter: mTxt(opt.missAfter),
     pcAfter: sci(opt.pcAfter),
     pcAfterOdds: odds(opt.pcAfter),
     rationale:
-      'The ' + (obj === 'unknown' ? 'unidentified object' : obj) + ' passes ' + mTxt(cev.miss) + ' away at ' + cev.relSpeed.toFixed(1) + ' km/s on a ' + Math.round(cev.crossDeg) +
-      '° crossing. This ' + dirShort(opt.alpha).toLowerCase() + ' burn makes us ' + aheadTxt + ' by closest approach, which opens the encounter-plane miss to ' + mTxt(opt.missAfter) +
+      'The ' + objTxt + ' This ' + dirShort(opt.alpha).toLowerCase() + ' burn makes us ' + aheadTxt + ' by closest approach, which opens the encounter-plane miss to ' + mTxt(opt.missAfter) +
       ' and cuts Pc to ' + sci(opt.pcAfter) + '.',
-    approveLabel: approved ? 'Approved' : passed ? 'Burn time passed' : 'Approve and queue upload',
-    burnPassed: !approved && passed,
     att: buildAttitude(opt.alpha),
-    checks: buildGateChecks(e, plan, opt, ctx.budget),
   };
 }
 
-/**
- * The feasible option the operator picked, else the first in display order (robust first). Options whose burn time has
- * passed are skipped while another is still ahead.
- */
-export function pickOption(plan: Plan | null, key: OptionKey, e?: ReplayEvent): CoaOption | null {
-  if (!plan) return null;
-  const feasible = orderedFeasible(plan.c.opts);
-  const live = e ? feasible.filter((o) => !burnPassed(e, plan, o)) : feasible;
-  return live.find((o) => o.key === key) ?? live[0] ?? feasible.find((o) => o.key === key) ?? feasible[0] ?? null;
+/** Modal fields for "Burn this window": the Δv and what follows from it, with targets instead of computed outcomes. */
+function windowModal(e: ReplayEvent, o: WindowOption, objTxt: string) {
+  const notComputed = 'not computed for this window';
+  return {
+    when: 'Anywhere in this window, ' + at(o.start) + '–' + at(o.end).slice(-5) + ', ' + Math.round(e.tca - o.end) + '–' + Math.round(e.tca - o.start) + ' h before closest approach',
+    dirLong: 'Not computed for this window; flight dynamics sets it',
+    beta: notComputed,
+    ...burnFacts(o.dv),
+    dA: notComputed,
+    missAfter: 'over 1 km (target)',
+    pcAfter: 'below 1e-4 (target)',
+    pcAfterOdds: 'under 1 in 10,000 (target)',
+    rationale:
+      'The ' + objTxt + ' The planned burn times have passed. ' + o.dv.toFixed(1) + ' mm/s is the lowest Δv that keeps Pc below 1e-4 and the miss above 1 km for a burn anywhere in this 6 h window (the cost-of-waiting envelope). Its direction and the resulting miss are not computed here.',
+    att: null,
+  };
 }
 
 /** Same Δv and direction: the minimum-Δv burn already meets the robust target. */
-const sameBurn = (a: CoaOption, b: CoaOption) => a.dv === b.dv && a.alpha === b.alpha && a.beta === b.beta;
+const sameBurn = (a: PlanOption, b: PlanOption) => !isWindow(a) && !isWindow(b) && a.dv === b.dv && a.alpha === b.alpha && a.beta === b.beta;
 
-function optionSub(o: CoaOption, all: CoaOption[], robustMissM: number | undefined): string {
-  if (o.key === 'coa4') return 'keeps ≥ 1 km at the pessimistic end' + (robustMissM != null ? ', target ' + mTxt(robustMissM) : '');
+function optionSub(o: PlanOption, all: PlanOption[], plan: Plan): string {
+  if (isWindow(o)) return 'anywhere in ' + at(o.start) + '–' + at(o.end).slice(-5) + ' · direction not computed';
+  const robustMissM = plan.c.robustMissM;
+  if (o.key === 'coa4') return 'stays over 1 km even if the miss shrinks like the worst 1 in 10 past events' + (robustMissM != null ? ' (aims for ' + mTxt(robustMissM) + ')' : '');
   const robust = all.find((x) => x.key === 'coa4');
   if (o.key === 'coa1' && robust && sameBurn(o, robust)) return dirShort(o.alpha) + ' · same as robust';
+  if (o.key === 'coa3') return dirShort(o.alpha) + ' · 24 h after message ' + (plan.key + 1);
   return dirShort(o.alpha);
 }
 
-export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: OptionKey, facts: WorkspaceFacts, mission?: Mission, forecast?: Forecast | null): WorkspaceView {
+export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: OptChoice, facts: WorkspaceFacts, mission?: Mission, forecast?: Forecast | null): WorkspaceView {
   if (!e) return { kind: 'empty', text: 'Select an event from the queue, the timeline or the run digest.' };
   const st = stateAt(e, ctx.T, ctx.replay.runH);
   if (!isKnown(st)) return { kind: 'empty', text: 'Event #' + e.id + ' has not been reported yet. Its first message arrives in ' + dh(e.m[0][0] - ctx.T) + '.' };
@@ -672,30 +726,35 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
   const stored = approvedAt(ctx, e.id) != null ? ctx.dec.approvedPlan[e.id] : undefined;
   // That holds even when the planner stops producing a plan (the Pc falls below 1e-4, or closest approach is under 3 h).
   const plan = stored && st.phase === 'open' && e.coa[String(stored.key)] ? planAt(e, stored.key, ctx.T, ctx.budget) : live;
-  const opt = stored && plan ? (orderedFeasible(plan.c.opts).find((o) => o.key === stored.opt) ?? null) : pickOption(plan, optKey, e);
+  const opt = stored && plan ? approvedOption(e, plan, stored) : pickOption(plan, optKey, e);
   const fc = forecastAt(forecast, e, st);
   const header = buildHeader(ctx, e, st, plan, mission);
   const hist = buildHistory(e, st, ctx.T, fc, pcForecastAt(forecast, e, st), !!forecast?.pcForecast);
   const fcCard: ForecastCardView | null = !forecast
     ? null
     : fc
-      ? { kind: 'open', card: forecastCard(fc, e.tca - ctx.T) }
+      ? { kind: 'open', card: forecastCard(fc) }
       : st.phase === 'resolved'
         ? { kind: 'passed', text: 'Closest approach has passed: the final miss was ' + mTxt(st.last[2]) + '. Nothing left to forecast.' }
         : null;
   if (plan && opt) {
     const appr = approvedAt(ctx, e.id);
-    const optsAll = orderedFeasible(plan.c.opts);
+    const rec = recommended(e, plan);
+    // Once approved the table shows the approved option; a window option appears only when it is the one approved.
+    const listed = planOptions(e, plan).filter((o) => !isWindow(o) || stored == null);
+    const sameWindow = (o: PlanOption) => isWindow(o) && isWindow(opt) && o.wi === opt.wi;
+    const optsAll = isWindow(opt) && !listed.some(sameWindow) ? [...listed.filter((o) => !isWindow(o)), opt] : listed;
     const opts: OptionsView = {
       basis: 'planned at message ' + (plan.key + 1) + ', ' + Math.round(plan.age) + ' h ago',
       rows: optsAll.map((o) => ({
         key: o.key,
+        rec: appr == null && rec != null && o.key === rec.key,
         name: OPTION_NAMES[o.key],
-        dir: optionSub(o, optsAll, plan.c.robustMissM) + (burnPassed(e, plan, o) ? ' · time passed' : ''),
+        dir: optionSub(o, optsAll, plan) + (burnPassed(e, plan, o) ? ' · time passed' : !meetsTargets(o) ? ' · misses a target' : ''),
         dvTxt: o.dv.toFixed(1) + ' mm/s',
-        pcAfter: sci(o.pcAfter),
-        pcAfterTitle: odds(o.pcAfter) ?? undefined,
-        missAfter: mTxt(o.missAfter),
+        pcAfter: isWindow(o) ? '< 1e-4' : sci(o.pcAfter),
+        pcAfterTitle: isWindow(o) ? 'Target, not a computed value' : (odds(o.pcAfter) ?? undefined),
+        missAfter: isWindow(o) ? '> 1 km' : mTxt(o.missAfter),
         on: o.key === opt.key,
         passed: burnPassed(e, plan, o),
       })),
@@ -706,7 +765,8 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
       burnPassed: appr == null && burnPassed(e, plan, opt),
       reviewLabel: appr != null ? 'View approved plan' : 'Review and approve',
     };
-    const planner: PlannerView = { plan, opt, wc: buildCostOfWaiting(ctx, plan, facts), bp: buildEncounterPlane(plan, opt), opts, modal: buildModal(ctx, e, plan, opt) };
+    const isRec = appr == null && rec != null && rec.key === opt.key;
+    const planner: PlannerView = { plan, opt, wc: buildCostOfWaiting(ctx, plan, facts, appr ?? null), bp: buildEncounterPlane(plan, opt), opts, modal: buildModal(ctx, e, plan, opt, isRec) };
     return { kind: 'event', header, forecast: fcCard, hist, planner, other: null, msgRows: [] };
   }
   const { other, msgRows } = buildOther(ctx, e, st);

@@ -1,11 +1,11 @@
 // Replay timeline dock: fleet density per run, one lane per satellite with Pc >= 1e-4 events, deadlines, burns and the 24 h band.
 
-import type { CoaOption, Forecast, OptionKey, Replay, ReplayEvent } from '../data/types';
-import { forecastAt, inTen, kmTxt, pctTxt, rangeTxt } from './forecast';
+import type { Forecast, Replay, ReplayEvent } from '../data/types';
+import { CRIT_NAME, CRIT_RULE, forecastAt, inTen, kmTxt, pctTxt, rangeTxt } from './forecast';
 import { at, clamp, dh, dirShort, mTxt, pcWithOdds, plural, withOdds } from './format';
-import { PC_ACTION, burnAt, burnPassed, isKnown, planOf, stateAt } from './replay';
-import { type RunCtx, DEFAULT_OPTION, OPTION_NAMES, approvedAt, queueChip } from './run';
-import { pickOption } from './workspace';
+import { PC_ACTION, burnAt, burnPassed, isKnown, planAt, planOf, stateAt } from './replay';
+import { type RunCtx, approvedAt, queueChip } from './run';
+import { DEFAULT_OPTION, OPTION_NAMES, type OptChoice, approvedOption, isWindow, pickOption } from './options';
 import { C } from './theme';
 
 /** Where a hover card anchors: its left or right edge, offset in px from the trigger's edge. */
@@ -233,7 +233,7 @@ export function futureWindows(ctx: RunCtx, forecast: Forecast | null | undefined
   return out;
 }
 
-export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null, optKey: OptionKey, changed: Set<number> = new Set(), forecast: Forecast | null = null): DockView {
+export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null, optKey: OptChoice, changed: Set<number> = new Set(), forecast: Forecast | null = null): DockView {
   const { replay, T, run, budget } = ctx;
   const runH = replay.runH;
   const DOM = dockHours(replay);
@@ -278,7 +278,10 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
       side,
       title: at(r * runH) + '–' + clock((r + 1) * runH),
       l1: w
-        ? plural(w.due, 'pass', 'passes') + ' due, about ' + w.expected.toFixed(1) + ' expected to end Critical' + (w.unknown ? ' (' + w.unknown + ' with too little history, not counted)' : '')
+        ? plural(w.due, 'pass', 'passes') +
+          ' due, ' +
+          (w.expected < 0.05 ? 'none expected to end Critical' : 'about ' + w.expected.toFixed(1) + ' expected to end Critical') +
+          (w.unknown ? ' (' + w.unknown + ' with too little history, not counted)' : '')
         : 'No forecast',
       l2: 'Forecast from events already reported (dotted line). Click to jump to this run.',
     };
@@ -381,8 +384,8 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
             side: sideOf(e.tca),
             title: 'Forecast at closest approach · ' + at(e.tca),
             lines: [
-              (p == null ? 'Chance it ends Critical: not enough history' : pctTxt(p) + ' chance it ends Critical') +
-                ' · likely final miss ' + kmTxt(fc.q50M) + ' (' + inTen(fc.coverage) + ': ' + rangeTxt(fc.q10M, fc.q90M) + ').',
+              CRIT_NAME + ': ' + (p == null ? 'not enough history' : pctTxt(p)) + ' · likely final miss ' + kmTxt(fc.q50M) + ' (' + inTen(fc.coverage) + ' end ' + rangeTxt(fc.q10M, fc.q90M) + ').',
+              CRIT_RULE,
               'From its latest message seen at this run.',
             ],
           };
@@ -407,7 +410,7 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
       if (appr != null) {
         // The approved burn sits at its own burn time, from the plan and option that were approved.
         const ap = ctx.dec.approvedPlan[e.id];
-        const ao = ap ? e.coa[String(ap.key)]?.opts.find((x) => x.key === ap.opt) : undefined;
+        const ao = ap && e.coa[String(ap.key)] ? approvedOption(e, planAt(e, ap.key, T, budget), ap) : null;
         const hA = ao ? burnAt(e, ao) : (appr - 1) * runH;
         marks.push({
           id: e.id,
@@ -423,10 +426,16 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
         });
       } else if (pl) {
         // Same choice as the workspace planner, drawn at the option's own burn time.
-        const o: CoaOption | null = pickOption(pl, sel === e.id ? optKey : DEFAULT_OPTION, e);
+        const o = pickOption(pl, sel === e.id ? optKey : DEFAULT_OPTION, e);
         if (o) {
           const hB = burnAt(e, o);
           const passed = burnPassed(e, pl, o);
+          // A burn in the current 6 h window can happen any time in it at about the same Δv, so say so rather than
+          // stamp a time that may already be behind the clock.
+          const wk = Math.round((hB - pl.msgT) / 6);
+          const inWindow = !passed && Math.floor(pl.age / 6) === wk;
+          const wS = pl.msgT + wk * 6;
+          const when = inWindow ? 'any time in this window, ' + at(wS) + '–' + at(wS + 6).slice(-5) : at(hB);
           marks.push({
             id: e.id,
             kind: 'proposed',
@@ -436,11 +445,13 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
             side: sideOf(hB, { edge: 'left', px: 6 }),
             text: passed ? 'time passed' : o.dv.toFixed(1) + ' mm/s',
             short: passed ? 'passed' : o.dv.toFixed(1) + ' mm/s',
-            title: 'Proposed burn · ' + OPTION_NAMES[o.key] + ' · ' + at(hB),
+            title: 'Proposed burn · ' + OPTION_NAMES[o.key] + ' · ' + when,
             lines: [
-              o.dv.toFixed(1) + ' mm/s ' + dirShort(o.alpha).toLowerCase() + (o.key === 'coa3' ? ', 24 h after message ' : ', planned at message ') + (pl.key + 1) + '.',
+              isWindow(o)
+                ? o.dv.toFixed(1) + ' mm/s, the lowest Δv for this window; direction not computed.'
+                : o.dv.toFixed(1) + ' mm/s ' + dirShort(o.alpha).toLowerCase() + (o.key === 'coa3' ? ', 24 h after message ' : ', planned at message ') + (pl.key + 1) + '.',
               ...(passed ? ['That burn time passed ' + dh(T - hB) + ' ago; re-plan at the next message.'] : []),
-              'Pc after ' + withOdds(o.pcAfter) + ' · miss after ' + mTxt(o.missAfter) + '.',
+              isWindow(o) ? 'Targets Pc below 1e-4 and a miss above 1 km.' : 'Pc after ' + withOdds(o.pcAfter) + ' · miss after ' + mTxt(o.missAfter) + '.',
               pl.overNow ? 'Past the ' + budget + ' mm/s deadline.' : 'Decide by ' + at(pl.dlAbs) + ', in ' + dh(pl.left) + '.',
               'Not approved yet. Click the bar to review.',
             ],
@@ -462,9 +473,10 @@ export function buildLegend(budget: number): LegendItem[] {
     { key: 'pc', label: 'Pc ≥ 1e-4', name: 'Orange stretch', tip: 'Time when the latest message had Pc at or above 1e-4, the action threshold. In the open-events strip, the orange line is the count to decide at each run, on its own scale.' },
     { key: 'ahead', label: 'to closest approach', name: 'Dashed outline', tip: 'Time left until closest approach. Those messages have not arrived yet.' },
     { key: 'burn', label: 'proposed burn', name: 'Proposed burn', tip: 'For the selected event, the option picked in the workspace; for the others, the planner’s recommended option (robust when it has one, which can cost more Δv than the minimum). Drawn at its burn time with its Δv. It aims for Pc below 1e-4 and a miss above 1 km; check the gate before approving. It waits for approval.' },
+    { key: 'approved', label: 'approved burn', name: 'Approved burn', tip: 'Teal pill at the approved burn time. The upload is simulated, so later messages, which are the real recorded ones, do not show the burn.' },
     { key: 'deadline', label: 'decision deadline', name: 'Decision deadline', tip: 'After this, the cheapest burn needs more than the ' + budget + ' mm/s Δv budget.' },
-    { key: 'end', label: 'passed unmitigated', name: 'Red end dot', tip: 'Closest approach passed with Pc still at or above 1e-4 and no approved burn. Grey: passed below 1e-4. Teal: burn approved.' },
-    { key: 'forecast', label: 'forecast (chance it ends Critical)', name: 'Forecast', tip: 'Ring at each open event’s closest approach, filled to its chance of ending Critical (from the latest message seen at this run). In the strip, the dotted line after the playhead is the expected number of passes ending Critical per 8 h.' },
-    { key: 'band', label: 'next 24 h', name: 'Next 24 h', tip: 'The window the Next 24 h panel counts: closest approach within the next 24 h (time_to_tca ≤ 1 day) of this run.' },
+    { key: 'end', label: 'closest approach passed', name: 'End dot', tip: 'Red: passed with Pc still at or above 1e-4 and no approved burn (unmitigated). Grey: passed below 1e-4. Teal: a burn was approved.' },
+    { key: 'forecast', label: 'forecast (chance it ends Critical)', name: 'Forecast', tip: 'Ring at each open event’s closest approach, filled to its chance it ends Critical (from the latest message seen at this run). ' + CRIT_RULE + ' In the strip, the dotted line after the playhead is the expected number of passes ending Critical per 8 h.' },
+    { key: 'band', label: 'next 24 h', name: 'Next 24 h', tip: 'The window the Next 24 h panel counts: closest approach within 1 day of this run.' },
   ];
 }

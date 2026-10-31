@@ -1,14 +1,15 @@
 import type { KeyboardEvent } from 'react';
-import type { OptionKey } from '../data/types';
+import type { PlanKey } from '../model/options';
 import type { ForecastCardView, MsgRow, OptionsView, OtherView, WorkspaceView } from '../model/workspace';
 import { CostOfWaiting, EncounterPlane, MessageHistory } from './Charts';
 import { Chip } from './Chip';
+import { CRIT_NAME } from '../model/forecast';
 import { Hover } from './Hover';
 
 interface WorkspaceProps {
   ws: WorkspaceView;
   budget: number;
-  onOpt: (k: OptionKey) => void;
+  onOpt: (k: PlanKey) => void;
   onReview: () => void;
   onDefer: () => void;
 }
@@ -77,7 +78,7 @@ export function Workspace({ ws, budget, onOpt, onReview, onDefer }: WorkspacePro
   );
 }
 
-function Options({ opts, onOpt, onReview, onDefer }: { opts: OptionsView; onOpt: (k: OptionKey) => void; onReview: () => void; onDefer: () => void }) {
+function Options({ opts, onOpt, onReview, onDefer }: { opts: OptionsView; onOpt: (k: PlanKey) => void; onReview: () => void; onDefer: () => void }) {
   const off = (o: OptionsView['rows'][number]) => (opts.locked || o.passed) && !o.on;
   const live = opts.rows.filter((o) => !off(o));
   const tabKey = (opts.rows.find((o) => o.on) ?? live[0])?.key;
@@ -118,7 +119,10 @@ function Options({ opts, onOpt, onReview, onDefer }: { opts: OptionsView; onOpt:
             onClick={() => onOpt(o.key)}
           >
             <span className="opt-name">
-              <span>{o.name}</span>
+              <span>
+                {o.name}
+                {o.rec && <b className="opt-rec">Recommended</b>}
+              </span>
               <span>{o.dir}</span>
             </span>
             <span className="mono">{o.dvTxt}</span>
@@ -229,10 +233,10 @@ function ForecastPanel({ f }: { f: ForecastCardView }) {
               <i>1 km</i>
             </span>
             <span className="fc-now" style={{ left: c.now.left }}>
-              <i>{c.now.label}</i>
+              <i className={'fc-' + c.now.align}>{c.now.label}</i>
             </span>
             <span className="fc-pred" style={{ left: c.pred.left }}>
-              <i>{c.pred.label}</i>
+              <i className={'fc-' + c.pred.align}>{c.pred.label}</i>
             </span>
           </div>
           <div className="fc-axis" aria-hidden="true">
@@ -249,8 +253,8 @@ function ForecastPanel({ f }: { f: ForecastCardView }) {
         <dl className="fc-numbers">
           <div>
             <dt>
-              <Hover className="help" title="Chance it gets closer than 1 km" lines={c.pUnder1kmTip}>
-                <span className="dotted">Chance it gets closer than 1 km</span>
+              <Hover className="help" title="Chance it ends under 1 km" lines={c.pUnder1kmTip}>
+                <span className="dotted">Chance it ends under 1 km</span>
               </Hover>
               <small>{c.pUnder1kmBasis}</small>
             </dt>
@@ -260,8 +264,8 @@ function ForecastPanel({ f }: { f: ForecastCardView }) {
           </div>
           <div>
             <dt>
-              <Hover className="help" title="Chance it ends up needing a burn" lines={c.pCriticalTip} side={{ edge: 'right', px: 0 }}>
-                <span className="dotted">Chance it ends up needing a burn</span>
+              <Hover className="help" title={CRIT_NAME} lines={c.pCriticalTip} side={{ edge: 'right', px: 0 }}>
+                <span className="dotted">{CRIT_NAME}</span>
               </Hover>
               <small>{c.pCriticalBasis}</small>
             </dt>

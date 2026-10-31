@@ -1,6 +1,7 @@
 // One screening run: which events are open, to decide, on watch or passed, and the chip each one shows.
 
 import type { OptionKey, Replay, ReplayEvent } from '../data/types';
+import type { PlanKey } from './options';
 import { type EventState, type KnownState, type Plan, PC_ACTION, isKnown, planOf, stateAt } from './replay';
 import { TONE, type Tone } from './theme';
 
@@ -18,7 +19,8 @@ export interface Decisions {
   approved: Record<number, number>;
   approvedTxt: Record<number, string>;
   /** The plan (CDM index) and option each approval was made on, so later plans cannot change an approved burn. */
-  approvedPlan: Record<number, { key: number; opt: OptionKey }>;
+  /** The plan (message index) and option each approval used; wi is the window of a "Burn this window" approval. */
+  approvedPlan: Record<number, { key: number; opt: PlanKey; wi?: number }>;
   /** Every 1-based run at which each event was deferred. */
   deferred: Record<number, number[]>;
   log: LogEntry[];
@@ -188,11 +190,9 @@ export function changedSincePrev(ctx: RunCtx, snap: Snapshot): Set<number> {
   return out;
 }
 
-export const OPTION_NAMES: Record<OptionKey, string> = { coa4: 'Recommended (robust)', coa1: 'Minimum Δv', coa2: 'More margin', coa3: 'Wait 24 h' };
 
 /** Display and default order: the robust option first when the planner produced one. */
 export const OPTION_ORDER: OptionKey[] = ['coa4', 'coa1', 'coa2', 'coa3'];
-export const DEFAULT_OPTION: OptionKey = 'coa4';
 
 /** Feasible options in display order. */
 export function orderedFeasible<T extends { key: OptionKey; feasible: boolean }>(opts: T[]): T[] {

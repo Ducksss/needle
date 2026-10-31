@@ -15,7 +15,7 @@ The two `/_blob/...` fetch URLs are `fleet.json` and `replay.json`. Port the log
 
 - Manrope for UI text, IBM Plex Mono for numbers.
 - One 10 px radius and 1 px `#E3E8EE` borders.
-- Colours: ink `#0F172A`, risk `#C2410C`, watch `#2563EB`, hidden `#B45309`, action `#6D28D9`, ok `#0F766E`.
+- Colours: ink `#0F172A`, risk `#C2410C`, watch `#2563EB`, hidden `#A16207`, action `#6D28D9`, ok `#0F766E`.
 
 ## Panels (keep every one; each answers one question)
 

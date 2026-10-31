@@ -4,7 +4,7 @@ export const C = {
   ink: '#0F172A',
   risk: '#C2410C',
   watch: '#2563EB',
-  hidden: '#B45309',
+  hidden: '#A16207',
   action: '#6D28D9',
   ok: '#0F766E',
   muted: '#64748B',

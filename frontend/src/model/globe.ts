@@ -142,7 +142,7 @@ export interface GlobeScene {
 
 const DOT_CODE: Record<string, DotCode> = { pc: 3, hidden: 2, distance: 1, elevated: 1, quiet: 0 };
 export const DOT_SIZE = [3, 5, 6.5, 9];
-export const DOT_COLOR = ['#94A3B8', '#2563EB', '#B45309', '#C2410C'];
+export const DOT_COLOR = ['#94A3B8', '#2563EB', '#A16207', '#C2410C'];
 
 export interface GlobeInput {
   missions: Mission[];

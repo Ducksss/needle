@@ -1,7 +1,7 @@
 // Queue panel: Decide, Watch and Passed tabs.
 
 import type { Forecast } from '../data/types';
-import { NOT_ENOUGH, forecastAt, pctTxt } from './forecast';
+import { CRIT_NAME, CRIT_RULE, NOT_ENOUGH, forecastAt, pctTxt } from './forecast';
 import { clamp, dh, mTxt, pcOdds, pcTxt } from './format';
 import { PLAN_CUTOFF_H } from './replay';
 import { type Chip, type KnownRow, type NeedRow, type RunCtx, type Snapshot, chipFor } from './run';
@@ -123,7 +123,7 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
       on: sel === x.e.id,
       title:
         tab === 'watch' && forecast
-          ? 'Closest approach in ' + dh(x.e.tca - T) + '. ' + (pCrit.get(x.e.id) == null ? 'Chance of ending Critical: ' + NOT_ENOUGH + '.' : 'Forecast chance of ending Critical, from the latest Pc band, miss and time left.')
+          ? 'Closest approach in ' + dh(x.e.tca - T) + '. ' + CRIT_NAME + ': ' + (pCrit.get(x.e.id) == null ? NOT_ENOUGH + '.' : 'forecast from the latest Pc band, miss and time left.') + ' ' + CRIT_RULE
           : undefined,
       urgency,
       changed: changed.has(x.e.id),
@@ -132,7 +132,7 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
   return {
     tabs,
     rows,
-    col: tab === 'needs' ? 'Decide within' : tab === 'watch' ? (forecast ? 'P(final Crit.)' : 'Miss') : 'Final Pc',
+    col: tab === 'needs' ? 'Decide within' : tab === 'watch' ? (forecast ? 'Chance Critical' : 'Miss') : 'Final Pc',
     meta: tab === 'needs' ? 'soonest deadline first' : tab === 'watch' ? (forecast ? 'forecast risk first · ' : '') + snap.quiet + ' quiet hidden' : 'most recent first',
     empty: rows.length === 0,
   };
