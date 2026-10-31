@@ -45,3 +45,42 @@ export function useTween(target: number, ms = LAPSE_MS): number {
   }, [target, reduced, ms]);
   return shown;
 }
+
+const PAD = 8;
+
+/**
+ * Keeps a host's hover card on screen: flips it up or down when it would leave the viewport vertically, and shifts it
+ * sideways when it would leave horizontally. Runs on the frame after the card becomes visible.
+ */
+export function fitCard(host: Element | null) {
+  const tt = host?.querySelector<HTMLElement>(':scope > .tt');
+  if (!host || !tt) return;
+  tt.style.transform = '';
+  tt.classList.remove('tt-up', 'tt-down');
+  requestAnimationFrame(() => {
+    let r = tt.getBoundingClientRect();
+    if (!r.width) return;
+    const h = host.getBoundingClientRect();
+    const up = r.bottom <= h.top + 1;
+    if (!up && r.bottom > window.innerHeight - PAD && h.top - r.height - 6 > PAD) tt.classList.add('tt-up');
+    else if (up && r.top < PAD && h.bottom + r.height + 6 < window.innerHeight - PAD) tt.classList.add('tt-down');
+    r = tt.getBoundingClientRect();
+    let dx = 0;
+    if (r.right > window.innerWidth - PAD) dx = window.innerWidth - PAD - r.right;
+    if (r.left + dx < PAD) dx = PAD - r.left;
+    if (dx) tt.style.transform = `translateX(${Math.round(dx)}px)`;
+  });
+}
+
+/** Fits every hover card as it opens, by pointer or keyboard focus. */
+export function useHoverCardFit() {
+  useEffect(() => {
+    const on = (e: Event) => fitCard((e.target as Element | null)?.closest?.('.tw') ?? null);
+    document.addEventListener('pointerover', on);
+    document.addEventListener('focusin', on);
+    return () => {
+      document.removeEventListener('pointerover', on);
+      document.removeEventListener('focusin', on);
+    };
+  }, []);
+}

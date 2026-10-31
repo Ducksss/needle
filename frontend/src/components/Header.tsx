@@ -37,7 +37,7 @@ export function Header({ kpis, budget, onBudget, facts }: HeaderProps) {
           title="Demo replay"
           side={{ edge: 'right', px: 0 }}
           lines={[
-            'Real ESA training-set CDM histories, with message timing kept relative to closest approach, on a simulated 21-day calendar of 8 h screening runs.',
+            'Real ESA training-set CDM histories, with message timing kept relative to closest approach, on a simulated 21-day calendar of 8 h screening runs; the last run falls at its close, Day 22 00:00.',
             (facts ? facts.escalated + ' of ' + facts.events + ' replay events' : 'Replay events') + ' reach Pc ≥ 1e-4, against about 1.2% of events in ESA’s training data, so high-risk events are over-sampled about 7×.',
           ]}
         >

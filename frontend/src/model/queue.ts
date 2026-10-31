@@ -3,7 +3,7 @@
 import type { Forecast } from '../data/types';
 import { NOT_ENOUGH, forecastAt, pctTxt } from './forecast';
 import { clamp, dh, mTxt, pcOdds, pcTxt } from './format';
-import { PC_ACTION } from './replay';
+import { PC_ACTION, PLAN_CUTOFF_H } from './replay';
 import { type Chip, type KnownRow, type NeedRow, type RunCtx, type Snapshot, chipFor } from './run';
 import { BUCKET_COLOR, C } from './theme';
 
@@ -16,7 +16,7 @@ export interface QueueTabView {
   on: boolean;
 }
 
-export type Urgency = 'calm' | 'soon' | 'over';
+export type Urgency = 'calm' | 'soon' | 'over' | 'none';
 
 export interface QueueRow {
   id: number;
@@ -69,14 +69,18 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
     let urgency: QueueRow['urgency'] = null;
     if (tab === 'needs') {
       const plan = (x as NeedRow).plan;
+      const late = x.e.tca - T < PLAN_CUTOFF_H;
       urgency =
-        !plan || plan.overNow
+        !plan && !late
+          ? { w: '0%', tone: 'none' }
+          : !plan || plan.overNow
           ? { w: '100%', tone: 'over' }
           : { w: ((clamp(plan.left, 0, URGENCY_SCALE_H) / URGENCY_SCALE_H) * 100).toFixed(1) + '%', tone: plan.left < 24 ? 'soon' : 'calm' };
       col2 = 'TCA ' + dh(x.e.tca - T);
       if (!plan) {
-        col1 = 'too late';
-        col1Color = C.overdue;
+        // No plan is "too late" only inside the last 3 h; otherwise the planner did not run for this message.
+        col1 = late ? 'too late' : 'no plan';
+        col1Color = late ? C.overdue : C.muted;
       } else if (plan.overNow) {
         col1 = 'over budget';
         col1Color = C.overdue;

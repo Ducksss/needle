@@ -138,6 +138,17 @@ h2 {
   display: block;
 }
 
+/* Set by fitCard when a card would leave the viewport. */
+.tw > .tt.tt-up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.tw > .tt.tt-down {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+
 .help {
   position: relative;
   cursor: help;
@@ -966,7 +977,14 @@ h2 {
 .fc-numbers dt {
   font-size: 12px;
   color: var(--muted);
-  max-width: 120px;
+  max-width: 150px;
+}
+
+.fc-numbers dt small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--faint);
 }
 
 .fc-numbers dd {
@@ -1643,6 +1661,27 @@ h2 {
 
 .dens {
   cursor: pointer;
+}
+
+.tw.kbd > .tt {
+  display: block;
+}
+
+.density:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Dock cards open upward: the dock is at the bottom of the page. */
+.dock-track .tt,
+.legend .tt {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.btn-icon:disabled {
+  cursor: default;
+  opacity: 0.35;
 }
 
 .dens-open {

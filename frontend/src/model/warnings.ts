@@ -167,7 +167,7 @@ function dangerInsight(danger: InWindow[]): string {
   const highPc = danger.filter((x) => x.s.last[1] >= PC_ACTION).length;
   const all = n === 1 ? 'The one pass under 1 km has' : 'All ' + n + ' passes under 1 km have';
   if (lowPc === n) return all + ' Pc below 1e-6: Critical by the brief’s distance rule, Watch for Needle.';
-  if (lowPc > 0) return lowPc + ' of ' + n + ' passes under 1 km have Pc below 1e-6: Critical by the brief’s distance rule, far below the action threshold.';
+  if (lowPc > 0) return lowPc + ' of ' + n + ' passes under 1 km ' + (lowPc === 1 ? 'has' : 'have') + ' Pc below 1e-6: Critical by the brief’s distance rule, far below the action threshold.';
   if (highPc === 0) return all + ' Pc from 1e-6 to 1e-4: Needle watches them and plans no burn yet.';
   return plural(n, 'pass', 'passes') + ' under 1 km; ' + highPc + ' also at Pc ≥ 1e-4.';
 }

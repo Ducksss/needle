@@ -8,6 +8,9 @@ export interface LogEntry {
   /** 1-based run the decision was made at. */
   run: number;
   text: string;
+  /** Event and kind, so a re-decision can replace the earlier entry. */
+  id?: number;
+  kind?: 'approve' | 'defer';
 }
 
 /** Operator decisions in this replay. Runs are 1-based, as shown in the UI. */
@@ -16,7 +19,8 @@ export interface Decisions {
   approvedTxt: Record<number, string>;
   /** The plan (CDM index) and option each approval was made on, so later plans cannot change an approved burn. */
   approvedPlan: Record<number, { key: number; opt: OptionKey }>;
-  deferred: Record<number, number>;
+  /** Every 1-based run at which each event was deferred. */
+  deferred: Record<number, number[]>;
   log: LogEntry[];
 }
 
@@ -45,7 +49,7 @@ export function approvedBy(dec: Decisions, id: number, run1: number): number | n
 /** Approval visible at the current run. Stepping back before an approval hides it again. */
 export const approvedAt = (ctx: RunCtx, id: number) => approvedBy(ctx.dec, id, ctx.run + 1);
 
-export const isDeferredNow = (ctx: RunCtx, id: number) => ctx.dec.deferred[id] === ctx.run + 1;
+export const isDeferredNow = (ctx: RunCtx, id: number) => ctx.dec.deferred[id]?.includes(ctx.run + 1) ?? false;
 
 export interface Row {
   e: ReplayEvent;
@@ -148,6 +152,8 @@ export function chipFor(ctx: RunCtx, e: ReplayEvent, s: KnownState): Chip {
   if (s.bucket === 'pc') return isDeferredNow(ctx, e.id) ? chip('DEFERRED', TONE.deferred) : chip('DECIDE', TONE.decide);
   if (s.peaked) return chip('DOWNGRADED', TONE.downgraded);
   if (s.isNew) return chip('NEW', TONE.fresh);
+  // Below every watch rule: not on any queue, so never labelled WATCH.
+  if (s.bucket === 'quiet') return chip('QUIET', TONE.passed);
   return chip('WATCH', TONE.watch);
 }
 

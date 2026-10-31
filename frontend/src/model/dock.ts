@@ -2,8 +2,9 @@
 
 import type { CoaOption, OptionKey, Replay, ReplayEvent } from '../data/types';
 import { at, clamp, dh, dirShort, mTxt, pcWithOdds, withOdds } from './format';
-import { PC_ACTION, isKnown, planOf, stateAt } from './replay';
-import { type RunCtx, OPTION_NAMES, approvedAt, chipFor, orderedFeasible } from './run';
+import { PC_ACTION, burnAt, burnPassed, isKnown, planOf, stateAt } from './replay';
+import { type RunCtx, DEFAULT_OPTION, OPTION_NAMES, approvedAt, queueChip } from './run';
+import { pickOption } from './workspace';
 import { C } from './theme';
 
 /** Where a hover card anchors: its left or right edge, offset in px from the trigger's edge. */
@@ -78,6 +79,8 @@ export interface EventBar {
 export type MarkKind = 'approved' | 'proposed';
 
 export interface LaneMark {
+  /** Event id: with kind, the pill's stable key. */
+  id: number;
   kind: MarkKind;
   top: number;
   left: string;
@@ -222,7 +225,8 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
   const days = Math.round(DOM / 24);
   for (let d = 0; d <= days; d++) ticks.push({ left: pctH(d * 24), h: d % 2 === 0 ? 10 : 5, label: d % 2 === 0 && d < days ? 'Day ' + (d + 1) : '', minor: d % 4 !== 0 || d >= days - 2 });
 
-  const hiEvents = replay.events.filter((e) => e.m.some((mm) => mm[1] >= PC_ACTION));
+  // Only what the operator could know at T: events that reached Pc >= 1e-4 in a message received by T.
+  const hiEvents = replay.events.filter((e) => e.m.some((mm) => mm[0] <= T && mm[1] >= PC_ACTION));
   const laneSats = Array.from(new Set(hiEvents.map((e) => e.sat))).sort();
   const lanes = laneSats.map((sat): Lane => {
     const bars: EventBar[] = [];
@@ -253,7 +257,7 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
       }
       const appr = approvedAt(ctx, e.id);
       const pl = planOf(e, s, T, budget);
-      const chip = chipFor(ctx, e, s);
+      const chip = queueChip(ctx, e, s);
       const tip: TipLine[] = [
         { t: chip.label + ': ' + chip.tip, c: '#E2E8F0' },
         { t: 'First message ' + at(start) + ' · ' + (s.k + 1) + (s.k ? ' messages' : ' message') + ' so far', c: '#CBD5E1' },
@@ -305,35 +309,41 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
           : null,
       });
       if (appr != null) {
-        const hA = (appr - 1) * runH;
+        // The approved burn sits at its own burn time, from the plan and option that were approved.
+        const ap = ctx.dec.approvedPlan[e.id];
+        const ao = ap ? e.coa[String(ap.key)]?.opts.find((x) => x.key === ap.opt) : undefined;
+        const hA = ao ? burnAt(e, ao) : (appr - 1) * runH;
         marks.push({
+          id: e.id,
           kind: 'approved',
           top: y - 1,
           left: pctH(hA),
           maxW: roomRight(hA),
           side: sideOf(hA, { edge: 'left', px: 6 }),
-          text: 'Burn approved',
-          short: 'Approved',
+          text: 'approved',
+          short: 'approved',
           title: 'Burn approved · run ' + appr,
           lines: [ctx.dec.approvedTxt[e.id] ?? '', 'Simulated upload. Later messages are the real recorded ones, so they do not show the burn.'].filter(Boolean),
         });
       } else if (pl) {
-        // Same choice as the workspace planner: feasible options, robust first.
-        const feasible = orderedFeasible(pl.c.opts);
-        const o: CoaOption | undefined = (sel === e.id ? feasible.find((x) => x.key === optKey) : undefined) ?? feasible[0];
+        // Same choice as the workspace planner, drawn at the option's own burn time.
+        const o: CoaOption | null = pickOption(pl, sel === e.id ? optKey : DEFAULT_OPTION, e);
         if (o) {
-          const hB = T + (o.key === 'coa3' ? 24 : 0);
+          const hB = burnAt(e, o);
+          const passed = burnPassed(e, pl, o);
           marks.push({
+            id: e.id,
             kind: 'proposed',
             top: y - 1,
             left: pctH(hB),
             maxW: roomRight(hB),
             side: sideOf(hB, { edge: 'left', px: 6 }),
-            text: 'Proposed burn · ' + o.dv.toFixed(1) + ' mm/s',
-            short: o.dv.toFixed(1) + ' mm/s',
-            title: 'Proposed burn · ' + OPTION_NAMES[o.key],
+            text: passed ? 'time passed' : o.dv.toFixed(1) + ' mm/s',
+            short: passed ? 'passed' : o.dv.toFixed(1) + ' mm/s',
+            title: 'Proposed burn · ' + OPTION_NAMES[o.key] + ' · ' + at(hB),
             lines: [
               o.dv.toFixed(1) + ' mm/s ' + dirShort(o.alpha).toLowerCase() + (o.key === 'coa3' ? ', 24 h after message ' : ', planned at message ') + (pl.key + 1) + '.',
+              ...(passed ? ['That burn time passed ' + dh(T - hB) + ' ago; re-plan at the next message.'] : []),
               'Pc after ' + withOdds(o.pcAfter) + ' · miss after ' + mTxt(o.missAfter) + '.',
               pl.overNow ? 'Past the ' + budget + ' mm/s deadline.' : 'Decide by ' + at(pl.dlAbs) + ', in ' + dh(pl.left) + '.',
               'Not approved yet. Click the bar to review.',
@@ -355,7 +365,7 @@ export function buildLegend(budget: number): LegendItem[] {
     { key: 'bar', label: 'known', name: 'Event bar', tip: 'From the event’s first message to now. Each event is its own stream of messages, about one every 8 h. Faded: closest approach has passed.' },
     { key: 'pc', label: 'Pc ≥ 1e-4', name: 'Orange stretch', tip: 'Time when the latest message had Pc at or above 1e-4, the action threshold. In the open-events strip, the orange line is the count to decide at each run, on its own scale.' },
     { key: 'ahead', label: 'to closest approach', name: 'Dashed outline', tip: 'Time left until closest approach. Those messages have not arrived yet.' },
-    { key: 'burn', label: 'proposed burn', name: 'Proposed burn', tip: 'The planner’s lowest-Δv option that brings Pc below 1e-4 and the miss above 1 km. It waits for approval.' },
+    { key: 'burn', label: 'proposed burn', name: 'Proposed burn', tip: 'The planner’s recommended option (robust when it has one), drawn at its burn time with its Δv. It aims for Pc below 1e-4 and a miss above 1 km; check the gate before approving. It waits for approval.' },
     { key: 'deadline', label: 'decision deadline', name: 'Decision deadline', tip: 'After this, the cheapest burn needs more than the ' + budget + ' mm/s Δv budget.' },
     { key: 'end', label: 'passed unmitigated', name: 'Red end dot', tip: 'Closest approach passed with Pc still at or above 1e-4 and no approved burn. Grey: passed below 1e-4. Teal: burn approved.' },
     { key: 'band', label: 'next 24 h', name: 'Next 24 h', tip: 'The window the Next 24 h panel counts: closest approach within the next 24 h (time_to_tca ≤ 1 day) of this run.' },

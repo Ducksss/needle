@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { coa, ev, realData, realReplay, replayOf } from '../test/fixtures';
-import { EMPTY_LANE_H, buildDock, decideCounts, densityCounts } from './dock';
+import { buildDock, decideCounts, densityCounts } from './dock';
 import { buildNext } from './header';
 import { buildQueue } from './queue';
 import { initialSelection, isKnown, rtnAt, stateAt } from './replay';
@@ -15,7 +15,7 @@ describe('Decide tab', () => {
   ]);
 
   it('drops the DECIDE chip but keeps DEFERRED', () => {
-    const ctx = runCtx(rp, 0, 10, { ...NO_DECISIONS, deferred: { 2: 1 } });
+    const ctx = runCtx(rp, 0, 10, { ...NO_DECISIONS, deferred: { 2: [1] } });
     const rows = buildQueue(ctx, snapshot(ctx), 'needs', null).rows;
     expect(rows.find((r) => r.id === 1)?.chip).toBeNull();
     expect(rows.find((r) => r.id === 2)?.chip?.label).toBe('DEFERRED');
@@ -50,12 +50,14 @@ describe('timeline', () => {
     expect(data.replay.runs).toBe(approved.length);
   });
 
-  it('collapses lanes with nothing reported yet instead of hiding them', () => {
+  it('adds a lane only once a satellite has an escalation known by then, and never drops it', () => {
     const rp = realReplay();
-    const lanes = buildDock(runCtx(rp, 0, 10, NO_DECISIONS), null, null, 'coa1').lanes;
-    const last = buildDock(runCtx(rp, rp.runs - 1, 10, NO_DECISIONS), null, null, 'coa1').lanes;
-    expect(lanes.map((l) => l.sat)).toEqual(last.map((l) => l.sat));
-    for (const l of lanes) expect(l.empty ? l.h === EMPTY_LANE_H && l.bars.length === 0 : l.h > EMPTY_LANE_H).toBe(true);
+    let prev: string[] = [];
+    for (let run = 0; run < rp.runs; run++) {
+      const sats = buildDock(runCtx(rp, run, 10, NO_DECISIONS), null, null, 'coa1').lanes.map((l) => l.sat);
+      for (const s of prev) expect(sats).toContain(s);
+      prev = sats;
+    }
   });
 
   it('fades passed events and flags the ones that changed this run', () => {
@@ -167,7 +169,7 @@ describe('review fixes', () => {
     c.opts[0] = { ...c.opts[0], feasible: false };
     const e = ev(1, 300, [[0, -3.5, 400]], { coa: { '0': c } });
     const marks = buildDock(runCtx(replayOf([e]), 0, 10, NO_DECISIONS), null, null, 'coa1').lanes.flatMap((l) => l.marks);
-    expect(marks.map((m) => m.text)).toEqual(['Proposed burn · 5.0 mm/s']);
+    expect(marks.map((m) => m.text)).toEqual(['5.0 mm/s']);
   });
 
   it('names an over-80 window a day later, not an impossible one', () => {

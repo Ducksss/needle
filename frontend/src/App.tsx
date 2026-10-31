@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
 import { readBudget, writeBudget } from './budget';
+import { useHoverCardFit } from './hooks';
 import { ApprovalModal } from './components/ApprovalModal';
 import { DecisionLog, OrbitContext, SinceLastRun } from './components/Context';
 import { Header } from './components/Header';
@@ -13,7 +14,7 @@ import type { ConsoleData, OptionKey } from './data/types';
 import type { QueueTab } from './model/queue';
 import { initialSelection } from './model/replay';
 import { DEFAULT_OPTION, type Decisions, NO_DECISIONS } from './model/run';
-import { type UiState, approve, buildView, defer } from './model/view';
+import { type UiState, approve, buildView, defer, queueTabFor } from './model/view';
 
 const PLAY_MS = 1200;
 
@@ -66,11 +67,17 @@ function reducer(s: State, a: Action): State {
       if (s.ui.run >= lastRun(s)) return { ...s, playing: false };
       return { ...s, flash: true, ui: { ...s.ui, fromRun: s.ui.run, run: s.ui.run + 1 } };
     case 'play':
+      // At the last run, Play starts the replay again from run 1.
+      if (!s.playing && s.ui.run >= lastRun(s)) return { ...s, playing: true, flash: true, ui: { ...s.ui, fromRun: s.ui.run, run: 0 } };
       return { ...s, playing: !s.playing };
     case 'tab':
-      return { ...s, ui: { ...s.ui, tab: a.tab } };
-    case 'pick':
-      return { ...s, modal: false, ui: { ...s.ui, sel: a.id, opt: DEFAULT_OPTION, tab: a.tab ?? s.ui.tab } };
+      return { ...s, flash: false, ui: { ...s.ui, tab: a.tab } };
+    case 'pick': {
+      // Show the event in the queue tab that lists it; keep the chosen option when it is already selected.
+      const tab = a.tab ?? (s.data ? queueTabFor(s.data, s.ui, a.id) : null) ?? s.ui.tab;
+      const opt = a.id === s.ui.sel ? s.ui.opt : DEFAULT_OPTION;
+      return { ...s, modal: false, flash: false, ui: { ...s.ui, sel: a.id, opt, tab } };
+    }
     case 'opt':
       return { ...s, ui: { ...s.ui, opt: a.opt } };
     case 'modal':
@@ -92,11 +99,13 @@ function revealWorkspace() {
   const el = document.getElementById('workspace');
   if (!el) return;
   const top = el.getBoundingClientRect().top;
-  if (top < 0 || top > window.innerHeight * 0.6) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (top < 0 || top > window.innerHeight * 0.6) el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
 }
 
 export function App() {
   const [s, dispatch] = useReducer(reducer, undefined, initState);
+  useHoverCardFit();
 
   useEffect(() => {
     let live = true;
@@ -179,7 +188,7 @@ export function App() {
           onPick={(id) => pickAndReveal(id)}
         />
         <p className="notes">
-          Data notes: each message is a real ESA training-set CDM, with timing kept relative to closest approach; the 21-day calendar is simulated. Pc model: encounter plane from the CDM’s
+          Data notes: each message is a real ESA training-set CDM, with timing kept relative to closest approach; the 21-day calendar is simulated, with 64 runs 8 h apart; the last run falls at its close, Day 22 00:00. Pc model: encounter plane from the CDM’s
           relative state, both covariances and object sizes; it reproduces ESA’s Pc within 0.1 orders of magnitude for {notes.pcModelWithin01} of {notes.coaMessages} escalation messages. Burn
           response: Clohessy-Wiltshire, checked against two-body propagation. Not modelled: drag, J2, burn execution error, re-screening against the full catalogue. Spacecraft: 1,000 kg, 1 N, Isp
           220 s assumed. Δv budget is a tweak (now {view.budget} mm/s).

@@ -57,8 +57,8 @@ describe('decisions', () => {
       return st;
     };
     expect(chipFor(runCtx(rp, 1, 10, NO_DECISIONS), e, s(1)).label).toBe('DECIDE');
-    expect(chipFor(runCtx(rp, 1, 10, dec({ deferred: { 7: 2 } })), e, s(1)).label).toBe('DEFERRED');
-    expect(chipFor(runCtx(rp, 2, 10, dec({ deferred: { 7: 2 } })), e, s(2)).label).toBe('DECIDE');
+    expect(chipFor(runCtx(rp, 1, 10, dec({ deferred: { 7: [2] } })), e, s(1)).label).toBe('DEFERRED');
+    expect(chipFor(runCtx(rp, 2, 10, dec({ deferred: { 7: [2] } })), e, s(2)).label).toBe('DECIDE');
     expect(chipFor(runCtx(rp, 2, 10, dec({ approved: { 7: 2 } })), e, s(2)).label).toBe('APPROVED');
     expect(chipFor(runCtx(rp, 0, 10, dec({ approved: { 7: 2 } })), e, s(0)).label).toBe('DECIDE');
     expect(chipFor(runCtx(rp, 25, 10, NO_DECISIONS), e, s(25)).label).toBe('PASSED · UNMITIGATED');

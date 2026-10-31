@@ -2,7 +2,7 @@
 
 import type { CoaOption, Forecast, Mission, OptionKey, ReplayEvent } from '../data/types';
 import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, sci } from './format';
-import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, TIER_TIP, bucketOf, isKnown, planAt, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
+import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, PLAN_CUTOFF_H, TIER_TIP, bucketOf, burnAt, burnPassed, isKnown, planAt, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
 import { type ForecastCard, type MissForecast, forecastAt, forecastCard, forecastLine, rangeTxt } from './forecast';
 import { type Chip, type RunCtx, OPTION_NAMES, approvedAt, chipFor, isDeferredNow, orderedFeasible } from './run';
 import { BUCKET_COLOR, C, TONE, type Tone } from './theme';
@@ -144,6 +144,8 @@ export interface OptionRow {
   pcAfterTitle: string | undefined;
   missAfter: string;
   on: boolean;
+  /** The burn time this option planned has gone by: shown, but it cannot be chosen. */
+  passed: boolean;
 }
 
 export interface OptionsView {
@@ -154,6 +156,8 @@ export interface OptionsView {
   approved: boolean;
   /** Approved: the options table shows the approved option and cannot change it. */
   locked: boolean;
+  /** The selected option's burn time has passed, so it cannot be approved. */
+  burnPassed: boolean;
   reviewLabel: string;
 }
 
@@ -192,6 +196,8 @@ export interface ModalView {
   pcAfterOdds: string | null;
   rationale: string;
   approveLabel: string;
+  /** The planned burn time has gone by: approval is blocked. */
+  burnPassed: boolean;
   att: Attitude;
   checks: GateCheck[];
 }
@@ -305,7 +311,13 @@ function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | nu
   } else if (appr != null) {
     status = 'Burn approved at run ' + appr + ' (simulated). Later messages are the real recorded ones, so they do not show the burn’s effect.';
   } else if (s.bucket === 'pc') {
-    status = plan ? 'Pc at or above 1e-4. Choose a burn, or defer to the next screening run.' : 'Pc at or above 1e-4, but closest approach is under 3 h away. Hand over to flight dynamics.';
+    status = !plan
+      ? e.tca - ctx.T < PLAN_CUTOFF_H
+        ? 'Pc at or above 1e-4, but closest approach is under 3 h away. Hand over to flight dynamics.'
+        : 'Pc at or above 1e-4, but the planner gave no burn plan for this message. Re-check at the next message.'
+      : isDeferredNow(ctx, e.id)
+        ? 'Deferred at this run. It returns to Decide at the next run.'
+        : 'Pc at or above 1e-4. Choose a burn, or defer to the next screening run.';
   } else if (s.peaked) {
     status = 'Pc reached 1e-4 earlier and has fallen back. The plan was withdrawn; watching to closest approach.';
   } else {
@@ -358,9 +370,12 @@ function buildOther(ctx: RunCtx, e: ReplayEvent, s: KnownState): { other: OtherV
       ],
     };
   } else if (s.bucket === 'pc') {
+    const late = e.tca - ctx.T < PLAN_CUTOFF_H;
     other = {
-      title: 'Too close to plan',
-      text: 'A burn this close to closest approach needs flight-dynamics planning outside this tool.',
+      title: late ? 'Too close to plan' : 'No burn plan for this message',
+      text: late
+        ? 'A burn this close to closest approach needs flight-dynamics planning outside this tool.'
+        : 'The planner did not run for this message, so there is no burn to review. Needle plans again when the next message arrives.',
       facts: [
         { k: 'Pc', v: pcTxt(s.last[1]) },
         { k: 'To TCA', v: dh(e.tca - ctx.T) },
@@ -495,9 +510,23 @@ export function buildAttitude(alpha: number): Attitude {
   };
 }
 
-export function buildGateChecks(plan: Plan, opt: CoaOption, budget: number): GateCheck[] {
+export function buildGateChecks(e: ReplayEvent, plan: Plan, opt: CoaOption, budget: number): GateCheck[] {
   const cev = plan.c;
   const wNow = waitDv(cev, windowIndex(cev, plan.age));
+  const T = plan.msgT + plan.age;
+  const passed = burnPassed(e, plan, opt);
+  const inNow = Math.round((burnAt(e, opt) - plan.msgT) / 6) === Math.floor(plan.age / 6);
+  const nowTxt = wNow != null ? wNow.toFixed(1) + ' mm/s' : 'over 80 mm/s';
+  // The burn must still be ahead, and a burn in the current window must not promise less Δv than that window needs.
+  const timing: GateCheck = passed
+    ? {
+        ok: false,
+        title: 'Planned burn time passed ' + dh(T - burnAt(e, opt)) + ' ago.',
+        detail: 'The current window needs ' + nowTxt + '; this plan offered ' + opt.dv.toFixed(1) + ' mm/s. Re-plan at the next message.',
+      }
+    : inNow && wNow != null && opt.dv + 0.05 < wNow
+      ? { ok: false, title: 'Δv below what the current window needs.', detail: opt.dv.toFixed(1) + ' mm/s planned; the current window needs ' + nowTxt + '.' }
+      : { ok: true, title: 'Plan computed ' + Math.round(plan.age) + ' h ago.', detail: inNow ? 'Burn falls in the current window (' + nowTxt + ').' : 'Burn in ' + dh(burnAt(e, opt) - T) + '.' };
   return [
     { ok: opt.pcAfter < 1e-4, title: 'Pc after burn below 1e-4.', detail: sci(opt.pcAfter) + '.' },
     { ok: opt.missAfter > 1000, title: 'Miss after burn above 1 km.', detail: mTxt(opt.missAfter) + '.' },
@@ -507,11 +536,7 @@ export function buildGateChecks(plan: Plan, opt: CoaOption, budget: number): Gat
       detail: cev.pcModelOk ? 'Within 0.1 orders of magnitude.' : 'Effective radius ' + cev.hbrEff.toFixed(1) + ' m.',
     },
     { ok: opt.dv <= budget, title: opt.dv <= budget ? 'Within the Δv budget.' : 'Above the Δv budget.', detail: opt.dv.toFixed(1) + ' of ' + budget + ' mm/s.' },
-    {
-      ok: plan.age < 6 || (wNow != null && wNow <= budget),
-      title: 'Plan computed ' + Math.round(plan.age) + ' h ago.',
-      detail: 'Best burn in the current window: ' + (wNow != null ? wNow.toFixed(1) + ' mm/s.' : 'over 80 mm/s.'),
-    },
+    timing,
     { ok: false, title: 'Not verified here:', detail: 'burn execution error, drag and J2, and re-screening the new orbit against the catalogue.' },
   ];
 }
@@ -520,6 +545,10 @@ function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: CoaOption): Mo
   const cev = plan.c;
   const approved = approvedAt(ctx, e.id) != null;
   const obj = e.obj.toLowerCase();
+  const passed = burnPassed(e, plan, opt);
+  const T = plan.msgT + plan.age;
+  // Pc now is ESA's Pc for the planning message, as everywhere else; the after value is the planner's model.
+  const pcNow = e.m[plan.key][1];
   const aheadTxt = opt.dT >= 0 ? 'arrive about ' + (opt.dT / 1000).toFixed(1) + ' km earlier along the track' : 'arrive about ' + (-opt.dT / 1000).toFixed(1) + ' km later along the track';
   return {
     id: e.id,
@@ -528,7 +557,9 @@ function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: CoaOption): Mo
     optName: OPTION_NAMES[opt.key],
     approved,
     status: approved ? 'Approved · queued for upload' : 'Awaiting approval',
-    when: 'Message ' + (plan.key + 1) + (opt.key === 'coa3' ? ' + 24 h, ' : ' time, ') + Math.round(opt.leadH) + ' h before closest approach',
+    when:
+      'Message ' + (plan.key + 1) + (opt.key === 'coa3' ? ' + 24 h, ' : ' time, ') + Math.round(opt.leadH) + ' h before closest approach' +
+      (passed ? ' (passed ' + dh(T - burnAt(e, opt)) + ' ago)' : ''),
     dv: opt.dv.toFixed(1) + ' mm/s',
     dirLong: dirLong(opt.alpha),
     beta: opt.beta,
@@ -537,25 +568,30 @@ function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: CoaOption): Mo
     dA: 'semi-major axis ' + (opt.dA >= 0 ? '+' : '') + opt.dA.toFixed(1) + ' m',
     missNow: mTxt(cev.miss),
     missAfter: mTxt(opt.missAfter),
-    pcNow: pcTxt(cev.risk),
-    pcNowOdds: pcOdds(cev.risk),
+    pcNow: pcTxt(pcNow),
+    pcNowOdds: pcOdds(pcNow),
     pcAfter: sci(opt.pcAfter),
     pcAfterOdds: odds(opt.pcAfter),
     rationale:
       'The ' + (obj === 'unknown' ? 'unidentified object' : obj) + ' passes ' + mTxt(cev.miss) + ' away at ' + cev.relSpeed.toFixed(1) + ' km/s on a ' + Math.round(cev.crossDeg) +
       '° crossing. This ' + dirShort(opt.alpha).toLowerCase() + ' burn makes us ' + aheadTxt + ' by closest approach, which opens the encounter-plane miss to ' + mTxt(opt.missAfter) +
       ' and cuts Pc to ' + sci(opt.pcAfter) + '.',
-    approveLabel: approved ? 'Approved' : 'Approve and queue upload',
+    approveLabel: approved ? 'Approved' : passed ? 'Burn time passed' : 'Approve and queue upload',
+    burnPassed: !approved && passed,
     att: buildAttitude(opt.alpha),
-    checks: buildGateChecks(plan, opt, ctx.budget),
+    checks: buildGateChecks(e, plan, opt, ctx.budget),
   };
 }
 
-/** The feasible option the operator picked, else the first in display order (robust first). */
-export function pickOption(plan: Plan | null, key: OptionKey): CoaOption | null {
+/**
+ * The feasible option the operator picked, else the first in display order (robust first). Options whose burn time has
+ * passed are skipped while another is still ahead.
+ */
+export function pickOption(plan: Plan | null, key: OptionKey, e?: ReplayEvent): CoaOption | null {
   if (!plan) return null;
   const feasible = orderedFeasible(plan.c.opts);
-  return feasible.find((o) => o.key === key) ?? feasible[0] ?? null;
+  const live = e ? feasible.filter((o) => !burnPassed(e, plan, o)) : feasible;
+  return live.find((o) => o.key === key) ?? live[0] ?? feasible.find((o) => o.key === key) ?? feasible[0] ?? null;
 }
 
 /** Same Δv and direction: the minimum-Δv burn already meets the robust target. */
@@ -576,7 +612,7 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
   // An approved burn stays the one approved, even when a later message brings a new plan.
   const stored = approvedAt(ctx, e.id) != null ? ctx.dec.approvedPlan[e.id] : undefined;
   const plan = live && stored && e.coa[String(stored.key)] ? planAt(e, stored.key, ctx.T, ctx.budget) : live;
-  const opt = pickOption(plan, stored ? stored.opt : optKey);
+  const opt = stored && plan ? (orderedFeasible(plan.c.opts).find((o) => o.key === stored.opt) ?? null) : pickOption(plan, optKey, e);
   const fc = forecastAt(forecast, e, st);
   const header = buildHeader(ctx, e, st, plan, mission);
   const hist = buildHistory(e, st, ctx.T, fc);
@@ -595,17 +631,19 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
       rows: optsAll.map((o) => ({
         key: o.key,
         name: OPTION_NAMES[o.key],
-        dir: optionSub(o, optsAll, plan.c.robustMissM),
+        dir: optionSub(o, optsAll, plan.c.robustMissM) + (burnPassed(e, plan, o) ? ' · burn time passed' : ''),
         dvTxt: o.dv.toFixed(1) + ' mm/s',
         pcAfter: sci(o.pcAfter),
         pcAfterTitle: odds(o.pcAfter) ?? undefined,
         missAfter: mTxt(o.missAfter),
         on: o.key === opt.key,
+        passed: burnPassed(e, plan, o),
       })),
       decision: appr != null ? 'Approved at run ' + appr + '.' : isDeferredNow(ctx, e.id) ? 'Deferred at this run; re-check after the next message.' : 'Not decided.',
-      canDefer: appr == null,
+      canDefer: appr == null && !isDeferredNow(ctx, e.id),
       approved: appr != null,
       locked: stored != null,
+      burnPassed: appr == null && burnPassed(e, plan, opt),
       reviewLabel: appr != null ? 'View approved plan' : 'Review and approve',
     };
     const planner: PlannerView = { plan, opt, wc: buildCostOfWaiting(ctx, plan, facts), bp: buildEncounterPlane(plan, opt), opts, modal: buildModal(ctx, e, plan, opt) };

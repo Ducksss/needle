@@ -9,7 +9,8 @@ import { type GlobeScene, buildGlobeScene } from './globe';
 import { type Lapse, lapseBetween } from './lapse';
 import { type Kpi, type NextDecision, buildKpis, buildNext } from './header';
 import { type QueueTab, type QueueView, buildQueue } from './queue';
-import { type Decisions, type LogEntry, OPTION_NAMES, changedSincePrev, runCtx, snapshot } from './run';
+import { isKnown, stateAt } from './replay';
+import { type Decisions, type LogEntry, OPTION_NAMES, changedSincePrev, queueOf, runCtx, snapshot } from './run';
 import { type WarningsView, buildWarnings } from './warnings';
 import { type WorkspaceView, buildWorkspace } from './workspace';
 
@@ -79,13 +80,13 @@ export function buildView(data: ConsoleData, ui: UiState): ConsoleView {
     lapse,
     clock: 'Run ' + (ui.run + 1) + ' of ' + replay.runs + ' · Day ' + day + ', ' + hh + ':00',
     budget: ui.budget,
-    kpis: buildKpis(snap),
-    next: buildNext(snap, ui.budget, ui.sel),
+    kpis: buildKpis(snap, ui.run),
+    next: buildNext(snap, ui.budget, ui.sel, ctx),
     queue: buildQueue(ctx, snap, ui.tab, ui.sel, changed, data.forecast ?? null),
     ws,
     globe: buildGlobeScene({ missions: fleet.missions, events: replay.events, T: ctx.T, lapse, open: snap.open, sel: selRow, opt }),
-    digest: buildDigest(snap),
-    log: buildLog(ui.dec.log),
+    digest: buildDigest(snap, ui.run),
+    log: buildLog(ui.dec.log, ui.run + 1),
     dock: buildDock(ctx, ui.sel, selRow?.e.sat ?? null, ui.opt, changed),
     legend: buildLegend(ui.budget),
     warnings: buildWarnings(ctx, snap, ui.sel),
@@ -93,31 +94,44 @@ export function buildView(data: ConsoleData, ui: UiState): ConsoleView {
   };
 }
 
-/** Records an approval of the selected option at the current run. */
+/** Records an approval of the selected option at the current run. A re-approval at an earlier run replaces the later one. */
 export function approve(ui: UiState, view: ConsoleView): Decisions {
-  if (view.ws.kind !== 'event' || !view.ws.planner || view.ws.planner.opts.approved) return ui.dec;
+  if (view.ws.kind !== 'event' || !view.ws.planner || view.ws.planner.opts.approved || view.ws.planner.opts.burnPassed) return ui.dec;
   const id = view.ws.header.id;
   const o = view.ws.planner.opt;
   const run1 = ui.run + 1;
   const what = OPTION_NAMES[o.key] + ', ' + o.dv.toFixed(1) + ' mm/s ' + dirShort(o.alpha).toLowerCase() + '.';
   // Lower-case only the first letter: "Minimum Δv" must not become "minimum δv".
   const name = OPTION_NAMES[o.key].charAt(0).toLowerCase() + OPTION_NAMES[o.key].slice(1);
-  const entry: LogEntry = { run: run1, text: 'Approved #' + id + ': ' + name + ', ' + o.dv.toFixed(1) + ' mm/s ' + dirShort(o.alpha).toLowerCase() + '.' };
+  const entry: LogEntry = { run: run1, id, kind: 'approve', text: 'Approved #' + id + ': ' + name + ', ' + o.dv.toFixed(1) + ' mm/s ' + dirShort(o.alpha).toLowerCase() + '.' };
   return {
     ...ui.dec,
     approved: { ...ui.dec.approved, [id]: run1 },
     approvedTxt: { ...ui.dec.approvedTxt, [id]: what },
     approvedPlan: { ...ui.dec.approvedPlan, [id]: { key: view.ws.planner.plan.key, opt: o.key } },
-    log: [...ui.dec.log, entry],
+    log: [...ui.dec.log.filter((l) => !(l.id === id && l.kind === 'approve' && l.run >= run1)), entry],
   };
 }
 
-/** Records a deferral of the selected event to the next run. */
+/** Records a deferral of the selected event to the next run, once per run. */
 export function defer(ui: UiState, view: ConsoleView): Decisions {
-  if (view.ws.kind !== 'event' || !view.ws.planner) return ui.dec;
+  if (view.ws.kind !== 'event' || !view.ws.planner || !view.ws.planner.opts.canDefer) return ui.dec;
   const id = view.ws.header.id;
   const plan = view.ws.planner.plan;
   const run1 = ui.run + 1;
-  const entry: LogEntry = { run: run1, text: 'Deferred #' + id + ' to the next run' + (!plan.overNow ? ' (deadline in ' + dh(plan.left) + ')' : '') + '.' };
-  return { ...ui.dec, deferred: { ...ui.dec.deferred, [id]: run1 }, log: [...ui.dec.log, entry] };
+  if (ui.dec.deferred[id]?.includes(run1)) return ui.dec;
+  const entry: LogEntry = { run: run1, id, kind: 'defer', text: 'Deferred #' + id + ' to the next run' + (!plan.overNow ? ' (deadline in ' + dh(plan.left) + ')' : '') + '.' };
+  return { ...ui.dec, deferred: { ...ui.dec.deferred, [id]: [...(ui.dec.deferred[id] ?? []), run1] }, log: [...ui.dec.log, entry] };
 }
+
+/** The queue tab that lists an event at this run, or null when no tab does (quiet or not reported yet). */
+export function queueTabFor(data: ConsoleData, ui: UiState, id: number): QueueTab | null {
+  const e = data.replay.events.find((x) => x.id === id);
+  if (!e) return null;
+  const ctx = runCtx(data.replay, ui.run, ui.budget, ui.dec);
+  const s = stateAt(e, ctx.T, data.replay.runH);
+  if (!isKnown(s)) return null;
+  const q = queueOf(ctx, e, s);
+  return q === 'Decide' ? 'needs' : q === 'Watch' ? 'watch' : q === 'Passed' ? 'passed' : null;
+}
+

@@ -1,5 +1,5 @@
-import { useId } from 'react';
-import { useTween } from '../hooks';
+import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { fitCard, useTween } from '../hooks';
 import type { Lapse } from '../model/lapse';
 import type { DockView, EventBar, LaneMark, LegendItem } from '../model/dock';
 import { Hover, TipCard, noBreak, sideStyle } from './Hover';
@@ -40,19 +40,50 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
   const day = Math.floor(h / 24) + 1;
   const ticking = 'Run ' + (Math.round(h / runH) + 1) + ' of ' + runs + ' · Day ' + day + ', ' + hh + ':00';
   const playLabel = 'Day ' + day + ' · ' + hh + ':00';
+
+  // Tick labels within about 48 px of the playhead are hidden so its label does not sit on them.
+  const track = useRef<HTMLDivElement>(null);
+  const [trackW, setTrackW] = useState(1000);
+  useEffect(() => {
+    const el = track.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setTrackW(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const playPct = parseFloat(dock.playLeft);
+  const nearPlayhead = (left: string) => (Math.abs(parseFloat(left) - playPct) / 100) * trackW < 48;
+
+  // The density strip is one tab stop: arrow keys move between runs and show that run's card; Enter jumps to it.
+  const [kbRun, setKbRun] = useState<number | null>(null);
+  const onStripKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const cur = kbRun ?? run;
+    const next = e.key === 'ArrowLeft' ? cur - 1 : e.key === 'ArrowRight' ? cur + 1 : e.key === 'Home' ? 0 : e.key === 'End' ? runs - 1 : null;
+    if (next != null) {
+      e.preventDefault();
+      setKbRun(Math.max(0, Math.min(runs - 1, next)));
+    } else if (e.key === 'Enter' && kbRun != null) {
+      e.preventDefault();
+      onRun(kbRun);
+    }
+  };
+  const kbCard = kbRun != null ? dock.density[kbRun] : null;
+  useEffect(() => {
+    if (kbRun != null) fitCard(document.querySelector('.dens.kbd'));
+  }, [kbRun]);
   return (
     <section aria-label="Replay timeline" className="card dock">
       <div className="dock-bar">
         <div className="transport">
-          <button type="button" className="btn-icon" aria-label="Previous screening run" onClick={() => onStep(-1)}>
+          <button type="button" className="btn-icon" aria-label="Previous screening run" disabled={run <= 0} onClick={() => onStep(-1)}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <polyline points="9,2 4,7 9,12" />
             </svg>
           </button>
           <button type="button" className="play" aria-pressed={playing} onClick={onPlay}>
-            {playing ? 'Pause' : 'Play'}
+            {playing ? 'Pause' : run >= runs - 1 ? 'Replay' : 'Play'}
           </button>
-          <button type="button" className="btn-icon" aria-label="Next screening run" onClick={() => onStep(1)}>
+          <button type="button" className="btn-icon" aria-label="Next screening run" disabled={run >= runs - 1} onClick={() => onStep(1)}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <polyline points="5,2 10,7 5,12" />
             </svg>
@@ -88,13 +119,13 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
             </div>
           ))}
         </div>
-        <div className="dock-track">
+        <div className="dock-track" ref={track}>
           <div className="band" style={{ left: dock.band.left, width: dock.band.w }} />
           <div className="ticks">
             {dock.ticks.map((t) => (
               <span key={t.left}>
                 <span className="tick" style={{ left: t.left, height: t.h }} />
-                {t.label && (
+                {t.label && !nearPlayhead(t.left) && (
                   <span className={'tick-label' + (t.minor ? ' minor' : '')} style={{ left: t.left }}>
                     {t.label}
                   </span>
@@ -102,9 +133,20 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
               </span>
             ))}
           </div>
-          <div className="density">
+          <div
+            className="density"
+            tabIndex={0}
+            role="group"
+            aria-label="Open events and events to decide per run. Arrow keys move between runs, Enter jumps to one."
+            onFocus={() => setKbRun(run)}
+            onBlur={() => setKbRun(null)}
+            onKeyDown={onStripKey}
+          >
+            <span className="sr-only" aria-live="polite">
+              {kbCard ? kbCard.title + '. ' + kbCard.l1 + '. ' + kbCard.l2 : ''}
+            </span>
             {dock.density.map((d) => (
-              <span key={d.run} className="tw dens" style={{ left: d.left, width: d.w }} onClick={() => onRun(d.run)}>
+              <span key={d.run} className={'tw dens' + (kbRun === d.run ? ' kbd' : '')} style={{ left: d.left, width: d.w }} onClick={() => onRun(d.run)}>
                 <span className={'dens-open' + (d.current ? ' now' : '')} style={{ height: d.h }} />
                 <TipCard title={d.title} lines={[d.l1, d.l2]} side={d.side} />
               </span>
@@ -123,7 +165,7 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
                 return <Bar key={lit ? b.id + ':' + run : b.id} b={b} lit={lit} onPick={onPick} />;
               })}
               {ln.marks.map((m) => (
-                <Mark key={m.kind + m.left} m={m} />
+                <Mark key={m.id + ':' + m.kind} m={m} />
               ))}
             </div>
           ))}
@@ -135,7 +177,7 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
       </div>
       <div className="scrub">
         <label htmlFor="replay-run">Screening run</label>
-        <input id="replay-run" type="range" min={0} max={runs - 1} step={1} value={run} onChange={(e) => onRun(Number(e.target.value))} />
+        <input id="replay-run" type="range" min={0} max={runs - 1} step={1} value={run} aria-valuetext={clock} onChange={(e) => onRun(Number(e.target.value))} />
       </div>
     </section>
   );

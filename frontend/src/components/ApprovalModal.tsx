@@ -162,7 +162,7 @@ export function ApprovalModal({ m, clock, onClose, onApprove }: ApprovalModalPro
             <button type="button" className="btn btn-quiet" onClick={onClose}>
               Cancel
             </button>
-            <button type="button" className={'btn ' + (m.approved ? 'btn-ok' : 'btn-action')} onClick={onApprove} disabled={m.approved}>
+            <button type="button" className={'btn ' + (m.approved ? 'btn-ok' : 'btn-action')} onClick={onApprove} disabled={m.approved || m.burnPassed}>
               {m.approveLabel}
             </button>
           </div>

@@ -1,6 +1,6 @@
 // Event state at a replay time, Needle buckets, brief tiers and burn plans.
 
-import type { Cdm, Coa, ReplayEvent, Rtn } from '../data/types';
+import type { Cdm, Coa, CoaOption, ReplayEvent, Rtn } from '../data/types';
 
 /** Action threshold: Pc 1e-4, as log10. */
 export const PC_ACTION = -4;
@@ -107,7 +107,10 @@ export function planAt(e: ReplayEvent, key: number, T: number, budget: number): 
   const msgT = e.m[key][0];
   const age = T - msgT;
   let firstOver: number | null = null;
+  // Scan from the window holding now: a window that has already gone by cannot set a deadline still to come.
+  const nowStart = Math.floor(Math.max(0, age) / 6) * 6;
   for (const [h, dv] of c.wait) {
+    if (h < nowStart) continue;
     if (dv == null || dv > budget) {
       firstOver = h;
       break;
@@ -124,6 +127,18 @@ const isRtn = (v: unknown): v is Rtn => Array.isArray(v) && v.length === 3 && v.
 export function rtnAt(e: ReplayEvent, i: number): Rtn | null {
   const v = e.rtn?.[i];
   return isRtn(v) ? v : null;
+}
+
+/** Replay hour of an option's burn: its lead time before closest approach. */
+export const burnAt = (e: ReplayEvent, o: CoaOption) => e.tca - o.leadH;
+
+/**
+ * The option's burn window has gone by: the 6 h window that holds now is later than the one the plan put the burn in.
+ * Its Δv is stale; the current window may need more.
+ */
+export function burnPassed(e: ReplayEvent, plan: Plan, o: CoaOption): boolean {
+  const planned = Math.round((burnAt(e, o) - plan.msgT) / 6);
+  return Math.floor(plan.age / 6) > planned;
 }
 
 /** Index of the 6 h cost-of-waiting window that contains the current time. */

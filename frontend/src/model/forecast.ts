@@ -27,6 +27,9 @@ export interface MissForecast {
   cell: ForecastCell;
   /** Chance of ending Critical given the Pc band; null with too little history or an older forecast.json. */
   pCritical: number | null;
+  /** Past events behind that chance, and the Pc band they share. */
+  pCriticalN: number | null;
+  pcBand: 0 | 1 | 2;
   missM: number;
   q10M: number;
   q50M: number;
@@ -47,11 +50,15 @@ export function forecastAt(f: Forecast | null | undefined, e: ReplayEvent, s: Kn
   const cell = f.cells[lb]?.[mb];
   if (!cell) return null;
   // cells[...].pCritical ignores Pc (an event at Pc 5e-4 would read about 5%), so it is never shown.
-  const byPc = f.pCriticalByPc?.[pcBandOf(f, s.last[1])]?.[lb]?.[mb]?.p;
+  const band = pcBandOf(f, s.last[1]);
+  const byPcCell = f.pCriticalByPc?.[band]?.[lb]?.[mb];
+  const byPc = byPcCell?.p;
   return {
     leadDays,
     cell,
     pCritical: byPc ?? null,
+    pCriticalN: byPcCell?.n ?? null,
+    pcBand: band,
     missM,
     q10M: missM * cell.ratioQ10,
     q50M: missM * cell.ratioQ50,
@@ -136,11 +143,17 @@ export interface ForecastCard {
   risk: { left: string; width: string } | null;
   oneKm: string;
   pUnder1km: string;
+  /** What the chance under 1 km rests on: "1,078 similar events". */
+  pUnder1kmBasis: string;
   pCritical: string;
+  /** What the chance of ending Critical rests on: "20 similar events at Pc ≥ 1e-4". */
+  pCriticalBasis: string;
   /** True when the chance of ending Critical is missing for lack of history. */
   pCriticalMissing: boolean;
   footnote: string;
 }
+
+const PC_BAND_TXT = ['Pc below 1e-6', 'Pc 1e-6 to 1e-4', 'Pc ≥ 1e-4'];
 
 const pct = (x: number) => (x * 100).toFixed(2) + '%';
 
@@ -159,10 +172,12 @@ export function forecastCard(fc: MissForecast, toTcaH = fc.leadDays * 24): Forec
     risk: fc.q10M < 1000 ? { left: pct(a), width: pct(Math.max(0.004, Math.min(b, k) - a)) } : null,
     oneKm: pct(k),
     pUnder1km: pctTxt(fc.cell.pUnder1km),
+    pUnder1kmBasis: fc.cell.n.toLocaleString('en-US') + ' similar events',
     pCritical: pCriticalTxt(fc),
+    pCriticalBasis: fc.pCriticalN != null ? fc.pCriticalN.toLocaleString('en-US') + ' similar events at ' + PC_BAND_TXT[fc.pcBand] : 'too few past events at ' + PC_BAND_TXT[fc.pcBand],
     pCriticalMissing: fc.pCritical == null,
     footnote:
-      'From ' + fc.cell.n.toLocaleString('en-US') + ' past events at the same lead time and distance; the band held ' + inTen(fc.coverage).replace(' in ', ' times in ') +
-      ' on ' + fc.heldOut.toLocaleString('en-US') + ' held-out events. The brief scores predictions made 2+ days out; Needle updates this at every message.',
+      'Band and chance under 1 km: past events at the same lead time and distance. Chance it ends Critical: past events that also shared the Pc band. The band held ' +
+      inTen(fc.coverage).replace(' in ', ' times in ') + ' on ' + fc.heldOut.toLocaleString('en-US') + ' held-out events. The brief scores predictions made 2+ days out; Needle updates this at every message.',
   };
 }

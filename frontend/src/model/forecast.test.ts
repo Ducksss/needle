@@ -69,7 +69,9 @@ describe('forecast lookup', () => {
     expect(pos(c.now.left)).toBeGreaterThan(pos(c.oneKm));
     expect(c.risk).not.toBeNull();
     expect([c.pUnder1km, c.pCritical]).toEqual(['15%', '70%']);
-    expect(c.footnote).toMatch(/^From 100 past events at the same lead time and distance; the band held 8 times in 10 on 2,529 held-out events\./);
+    expect(c.pUnder1kmBasis).toBe('100 similar events');
+    expect(c.pCriticalBasis).toBe('50 similar events at Pc ≥ 1e-4');
+    expect(c.footnote).toMatch(/The band held 8 times in 10 on 2,529 held-out events\./);
   });
 
   it('formats ranges and shares', () => {
@@ -100,6 +102,7 @@ describe('forecast in the console', () => {
     expect(v.ws.header.pc).toBe('5.0e-4');
     expect(v.ws.forecast.card.lead).toBe('Predicted from today’s message, 5d 22h before closest approach');
     expect(v.ws.forecast.card.pCritical).toBe('20%');
+    expect(v.ws.forecast.card.pCriticalBasis).toBe('20 similar events at Pc ≥ 1e-4');
   });
 
   it('shows no fan or line for a passed event', () => {
@@ -139,7 +142,7 @@ describe('robust burn option', () => {
       ['More margin', false],
     ]);
     expect(v.ws.planner.opts.rows[0].dir).toBe('keeps ≥ 1 km at the pessimistic end (target 1,330 m)');
-    expect(v.dock.lanes.flatMap((l) => l.marks).map((m) => m.text)).toEqual(['Proposed burn · 2.0 mm/s']);
+    expect(v.dock.lanes.flatMap((l) => l.marks).map((m) => m.text)).toEqual(['2.0 mm/s']);
     expect(buildNext(snapshot(runCtx(data.replay, 0, 10, NO_DECISIONS)), 10).text).toMatch(/Recommended burn: 2\.0 mm\/s \(robust\)\.$/);
   });
 

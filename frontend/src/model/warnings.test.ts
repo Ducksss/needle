@@ -59,7 +59,7 @@ describe('buildWarnings', () => {
 
   it('writes at most three insights, starting with the dangerous-distance one', () => {
     expect(view.insights.length).toBe(3);
-    expect(view.insights[0].text).toBe('1 of 2 passes under 1 km have Pc below 1e-6: Critical by the brief’s distance rule, far below the action threshold.');
+    expect(view.insights[0].text).toBe('1 of 2 passes under 1 km has Pc below 1e-6: Critical by the brief’s distance rule, far below the action threshold.');
     expect(view.insights[1].text).toBe('1 pass is at Pc ≥ 1e-4 in the window, with no approved burn.');
     expect(view.insights[1].eventId).toBe(4);
     expect(view.insights[2].text).toMatch(/^Earliest decision deadline: #8 \(ESA-01\) by Day 3 12:00, in 0d 12h, to stay within 10 mm\/s\.$/);

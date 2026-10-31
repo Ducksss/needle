@@ -97,8 +97,8 @@ function Options({ opts, onOpt, onReview, onDefer }: { opts: OptionsView; onOpt:
             role="radio"
             aria-checked={o.on}
             className="opt-grid opt"
-            disabled={opts.locked && !o.on}
-            title={opts.locked && !o.on ? 'The approved option is fixed.' : undefined}
+            disabled={(opts.locked || o.passed) && !o.on}
+            title={opts.locked && !o.on ? 'The approved option is fixed.' : o.passed && !o.on ? 'This option’s burn time has passed.' : undefined}
             onClick={() => onOpt(o.key)}
           >
             <span className="opt-name">
@@ -230,11 +230,17 @@ function ForecastPanel({ f }: { f: ForecastCardView }) {
         </div>
         <dl className="fc-numbers">
           <div>
-            <dt>Chance it ends under 1 km</dt>
+            <dt>
+              Chance it ends under 1 km
+              <small>{c.pUnder1kmBasis}</small>
+            </dt>
             <dd className="mono">{c.pUnder1km}</dd>
           </div>
           <div>
-            <dt>Chance it ends Critical</dt>
+            <dt>
+              Chance it ends Critical
+              <small>{c.pCriticalBasis}</small>
+            </dt>
             <dd className={'mono' + (c.pCriticalMissing ? ' fc-missing' : '')}>{c.pCritical}</dd>
           </div>
         </dl>

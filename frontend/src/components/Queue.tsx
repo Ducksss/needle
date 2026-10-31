@@ -10,7 +10,7 @@ interface QueueProps {
   onPick: (id: number) => void;
 }
 
-const URGENCY_LABEL = { calm: 'more than 24 h to the deadline', soon: 'under 24 h to the deadline', over: 'past the deadline' };
+const URGENCY_LABEL = { calm: 'more than 24 h to the deadline', soon: 'under 24 h to the deadline', over: 'past the deadline', none: 'no burn plan for this message' };
 
 export function Queue({ q, flash, run, onTab, onPick }: QueueProps) {
   return (

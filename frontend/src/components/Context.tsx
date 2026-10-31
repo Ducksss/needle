@@ -62,7 +62,7 @@ export function SinceLastRun({ d, onPick }: { d: DigestView; onPick: (id: number
           ))}
         </div>
       ))}
-      {d.quiet && <span style={{ color: 'var(--muted)' }}>No escalations, downgrades or passes this run.</span>}
+      {d.quiet && <span style={{ color: 'var(--muted)' }}>{d.first ? 'First run: there is no earlier run to compare with.' : 'No escalations, downgrades or passes this run.'}</span>}
     </section>
   );
 }
