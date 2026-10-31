@@ -15,8 +15,8 @@ shields state facts that hold while the repo is private.
 <div align="center">
   <a href="https://github.com/Ducksss/needle">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/brand/needle-lockup-dark.png">
-      <img src="docs/brand/needle-lockup.png" alt="Needle" width="360">
+      <source media="(prefers-color-scheme: dark)" srcset="docs/brand/needle-mark-dark.svg">
+      <img src="docs/brand/needle-mark.svg" alt="Needle logo" width="96" height="96">
     </picture>
   </a>
 
