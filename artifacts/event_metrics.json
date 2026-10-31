@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-31T15:34:43+08:00",
+  "generatedAt": "2026-10-31T16:03:37+08:00",
   "task": "predict each event's final tier from messages with time_to_tca >= 2 days",
   "labels": "challenge1_event_labels.xlsx",
   "split": "80/20 of usable train events, stratified by final tier, seed 42",
