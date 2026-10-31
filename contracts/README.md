@@ -81,6 +81,8 @@ How far an event's miss distance can still move before closest approach, from tr
   "cells": [[{ "n": 495, "ratioQ10": 0.677, "ratioQ50": 1.003, "ratioQ90": 1.792,
                "pUnder1km": 0.154, "pCritical": 0.154, "pooled": false }]],   // cells[leadBin][missBin]
   "robustRatioQ10": [0.976, 0.901, 0.751, 0.636, 0.529],                     // per lead bin, events now 1 to 5 km out
+  "pcEdgesLog10": [-6, -4],                                                   // Pc bands: below 1e-6, 1e-6 to 1e-4, at or above 1e-4
+  "pCriticalByPc": [[[{ "p": 0.06, "n": 8144, "pooledOver": "lead and miss" }]]], // [pcBand][leadBin][missBin]; p may be null
   "validation": { "heldOutEvents": 2529, "coverage10to90": 0.799, "coverageByLeadBin": { "0": 0.801 } },
   "excludedReplayEvents": 280
 }
@@ -90,7 +92,7 @@ To forecast an event at replay time `T`: take its latest message received by `T`
 
 - **Predicted final miss:** `miss × ratioQ50`.
 - **Lower and upper limits:** `miss × ratioQ10` and `miss × ratioQ90`. About 8 in 10 held-out outcomes fall inside them.
-- **Probabilities:** `pUnder1km` and `pCritical`.
+- **Probabilities:** `pUnder1km` from the cell. For the chance of ending Critical, use `pCriticalByPc[pcBand][leadBin][missBin].p`, where `pcBand` comes from the latest message's Pc. Pc changes this a lot: about 6% below 1e-6, and up to 75% at 1e-4 and above. `cells[...].pCritical` ignores Pc; don't show it.
 
 Pc has no band, because it swings by orders of magnitude.
 
