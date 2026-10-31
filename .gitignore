@@ -16,3 +16,4 @@ coverage/
 .DS_Store
 playwright-report/
 test-results/
+docs/brand/src/*.html
