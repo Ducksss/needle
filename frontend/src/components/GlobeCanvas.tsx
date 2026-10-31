@@ -1,5 +1,6 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef } from 'react';
-import { type GlobeScene, SPIN_RAD_PER_S, TILT_LIMIT, VIEW, VIEW0, type View } from '../model/globe';
+import { type GlobeLapse, type GlobeScene, SAT_RAD_PER_REPLAY_H, SPIN_RAD_PER_REPLAY_H, SPIN_RAD_PER_S, TILT_LIMIT, VIEW, VIEW0, type View } from '../model/globe';
+import { LAPSE_MS, easeOut, visibleTurn } from '../model/lapse';
 import { clamp } from '../model/format';
 import { drawGlobe } from './globeDraw';
 
@@ -7,8 +8,24 @@ import { drawGlobe } from './globeDraw';
 const RESUME_MS = 3000;
 const KEY_STEP = 0.18;
 
+/** A value easing from one number to another over LAPSE_MS. */
+interface Tween {
+  from: number;
+  to: number;
+  t0: number;
+}
+
+const tweenAt = (tw: Tween, now: number) => tw.from + (tw.to - tw.from) * easeOut((now - tw.t0) / LAPSE_MS);
+
 interface Live {
   view: View;
+  /** Fast-forward spin added to the view's yaw. */
+  spin: Tween;
+  /** Satellite phase along the orbits. */
+  phase: Tween;
+  effects: { marks: GlobeLapse; t0: number } | null;
+  lastKey: string | null;
+  started: boolean;
   dragging: boolean;
   hover: boolean;
   resumeAt: number;
@@ -27,11 +44,32 @@ interface Live {
 export function GlobeCanvas({ scene, label }: { scene: GlobeScene; label: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef(scene);
-  const live = useRef<Live>({ view: { ...VIEW0 }, dragging: false, hover: false, resumeAt: 0, last: 0, dirty: true, reduced: false, visible: true, px: 1, pointer: null });
+  const live = useRef<Live>({ view: { ...VIEW0 }, spin: { from: 0, to: 0, t0: 0 }, phase: { from: 0, to: 0, t0: 0 }, effects: null, lastKey: null, started: false, dragging: false, hover: false, resumeAt: 0, last: 0, dirty: true, reduced: false, visible: true, px: 1, pointer: null });
 
   useEffect(() => {
     sceneRef.current = scene;
-    live.current.dirty = true;
+    const s = live.current;
+    s.dirty = true;
+    if (!s.started) {
+      // First scene: satellites start where this run's replay time puts them, with nothing to animate.
+      const ph = SAT_RAD_PER_REPLAY_H * scene.T;
+      s.phase = { from: ph, to: ph, t0: 0 };
+      s.started = true;
+      s.lastKey = scene.lapse?.key ?? null;
+      return;
+    }
+    const lapse = scene.lapse;
+    if (!lapse || lapse.key === s.lastKey) return;
+    s.lastKey = lapse.key;
+    // Coalesce: always ease from what is on screen now to the latest target; nothing queues.
+    const now = performance.now();
+    const ease = (tw: Tween, add: number): Tween => {
+      const to = tw.to + add;
+      return s.reduced ? { from: to, to, t0: now } : { from: tweenAt(tw, now), to, t0: now };
+    };
+    s.spin = ease(s.spin, visibleTurn(SPIN_RAD_PER_REPLAY_H * lapse.dH));
+    s.phase = ease(s.phase, visibleTurn(SAT_RAD_PER_REPLAY_H * lapse.dH));
+    s.effects = !s.reduced && lapse.dH > 0 ? { marks: lapse, t0: now } : null;
   }, [scene]);
 
   useEffect(() => {
@@ -70,7 +108,14 @@ export function GlobeCanvas({ scene, label }: { scene: GlobeScene; label: string
       if (!s.visible) return;
       if (!s.reduced && !s.dragging && !s.hover && t >= s.resumeAt) s.view.yaw += (SPIN_RAD_PER_S * dt) / 1000;
       if (s.reduced && !s.dirty) return;
-      drawGlobe(ctx, sceneRef.current, s.view, { px: s.px, tMs: t, motion: !s.reduced });
+      const ph = tweenAt(s.phase, t);
+      const p = (t - s.phase.t0) / LAPSE_MS;
+      // The trail follows the remaining speed of the ease, so it shrinks to nothing as satellites settle.
+      const trail = p < 1 ? Math.max(-0.7, Math.min(0.7, (s.phase.to - s.phase.from) * 0.35 * (1 - p) * (1 - p))) : 0;
+      const fx = s.effects && t - s.effects.t0 < LAPSE_MS ? { marks: s.effects.marks, p: (t - s.effects.t0) / LAPSE_MS } : null;
+      if (!fx) s.effects = null;
+      const view = { yaw: s.view.yaw + tweenAt(s.spin, t), tilt: s.view.tilt };
+      drawGlobe(ctx, sceneRef.current, view, { px: s.px, tMs: t, motion: !s.reduced, phase: ph, trail, lapse: fx });
       s.dirty = false;
     };
     raf = requestAnimationFrame(frame);

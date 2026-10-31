@@ -1,9 +1,14 @@
 import { useId } from 'react';
+import { useTween } from '../hooks';
+import type { Lapse } from '../model/lapse';
 import type { DockView, EventBar, LaneMark, LegendItem } from '../model/dock';
 import { Hover, TipCard, noBreak, sideStyle } from './Hover';
 
 interface TimelineProps {
   dock: DockView;
+  /** Replay time of this run, hours: the clock ticks to it through the time-lapse. */
+  T: number;
+  lapse: Lapse | null;
   /** Highlight bars whose state changed since the previous run. */
   flash: boolean;
   legend: LegendItem[];
@@ -27,7 +32,9 @@ const SWATCH: Record<string, string> = {
   band: 'sw sw-band',
 };
 
-export function Timeline({ dock, flash, legend, clock, run, runs, playing, onPlay, onStep, onRun, onPick }: TimelineProps) {
+export function Timeline({ dock, T, lapse, flash, legend, clock, run, runs, playing, onPlay, onStep, onRun, onPick }: TimelineProps) {
+  const h = Math.round(useTween(T));
+  const ticking = 'Run ' + (run + 1) + ' of ' + runs + ' · Day ' + (Math.floor(h / 24) + 1) + ', ' + String(((h % 24) + 24) % 24).padStart(2, '0') + ':00';
   return (
     <section aria-label="Replay timeline" className="card dock">
       <div className="dock-bar">
@@ -46,9 +53,13 @@ export function Timeline({ dock, flash, legend, clock, run, runs, playing, onPla
             </svg>
           </button>
         </div>
-        <span className="clock" aria-live="polite">
+        <span className="clock" aria-hidden="true">
+          {ticking}
+        </span>
+        <span className="sr-only" aria-live="polite">
           {clock}
         </span>
+        {lapse?.label && <LapseChip key={lapse.key} label={lapse.label} />}
         <span className="meta">simulated calendar</span>
         <div className="legend">
           {legend.map((l) => (
@@ -88,7 +99,7 @@ export function Timeline({ dock, flash, legend, clock, run, runs, playing, onPla
           </div>
           <div className="density">
             {dock.density.map((d) => (
-              <span key={d.run} className="tw" style={{ left: d.left, width: d.w }}>
+              <span key={d.run} className="tw dens" style={{ left: d.left, width: d.w }} onClick={() => onRun(d.run)}>
                 <span className={'dens-open' + (d.current ? ' now' : '')} style={{ height: d.h }} />
                 <TipCard title={d.title} lines={[d.l1, d.l2]} side={d.side} />
               </span>
@@ -168,5 +179,14 @@ function Mark({ m }: { m: LaneMark }) {
         <span className="mark-short">{m.short}</span>
       </span>
     </Hover>
+  );
+}
+
+/** "+8 h" after a run change. It fades after a moment; under reduced motion it stays as plain text. */
+export function LapseChip({ label }: { label: string }) {
+  return (
+    <span className="lapse-chip" title="Replay time skipped by this change">
+      {label}
+    </span>
   );
 }

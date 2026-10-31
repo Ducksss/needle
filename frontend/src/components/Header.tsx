@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { useTween } from '../hooks';
 import markUrl from '../assets/needle-mark.svg';
 import type { ReplayFacts } from '../model/facts';
 import type { Kpi } from '../model/header';
@@ -49,11 +50,14 @@ export function Header({ kpis, budget, onBudget, facts }: HeaderProps) {
 
 function KpiItem({ k }: { k: Kpi }) {
   const id = useId();
+  // Counts to the new value with the time-lapse.
+  const n = Math.round(useTween(Number(k.v)));
   return (
     <div className="tw kpi" tabIndex={0} aria-describedby={id}>
       <dt>{k.label}</dt>
       <dd style={{ color: k.color }}>
-        {k.v}{' '}
+        <span aria-hidden="true">{n}</span>
+        <span className="sr-only">{k.v}</span>{' '}
         <span className="kpi-delta" style={{ color: k.dColor }}>
           {k.d}
         </span>

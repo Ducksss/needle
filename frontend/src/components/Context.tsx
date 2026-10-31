@@ -1,13 +1,17 @@
 import type { DigestView, LogRow } from '../model/digest';
 import type { GlobeScene } from '../model/globe';
 import { GlobeCanvas } from './GlobeCanvas';
+import type { Lapse } from '../model/lapse';
+import { LapseChip } from './Timeline';
 
-export function OrbitContext({ g }: { g: GlobeScene }) {
+export function OrbitContext({ g, lapse }: { g: GlobeScene; lapse: Lapse | null }) {
   return (
     <section aria-label="Orbit context" className="card side-card orbit-card">
       <div className="card-head">
         <h2>Orbit context</h2>
-        <span className="meta">orientation illustrative</span>
+        <span className="meta">
+          {lapse?.label && <LapseChip key={lapse.key} label={lapse.label} />} orientation illustrative
+        </span>
       </div>
       <div className="globe">
         <GlobeCanvas scene={g} label="Selected satellite orbit, open conjunctions, debris track and proposed path, over an illustrative world map." />

@@ -128,6 +128,33 @@ await page.waitForTimeout(150);
 await shot(page, '13b-forecast-hover.png', { fullPage: true, clip: await pageBox(page, ['.fan-wrap', '.fan-row', '.fan-label > .tt'], 14) });
 await page.close();
 
+// Time-lapse: frames about 0, 200 and 500 ms after a step, then during and after a long slider jump.
+// The viewport fits the whole console so each frame is one quick capture.
+page = await open(1440, 1760, 1);
+await page.waitForTimeout(800);
+const t0 = Date.now();
+await page.getByRole('button', { name: 'Next screening run' }).click();
+for (const ms of [0, 200, 500]) {
+  await page.waitForTimeout(Math.max(0, ms - (Date.now() - t0)));
+  await shot(page, `15-lapse-step-${ms}ms.png`);
+}
+await page.waitForTimeout(1500);
+await page.mouse.move(5, 5);
+const runsMax = Number(await page.$eval('#replay-run', (el) => el.max));
+await page.$eval(
+  '#replay-run',
+  (el, v) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, String(v));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  },
+  Math.round(runsMax * 0.6),
+);
+await page.waitForTimeout(250);
+await shot(page, '15-lapse-jump-250ms.png');
+await page.waitForTimeout(1200);
+await shot(page, '15-lapse-jump-settled.png');
+await page.close();
+
 // The globe spins and pulses: three frames one second apart, then the reduced-motion view.
 page = await open(1440, 1000, 2);
 const globe = ['section[aria-label="Orbit context"]'];

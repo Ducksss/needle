@@ -1,7 +1,8 @@
 // Orbit context globe. Orientation is illustrative: RAANs are spread evenly and altitudes are exaggerated 3×.
 // The scene is built once per run and selection in 3D; the canvas layer rotates and projects it every frame.
 
-import type { CoaOption, Mission } from '../data/types';
+import type { CoaOption, Mission, ReplayEvent } from '../data/types';
+import type { Lapse } from './lapse';
 import { clamp } from './format';
 import type { KnownRow, Row } from './run';
 import { BUCKET_COLOR, C } from './theme';
@@ -30,6 +31,10 @@ export interface View {
 export const VIEW0: View = { yaw: 0.6, tilt: 0.38 };
 /** Auto-rotation: one turn per minute. */
 export const SPIN_RAD_PER_S = (2 * Math.PI) / 60;
+/** Fast-forward spin per replay hour, as Earth turns: 15° an hour. */
+export const SPIN_RAD_PER_REPLAY_H = (15 * Math.PI) / 180;
+/** Satellites advance along their orbits by this much per replay hour (illustrative, not orbital rate). */
+export const SAT_RAD_PER_REPLAY_H = (12 * Math.PI) / 180;
 export const TILT_LIMIT = 1.3;
 
 /** [x, y, visible, depth] in the 900 × 900 view box; depth < 0 is the near side. */
@@ -69,13 +74,20 @@ export const hash = (n: number, s: number) => {
 /** Pulse and blink phase in [0, 1) at time tMs, offset per item so lights do not flash in unison. */
 export const phaseAt = (tMs: number, periodMs: number, offset: number) => (((tMs / periodMs + offset) % 1) + 1) % 1;
 
-/** A satellite icon: its position and two neighbours along the orbit, so the drawing can turn it to face its motion. */
+/** A satellite on its orbit. Its anomaly is u0 plus the shared phase, which advances with replay time. */
 export interface Icon {
-  p: Vec3;
-  prev: Vec3;
-  next: Vec3;
+  r: number;
+  inc: number;
+  raan: number;
+  u0: number;
   /** Blink offset for the nav light. */
   blink: number;
+}
+
+/** Icon position and two neighbours along the orbit, so the drawing can turn it to face its motion. */
+export function iconAt(ic: Icon, phase: number, du = 0): { p: Vec3; prev: Vec3; next: Vec3 } {
+  const u = ic.u0 + phase + du;
+  return { p: orbit3(ic.r, ic.inc, ic.raan, u), prev: orbit3(ic.r, ic.inc, ic.raan, u - 0.01), next: orbit3(ic.r, ic.inc, ic.raan, u + 0.01) };
 }
 
 export interface OrbitLine {
@@ -104,10 +116,28 @@ export interface SelectedScene {
   sat: Icon | null;
 }
 
+export interface LapseMark {
+  id: number;
+  p: Vec3;
+  color: string;
+  unmitigated: boolean;
+}
+
+/** The fast-forward from the previous run: replay hours skipped, events first reported, events that passed. */
+export interface GlobeLapse {
+  key: string;
+  dH: number;
+  arrived: LapseMark[];
+  passed: LapseMark[];
+}
+
 export interface GlobeScene {
+  /** Replay time of this run, hours. */
+  T: number;
   orbits: OrbitLine[];
   dots: EventDot[];
   sel: SelectedScene | null;
+  lapse: GlobeLapse | null;
 }
 
 const DOT_CODE: Record<string, DotCode> = { pc: 3, hidden: 2, distance: 1, elevated: 1, quiet: 0 };
@@ -116,21 +146,25 @@ export const DOT_COLOR = ['#94A3B8', '#2563EB', '#B45309', '#C2410C'];
 
 export interface GlobeInput {
   missions: Mission[];
+  /** All replay events, to place the events that passed in a lapse. */
+  events?: ReplayEvent[];
+  T?: number;
+  lapse?: Lapse | null;
   open: KnownRow[];
   /** Selected event row, when it has been reported. */
   sel: Row | null;
   opt: CoaOption | null;
 }
 
-const icon = (r: number, inc: number, raan: number, u: number, blink: number): Icon => ({
-  p: orbit3(r, inc, raan, u),
-  prev: orbit3(r, inc, raan, u - 0.01),
-  next: orbit3(r, inc, raan, u + 0.01),
-  blink,
-});
+const icon = (r: number, inc: number, raan: number, u0: number, blink: number): Icon => ({ r, inc, raan, u0, blink });
+
+/** Where an event's dot sits: near its satellite's orbit, scattered deterministically by its id. */
+function dotPos(o: { r: number; raan: number }, e: ReplayEvent): Vec3 {
+  return orbit3(o.r + (hash(e.id, 3) - 0.5) * 120, (e.inc * Math.PI) / 180, o.raan + (hash(e.id, 1) - 0.5) * 0.3, hash(e.id, 2) * 2 * Math.PI);
+}
 
 /** The 3D scene for this run and selection. The selected event sits where its orbit faces the opening view. */
-export function buildGlobeScene({ missions, open, sel, opt }: GlobeInput): GlobeScene {
+export function buildGlobeScene({ missions, events = [], T = 0, lapse = null, open, sel, opt }: GlobeInput): GlobeScene {
   const selSat = sel ? sel.e.sat : null;
   let selOrbit: { r: number; inc: number; raan: number } | null = null;
   const geo = missions.map((mm, k) => ({ r: RE + mm.alt * EX, inc: (mm.inc * Math.PI) / 180, raan: (k / missions.length) * Math.PI, label: mm.label, k }));
@@ -146,11 +180,26 @@ export function buildGlobeScene({ missions, open, sel, opt }: GlobeInput): Globe
     if (sel && x.e.id === sel.e.id) continue;
     const o = geo[x.e.mi];
     if (!o) continue;
-    const p = orbit3(o.r + (hash(x.e.id, 3) - 0.5) * 120, (x.e.inc * Math.PI) / 180, o.raan + (hash(x.e.id, 1) - 0.5) * 0.3, hash(x.e.id, 2) * 2 * Math.PI);
-    dots.push({ id: x.e.id, p, code: DOT_CODE[x.s.bucket], pulse: hash(x.e.id, 4) });
+    dots.push({ id: x.e.id, p: dotPos(o, x.e), code: DOT_CODE[x.s.bucket], pulse: hash(x.e.id, 4) });
+  }
+  let gl: GlobeLapse | null = null;
+  if (lapse) {
+    const byId = new Map(events.map((e) => [e.id, e]));
+    const codeOf = new Map(open.map((x) => [x.e.id, DOT_CODE[x.s.bucket]]));
+    const mark = (id: number, unmitigated: boolean, color: string): LapseMark[] => {
+      const e = byId.get(id);
+      const o = e ? geo[e.mi] : undefined;
+      return e && o ? [{ id, p: dotPos(o, e), color, unmitigated }] : [];
+    };
+    gl = {
+      key: lapse.key,
+      dH: lapse.dH,
+      arrived: lapse.arrived.flatMap((a) => mark(a.id, false, DOT_COLOR[codeOf.get(a.id) ?? 0])),
+      passed: lapse.passed.flatMap((x) => mark(x.id, x.unmitigated, x.unmitigated ? C.alarm : C.faint)),
+    };
   }
   const so = selOrbit as { r: number; inc: number; raan: number } | null;
-  if (!sel || sel.s.phase === 'future' || !so) return { orbits, dots, sel: null };
+  if (!sel || sel.s.phase === 'future' || !so) return { T, orbits, dots, sel: null, lapse: gl };
 
   const s = sel.s;
   let uEv = 0;
@@ -198,5 +247,5 @@ export function buildGlobeScene({ missions, open, sel, opt }: GlobeInput): Globe
       }
     }
   }
-  return { orbits, dots, sel: scene };
+  return { T, orbits, dots, sel: scene, lapse: gl };
 }

@@ -3,7 +3,8 @@
 import { type GeoPermissibleObjects, geoGraticule, geoOrthographic, geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
 import land110 from 'world-atlas/land-110m.json';
-import { DOT_COLOR, DOT_SIZE, EARTH_R, type GlobeScene, type Icon, type Pt, VIEW, type Vec3, type View, d3Rotation, phaseAt, project } from '../model/globe';
+import { DOT_COLOR, DOT_SIZE, EARTH_R, type GlobeLapse, type GlobeScene, type Icon, type Pt, VIEW, type Vec3, type View, d3Rotation, iconAt, orbit3, phaseAt, project } from '../model/globe';
+import { easeOut } from '../model/lapse';
 
 /** Natural Earth 110 m land, bundled through world-atlas. */
 const LAND = feature(land110, land110.objects.land) as GeoPermissibleObjects;
@@ -42,7 +43,7 @@ function circle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) 
 }
 
 /** Satellite glyph: a body and two panels, turned to face its motion on screen. */
-function glyph(ctx: CanvasRenderingContext2D, ic: Icon, v: View, scale: number, line: string, body: string, lineW: number): Pt | null {
+function glyph(ctx: CanvasRenderingContext2D, ic: { p: Vec3; prev: Vec3; next: Vec3 }, v: View, scale: number, line: string, body: string, lineW: number): Pt | null {
   const q = project(ic.p, v);
   if (!q[2]) return null;
   const a = project(ic.prev, v);
@@ -89,15 +90,75 @@ function navLight(ctx: CanvasRenderingContext2D, q: Pt, tMs: number, offset: num
   ctx.globalAlpha = 1;
 }
 
+/** A short trail behind a moving satellite, fading toward its tail. trail is the arc length, radians, signed by motion. */
+function trailOf(ctx: CanvasRenderingContext2D, ic: Icon, phase: number, trail: number, v: View) {
+  const steps = 10;
+  ctx.setLineDash([]);
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#64748B';
+  ctx.lineWidth = 4;
+  for (let j = 0; j < steps; j++) {
+    const u0 = ic.u0 + phase - (trail * (j + 1)) / steps;
+    const u1 = ic.u0 + phase - (trail * j) / steps;
+    const a = project(orbit3(ic.r, ic.inc, ic.raan, u0), v);
+    const b = project(orbit3(ic.r, ic.inc, ic.raan, u1), v);
+    if (!a[2] || !b[2]) continue;
+    ctx.globalAlpha = 0.5 * (1 - j / steps);
+    ctx.beginPath();
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(b[0], b[1]);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.lineCap = 'butt';
+}
+
+/** New events burst in with a bright ring; passed events fade, with a red flash when they passed unmitigated. */
+function lapseMarks(ctx: CanvasRenderingContext2D, lapse: GlobeLapse, p: number, v: View) {
+  const e = easeOut(p);
+  ctx.setLineDash([]);
+  for (const m of lapse.arrived) {
+    const q = project(m.p, v);
+    if (!q[2]) continue;
+    stroke(ctx, m.color, 5, [], 0.9 * (1 - p));
+    circle(ctx, q[0], q[1], 10 + 70 * e);
+    ctx.stroke();
+    ctx.globalAlpha = 0.85 * (1 - p);
+    ctx.fillStyle = '#FFFFFF';
+    circle(ctx, q[0], q[1], 14 * (1 - e) + 4);
+    ctx.fill();
+  }
+  for (const m of lapse.passed) {
+    const q = project(m.p, v);
+    if (!q[2]) continue;
+    if (m.unmitigated && p < 0.7) {
+      stroke(ctx, '#DC2626', 5, [], 0.9 * (1 - p / 0.7));
+      circle(ctx, q[0], q[1], 12 + 50 * e);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1 - e;
+    ctx.fillStyle = m.color;
+    circle(ctx, q[0], q[1], 7);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
 export interface DrawOpts {
   /** Canvas pixels per drawing unit. */
   px: number;
   tMs: number;
   /** False under prefers-reduced-motion: static rings, steady lights. */
   motion: boolean;
+  /** Satellite phase along the orbits, radians; advances with replay time. */
+  phase: number;
+  /** Trail arc behind each satellite while it moves, radians; 0 when settled. */
+  trail: number;
+  /** Lapse effects in progress, with their linear progress in [0, 1]. */
+  lapse: { marks: GlobeLapse; p: number } | null;
 }
 
-export function drawGlobe(ctx: CanvasRenderingContext2D, scene: GlobeScene, v: View, { px, tMs, motion }: DrawOpts) {
+export function drawGlobe(ctx: CanvasRenderingContext2D, scene: GlobeScene, v: View, { px, tMs, motion, phase, trail, lapse }: DrawOpts) {
   ctx.setTransform(px, 0, 0, px, 0, 0);
   ctx.clearRect(0, 0, VIEW, VIEW);
   ctx.lineCap = 'butt';
@@ -164,9 +225,12 @@ export function drawGlobe(ctx: CanvasRenderingContext2D, scene: GlobeScene, v: V
     ctx.lineCap = 'butt';
   }
 
+  if (lapse) lapseMarks(ctx, lapse.marks, lapse.p, v);
+
   for (const o of scene.orbits) {
     if (!o.icon) continue;
-    const q = glyph(ctx, o.icon, v, 1.4, '#64748B', '#64748B', 1.5);
+    if (trail) trailOf(ctx, o.icon, phase, trail, v);
+    const q = glyph(ctx, iconAt(o.icon, phase), v, 1.4, '#64748B', '#64748B', 1.5);
     if (q && motion) navLight(ctx, q, tMs, o.icon.blink, 4.5);
   }
 
@@ -187,7 +251,7 @@ export function drawGlobe(ctx: CanvasRenderingContext2D, scene: GlobeScene, v: V
       ctx.fill();
     }
     if (sel.sat) {
-      const s = glyph(ctx, sel.sat, v, 3.2, '#0F172A', '#0F172A', 2.5);
+      const s = glyph(ctx, iconAt(sel.sat, 0), v, 3.2, '#0F172A', '#0F172A', 2.5);
       if (s && motion) navLight(ctx, s, tMs, sel.sat.blink, 8);
     }
   }

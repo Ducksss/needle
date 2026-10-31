@@ -56,12 +56,15 @@ function reducer(s: State, a: Action): State {
       return { ...s, status: 'error' };
     case 'retry':
       return { ...s, status: 'loading', attempt: s.attempt + 1 };
-    case 'run':
-      return { ...s, playing: false, flash: true, ui: { ...s.ui, run: Math.max(0, Math.min(lastRun(s), a.run)) } };
+    case 'run': {
+      const run = Math.max(0, Math.min(lastRun(s), a.run));
+      if (run === s.ui.run) return { ...s, playing: false };
+      return { ...s, playing: false, flash: true, ui: { ...s.ui, fromRun: s.ui.run, run } };
+    }
     case 'tick':
       if (!s.playing) return s;
       if (s.ui.run >= lastRun(s)) return { ...s, playing: false };
-      return { ...s, flash: true, ui: { ...s.ui, run: s.ui.run + 1 } };
+      return { ...s, flash: true, ui: { ...s.ui, fromRun: s.ui.run, run: s.ui.run + 1 } };
     case 'play':
       return { ...s, playing: !s.playing };
     case 'tab':
@@ -156,11 +159,13 @@ export function App() {
           />
           <aside aria-label="Outlook" className="col col-right">
             <Warnings24h w={view.warnings} onPick={(id) => pickAndReveal(id)} />
-            <OrbitContext g={view.globe} />
+            <OrbitContext g={view.globe} lapse={view.lapse} />
           </aside>
         </div>
         <Timeline
           dock={view.dock}
+          T={view.T}
+          lapse={view.lapse}
           flash={s.flash}
           legend={view.legend}
           clock={view.clock}

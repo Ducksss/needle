@@ -6,6 +6,7 @@ import { type DockView, type LegendItem, buildDock, buildLegend } from './dock';
 import { type ReplayFacts, replayFacts } from './facts';
 import { dirShort, dh } from './format';
 import { type GlobeScene, buildGlobeScene } from './globe';
+import { type Lapse, lapseBetween } from './lapse';
 import { type Kpi, type NextDecision, buildKpis, buildNext } from './header';
 import { type QueueTab, type QueueView, buildQueue } from './queue';
 import { type Decisions, type LogEntry, OPTION_NAMES, changedSincePrev, runCtx, snapshot } from './run';
@@ -14,6 +15,8 @@ import { type WorkspaceView, buildWorkspace } from './workspace';
 
 export interface UiState {
   run: number;
+  /** The run shown before the latest run change, for the fast-forward between them. */
+  fromRun?: number;
   tab: QueueTab;
   sel: number | null;
   opt: OptionKey;
@@ -24,6 +27,10 @@ export interface UiState {
 export interface ConsoleView {
   run: number;
   runs: number;
+  /** Replay time of this run, hours. */
+  T: number;
+  /** The fast-forward from the previous run, or null on first load. */
+  lapse: Lapse | null;
   clock: string;
   budget: number;
   kpis: Kpi[];
@@ -59,18 +66,21 @@ export function buildView(data: ConsoleData, ui: UiState): ConsoleView {
   const changed = changedSincePrev(ctx, snap);
   const ws = buildWorkspace(ctx, selRow?.e ?? null, ui.opt, facts, selRow ? fleet.missions[selRow.e.mi] : undefined, data.forecast);
   const opt = ws.kind === 'event' && ws.planner ? ws.planner.opt : null;
+  const lapse = ui.fromRun != null && ui.fromRun !== ui.run ? lapseBetween(ctx, ui.fromRun) : null;
   const day = Math.floor(ctx.T / 24) + 1;
   const hh = String(ctx.T % 24).padStart(2, '0');
   return {
     run: ui.run,
     runs: replay.runs,
+    T: ctx.T,
+    lapse,
     clock: 'Run ' + (ui.run + 1) + ' of ' + replay.runs + ' · Day ' + day + ', ' + hh + ':00',
     budget: ui.budget,
     kpis: buildKpis(snap),
     next: buildNext(snap, ui.budget, ui.sel),
     queue: buildQueue(ctx, snap, ui.tab, ui.sel, changed, data.forecast ?? null),
     ws,
-    globe: buildGlobeScene({ missions: fleet.missions, open: snap.open, sel: selRow, opt }),
+    globe: buildGlobeScene({ missions: fleet.missions, events: replay.events, T: ctx.T, lapse, open: snap.open, sel: selRow, opt }),
     digest: buildDigest(snap),
     log: buildLog(ui.dec.log),
     dock: buildDock(ctx, ui.sel, selRow?.e.sat ?? null, ui.opt, changed),

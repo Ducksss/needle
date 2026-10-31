@@ -206,7 +206,7 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
       side: r > replay.runs * 0.625 ? { edge: 'right', px: 0 } : { edge: 'left', px: 0 },
       title: 'Run ' + (r + 1) + ' · ' + at(r * runH),
       l1: c[0] + ' events open (grey bar, true scale)',
-      l2: decide[r] + ' to decide (orange line, scale 0 to ' + decideMax + ')',
+      l2: decide[r] + ' to decide (orange line, scale 0 to ' + decideMax + '). Click to jump to this run.',
     }),
   );
   let decideLine = '';
