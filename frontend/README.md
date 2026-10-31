@@ -65,3 +65,19 @@ The timeline elements, legend, KPIs and status chips all show hover cards. Match
 ## Done when
 
 All checks pass, the screenshots are committed and referenced in the pull request, and a pull request to `main` is open.
+
+## Running it
+
+```bash
+npm install
+npm run dev          # http://localhost:5173, reads public/data/*.json
+npm run typecheck
+npm test
+npm run build        # dist/ works as a static site, no API needed
+npm run sync-data    # after ml/ rewrites ../artifacts/*.json; commit the copies
+npm run screenshots  # needs the dev server and Google Chrome; writes docs/screenshots/
+```
+
+Set `VITE_API_URL=http://localhost:8000` (no trailing `/api`) to read the API instead of the static copies.
+
+Code layout: `src/model/` holds every view value as typed pure functions (one file per panel, tests beside them), `src/components/` lays them out, and `src/styles/console.css` holds the visual system. `src/model/view.ts` is the entry point: `buildView(data, uiState)`.
