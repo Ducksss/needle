@@ -134,6 +134,8 @@ The repo has three segments that meet only through [`contracts/README.md`](contr
 | [`contracts/`](contracts/README.md) | Data shapes and API endpoints every segment codes against |
 | [`artifacts/`](artifacts/) | Built JSON and CSV outputs |
 | [`docs/brand/`](docs/brand/README.md) | Logo, lockups, cover and brand guide |
+| [`docs/pitch/`](docs/pitch/demo-script.md) | Spoken demo walkthrough for judges, with likely questions |
+| [`submission/`](submission/README.md) | Test data, our predictions, held-out labels and a scorer for judges |
 
 ### Prerequisites
 
