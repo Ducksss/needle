@@ -1,44 +1,283 @@
-# Needle
+<!-- Structure follows othneildrew/Best-README-Template. -->
+<a id="readme-top"></a>
 
-Needle is a conjunction triage console for satellite operators. It reads conjunction data messages (CDMs), computes collision probability (Pc), ranks events by the decision they need, and plans a burn when Pc reaches the action threshold.
+<!--
+Dynamic shields (contributors, stars, issues) need a public repo. These static
+shields state facts that hold while the repo is private.
+-->
+[![Autonomous SG 2026][event-shield]][event-url]
+[![Airbus Challenge #1][challenge-shield]][challenge-url]
+[![ESA Kelvins CDM data][data-shield]][data-url]
+[![Critical recall 0.992][recall-shield]][results-url]
 
-Built for Autonomous SG 2026 (Acacia Hackathon Society × NUS Product Club), AI and Aerospace track, Airbus Challenge #1: satellite collision avoidance. Data: the ESA Kelvins Collision Avoidance Challenge dataset.
+<!-- PROJECT LOGO -->
+<br />
+<div align="center">
+  <a href="https://github.com/Ducksss/needle">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/brand/needle-mark-dark.svg">
+      <img src="docs/brand/needle-mark.svg" alt="Needle logo" width="96" height="96">
+    </picture>
+  </a>
 
-## Risk tiers (from the brief)
+  <h3 align="center">Needle</h3>
 
-| Tier | Rule |
+  <p align="center">
+    Pc-first conjunction triage for satellite operators.
+    <br />
+    Rank every conjunction message by the decision it needs, then plan the burn.
+    <br />
+    <a href="contracts/README.md"><strong>Explore the docs »</strong></a>
+    <br />
+    <br />
+    <a href="#usage">View Demo</a>
+    &middot;
+    <a href="https://github.com/Ducksss/needle/issues/new?labels=bug">Report Bug</a>
+    &middot;
+    <a href="https://github.com/Ducksss/needle/issues/new?labels=enhancement">Request Feature</a>
+  </p>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#results">Results</a></li>
+        <li><a href="#built-with">Built With</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#installation">Installation</a></li>
+      </ul>
+    </li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ol>
+</details>
+
+<!-- ABOUT THE PROJECT -->
+## About The Project
+
+[![Needle cover][product-cover]](#about-the-project)
+
+Satellite operators receive conjunction data messages (CDMs) every few hours for every close approach. Most of these alerts never need action, but each one has to be checked. Needle reads the CDM telemetry, computes the collision probability (Pc), and sorts each event into the brief's tiers. It then ranks open events by the decision they need and its deadline, and plans an avoidance burn when Pc reaches the action threshold.
+
+What it adds over a distance alarm:
+
+* **Pc first, distance second.** In the ESA test set, 186 events are Critical by the brief's rules. Only 23 of them reach Pc ≥ 1e-4; the other 163 are flagged by miss distance alone, and two-thirds of those have Pc below 1e-6.
+* **A deadline for every decision.** Waiting costs Δv. The cost-of-waiting curve sets the last moment the cheapest burn still fits the Δv budget. Across 119 escalation messages, waiting 24 h raises the required Δv by a median of 1.25×.
+* **A burn plan the operator can check.** For each escalation, Needle searches thrust direction and Δv with Clohessy-Wiltshire relative motion. It shows the predicted miss and Pc after the burn, and lists the checks it did not run (drag, J2, execution error, re-screening).
+* **A replay over time.** 280 real ESA CDM histories play on a 21-day calendar of 8 h screening runs. Events move through Decide, Watch and Passed instead of being flagged all at once. High-risk events are over-sampled about 7×, and the console says so.
+
+[![Needle console][product-screenshot]](#usage)
+
+| Tier | Rule (from the brief) |
 |---|---|
 | Safe | Pc < 1e-6 and miss distance > 5 km |
 | Elevated | 1e-6 ≤ Pc < 1e-4, or miss distance 1 to 5 km |
 | Critical (manoeuvre required) | Pc ≥ 1e-4 (`risk` ≥ -4), or miss distance < 1 km |
 
-## Repository layout
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-| Folder | Owner segment | What it holds |
-|---|---|---|
-| [`ml/`](ml/README.md) | ML | Python package `needle_ml`: physics Pc, burn planner, tier classifier, artifact builders, tests |
-| [`api/`](api/README.md) | API | FastAPI service that serves the artifacts and computes Pc and burn options on demand |
-| [`frontend/`](frontend/README.md) | Frontend | React + TypeScript console: queue, workspace, replay timeline, 24 h warnings, approval modal |
-| [`contracts/`](contracts/README.md) | Shared | Data shapes and API endpoints every segment codes against |
-| [`artifacts/`](artifacts/) | ML writes, others read | Built JSON and CSV outputs (fleet, replay, test predictions, metrics) |
-| [`data/`](data/README.md) | Nobody commits here | Local copy of the ESA CSVs (git-ignored) |
+### Results
 
-Segments talk only through `contracts/` and `artifacts/`. A change to a contract needs its own pull request.
-
-## Current results
-
-Per-row tier predictions for `test_data` (24,484 rows), using only the columns the brief allows. The thresholds were chosen by event-grouped cross-validation on train. Test labels were used once, for scoring.
+Per-row tier predictions for `test_data` (24,484 rows). The model uses only the 13 columns the brief allows. Its two decision thresholds were chosen on train only, by event-grouped 5-fold cross-validation over a 0.30 to 0.95 grid; test labels were used once, for scoring. Every number below was recomputed independently from the predictions file and the test labels.
 
 | Method | Row accuracy | Macro F1 | Critical recall | Critical precision |
 |---|---|---|---|---|
 | Miss-distance rule only | 0.954 | 0.952 | 0.959 | 1.000 |
 | `max_risk_estimate` band + miss | 0.808 | 0.842 | 1.000 | 0.928 |
-| Needle classifier + miss | 0.971 | 0.972 | 0.993 | 0.988 |
+| **Needle classifier + miss** | **0.975** | **0.976** | **0.992** | **0.990** |
 
-File: [`artifacts/test_predictions.csv`](artifacts/test_predictions.csv). Script: [`ml/legacy/predict.py`](ml/legacy/predict.py).
+The gain comes from the 1,116 rows (4.6%) whose tier is set by Pc rather than miss distance. The model gets 73% of those right; the miss rule gets none. Total errors fall from 1,116 to 602, at the cost of 276 Safe rows raised to Elevated. `needle-ml build --grid legacy` reproduces the earlier thresholds (accuracy 0.971, Critical recall 0.993, 514 Safe rows raised).
 
-The physics Pc model (encounter plane, full covariance, object sizes) reproduces ESA's own Pc within 0.02 orders of magnitude for 20 of the 23 Pc-confirmed test events. It needs more columns than the brief's simplified list, so the scored predictions do not use it.
+The physics Pc model (encounter plane, full covariance, object sizes) reproduces ESA's own Pc within 0.02 orders of magnitude for 20 of the 23 Pc-confirmed test events. It uses more columns than the brief's simplified list, so the scored predictions do not depend on it.
 
-## Status
+Files: [`artifacts/test_predictions.csv`](artifacts/test_predictions.csv), [`artifacts/metrics.json`](artifacts/metrics.json).
 
-Scaffold. The ML, API and frontend segments are being built in parallel on their own branches. See each folder's README for its brief and definition of done.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### Built With
+
+* [![Python][Python-badge]][Python-url]
+* [![scikit-learn][sklearn-badge]][sklearn-url]
+* [![pandas][pandas-badge]][pandas-url]
+* [![FastAPI][FastAPI-badge]][FastAPI-url]
+* [![React][React-badge]][React-url]
+* [![TypeScript][TypeScript-badge]][TypeScript-url]
+* [![Vite][Vite-badge]][Vite-url]
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- GETTING STARTED -->
+## Getting Started
+
+The repo has three segments that meet only through [`contracts/README.md`](contracts/README.md) and the files in [`artifacts/`](artifacts/).
+
+| Folder | What it holds |
+|---|---|
+| [`ml/`](ml/README.md) | Python package `needle_ml`: physics Pc, burn planner, tier classifier, artifact builders |
+| [`api/`](api/README.md) | FastAPI service that serves the artifacts and computes Pc and burn options on demand |
+| [`frontend/`](frontend/README.md) | React + TypeScript console: queue, workspace, replay timeline, 24 h warnings, approval modal |
+| [`contracts/`](contracts/README.md) | Data shapes and API endpoints every segment codes against |
+| [`artifacts/`](artifacts/) | Built JSON and CSV outputs |
+| [`docs/brand/`](docs/brand/README.md) | Logo, lockups, cover and brand guide |
+
+### Prerequisites
+
+* Python 3.11 or newer, with [uv](https://docs.astral.sh/uv/)
+  ```sh
+  brew install uv
+  ```
+* Node.js 20 or newer, with npm
+* The ESA Kelvins Collision Avoidance Challenge CSVs (`train_data.csv`, `test_data.csv`). They are not in this repo.
+
+### Installation
+
+1. Clone the repo
+   ```sh
+   git clone https://github.com/Ducksss/needle.git
+   cd needle
+   ```
+2. Put the ESA CSVs in `data/`, or point at them
+   ```sh
+   export NEEDLE_DATA_DIR=/path/to/esa-csvs
+   ```
+3. Rebuild the artifacts (optional; built copies are committed; about 90 s)
+   ```sh
+   cd ml && uv run needle-ml build
+   ```
+4. Start the API. Installing `ml/` into it enables the on-demand Pc and burn endpoints.
+   ```sh
+   cd api && uv pip install -e ../ml && uv run uvicorn needle_api.main:app --reload --port 8000
+   ```
+5. Start the console
+   ```sh
+   cd frontend && npm install && npm run sync-data && npm run dev
+   ```
+
+Each segment's README lists its full commands and tests.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- USAGE EXAMPLES -->
+## Usage
+
+**In the console**
+
+1. Press **Play**, or drag the screening-run slider at the bottom. New CDMs arrive every 8 h of replay time.
+2. Read the **Next decision** bar: the event with the closest deadline, and the Δv it needs now.
+3. Open it in the workspace. Check the message history, where the object passes, and what waiting costs.
+4. Pick an option and **Review and approve**. The modal shows the burn plan, the predicted outcome and the gate checks.
+5. Hover over any bar, pill, tick or chip to see what it means.
+
+**From the API**
+
+```sh
+curl "http://localhost:8000/api/predictions?tier=Critical&limit=5"
+curl http://localhost:8000/api/metrics
+```
+
+**The scored predictions**
+
+`artifacts/test_predictions.csv` has one row per `test_data.csv` row, in the same order. Each row has the predicted tier, the class probabilities behind it, and the rule that set the tier.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- ROADMAP -->
+## Roadmap
+
+- [x] Pc model checked against ESA's own Pc
+- [x] Burn planner checked against two-body propagation
+- [x] Scored per-row tier predictions, independently verified
+- [x] Replay console design (A3+) with hover explanations
+- [x] Repo scaffold, data contract and brand
+- [x] `needle_ml` package with one-command artifact build ([#2](https://github.com/Ducksss/needle/pull/2))
+- [x] API service ([#1](https://github.com/Ducksss/needle/pull/1))
+- [ ] React console with the Next 24 h warnings view
+- [ ] Hosted demo
+- [ ] Pc dilution check with a "request tracking" action
+- [ ] Wait-or-burn advice from historical downgrade rates
+- [ ] Real approach trajectory in place of the illustrative globe
+
+See the [open issues](https://github.com/Ducksss/needle/issues) for proposed features and known issues.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- CONTRIBUTING -->
+## Contributing
+
+1. Read [`AGENTS.md`](AGENTS.md) and [`contracts/README.md`](contracts/README.md)
+2. Create a branch (`git checkout -b PinZheng/<topic>`)
+3. Stay inside one segment folder; propose contract changes in their own pull request
+4. Commit as `<area>(<type>): <short summary>`, for example `frontend(feat): add 24 h warnings panel`
+5. Open a pull request using the template, with your validation commands and, for UI changes, screenshots
+
+Never commit the ESA CSVs.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- LICENSE -->
+## License
+
+No license yet. All rights reserved until a `LICENSE` file is added. The ESA dataset has its own terms; this repo does not redistribute it.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- CONTACT -->
+## Contact
+
+Chai Pin Zheng · [GitHub](https://github.com/Ducksss)
+
+Project Link: [https://github.com/Ducksss/needle](https://github.com/Ducksss/needle)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- ACKNOWLEDGMENTS -->
+## Acknowledgments
+
+* [ESA Kelvins Collision Avoidance Challenge](https://kelvins.esa.int/collision-avoidance-challenge/) for the CDM dataset
+* [Spacecraft Collision Avoidance Challenge: design and results of a machine learning competition](https://arxiv.org/abs/2008.03069) (arXiv:2008.03069)
+* NASA Spacecraft Conjunction Assessment and Collision Avoidance Best Practices Handbook (NASA/SP-20205011318), the source of the brief's tier rules
+* Autonomous SG 2026, run by Acacia Hackathon Society and NUS Product Club, and Airbus for the challenge
+* [Best-README-Template](https://github.com/othneildrew/Best-README-Template)
+* [Shields.io](https://shields.io)
+* [Manrope](https://fonts.google.com/specimen/Manrope) and [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- MARKDOWN LINKS & IMAGES -->
+[event-shield]: https://img.shields.io/badge/Autonomous_SG-2026-0F172A?style=for-the-badge
+[event-url]: https://github.com/Ducksss/needle
+[challenge-shield]: https://img.shields.io/badge/Airbus-Challenge_%231-0F766E?style=for-the-badge
+[challenge-url]: https://github.com/Ducksss/needle#about-the-project
+[data-shield]: https://img.shields.io/badge/data-ESA_Kelvins_CDM-475569?style=for-the-badge
+[data-url]: https://kelvins.esa.int/collision-avoidance-challenge/
+[recall-shield]: https://img.shields.io/badge/Critical_recall-0.992-F97316?style=for-the-badge
+[results-url]: #results
+[product-cover]: docs/brand/needle-cover.png
+[product-screenshot]: docs/images/console-a3plus.png
+[Python-badge]: https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white
+[Python-url]: https://www.python.org/
+[sklearn-badge]: https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white
+[sklearn-url]: https://scikit-learn.org/
+[pandas-badge]: https://img.shields.io/badge/pandas-150458?style=for-the-badge&logo=pandas&logoColor=white
+[pandas-url]: https://pandas.pydata.org/
+[FastAPI-badge]: https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white
+[FastAPI-url]: https://fastapi.tiangolo.com/
+[React-badge]: https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB
+[React-url]: https://react.dev/
+[TypeScript-badge]: https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white
+[TypeScript-url]: https://www.typescriptlang.org/
+[Vite-badge]: https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white
+[Vite-url]: https://vite.dev/
