@@ -16,6 +16,8 @@ function fixture() {
     ev(6, 65, [[49, -8, 400]]),
     ev(7, 47.9, [[10, -8, 400]]),
     ev(8, 200, [[30, -3.5, 2000]], { coa: { '0': coa({ wait: [[0, 2], [6, 3], [12, 4], [18, 5], [24, 6], [30, 20]] }) } }),
+    // Already over the budget at T: its deadline has passed, so it is not a deadline inside the window.
+    ev(9, 300, [[40, -3.5, 2000]], { coa: { '0': coa({ wait: [[0, 12], [6, 14], [12, 16]] }) } }),
   ]);
 }
 
@@ -44,8 +46,11 @@ describe('buildWarnings', () => {
     expect(count('pc')).toBe(1);
   });
 
-  it('counts decision deadlines in the window whatever the TCA', () => {
+  it('counts decision deadlines in the window whatever the TCA, but not ones already passed', () => {
+    const nine = snapshot(ctx).needs.find((n) => n.e.id === 9);
+    expect(nine?.plan?.overNow).toBe(true);
     expect(count('deadlines')).toBe(1);
+    expect(view.insights.map((i) => i.eventId)).not.toContain(9);
   });
 
   it('labels each row with the brief tier and the Needle queue', () => {

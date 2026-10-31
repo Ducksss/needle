@@ -15,15 +15,17 @@ interface HeaderProps {
   budget: number;
   onBudget: (v: number) => void;
   facts?: ReplayFacts;
+  /** Satellites in the loaded fleet; unknown while loading. */
+  satellites?: number;
 }
 
-export function Header({ kpis, budget, onBudget, facts }: HeaderProps) {
+export function Header({ kpis, budget, onBudget, facts, satellites }: HeaderProps) {
   return (
     <header className="header">
       <div className="brand">
         <img src={markUrl} width={28} height={28} alt="" />
         <span className="brand-name">Needle</span>
-        <span style={{ color: 'var(--muted)' }}>Conjunction triage · 19 ESA satellites</span>
+        <span style={{ color: 'var(--muted)' }}>Conjunction triage{satellites != null ? ' · ' + satellites + ' ESA satellites' : ''}</span>
       </div>
       <dl className="kpis">
         {kpis.map((k) => (

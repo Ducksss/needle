@@ -26,6 +26,8 @@ export interface UiState {
 }
 
 export interface ConsoleView {
+  /** Satellites in the loaded fleet, for the header. */
+  satellites: number;
   run: number;
   runs: number;
   /** Replay time of this run, hours. */
@@ -73,6 +75,7 @@ export function buildView(data: ConsoleData, ui: UiState): ConsoleView {
   const day = Math.floor(ctx.T / 24) + 1;
   const hh = String(ctx.T % 24).padStart(2, '0');
   return {
+    satellites: fleet.missions.length,
     run: ui.run,
     runs: replay.runs,
     T: ctx.T,

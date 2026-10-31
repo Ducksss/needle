@@ -209,13 +209,15 @@ export interface FutureWindow {
   start: number;
   due: number;
   expected: number;
+  /** Passes in the window whose chance of ending Critical is unknown (too little history); not in expected. */
+  unknown: number;
 }
 
 /** Passes due in each 8 h window from T on, and the sum of their Pc-aware chances of ending Critical. */
 export function futureWindows(ctx: RunCtx, forecast: Forecast | null | undefined, until: number): FutureWindow[] {
   const { replay, T } = ctx;
   const out: FutureWindow[] = [];
-  for (let start = T; start < until; start += replay.runH) out.push({ start, due: 0, expected: 0 });
+  for (let start = T; start < until; start += replay.runH) out.push({ start, due: 0, expected: 0, unknown: 0 });
   if (!forecast) return out;
   for (const e of replay.events) {
     if (e.tca <= T || e.tca >= until) continue;
@@ -224,7 +226,9 @@ export function futureWindows(ctx: RunCtx, forecast: Forecast | null | undefined
     const w = out[Math.floor((e.tca - T) / replay.runH)];
     if (!w) continue;
     w.due++;
-    w.expected += forecastAt(forecast, e, s)?.pCritical ?? 0;
+    const p = forecastAt(forecast, e, s)?.pCritical;
+    if (p == null) w.unknown++;
+    else w.expected += p;
   }
   return out;
 }
@@ -273,7 +277,9 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
       future: true,
       side,
       title: at(r * runH) + '–' + clock((r + 1) * runH),
-      l1: w ? plural(w.due, 'pass', 'passes') + ' due, about ' + w.expected.toFixed(1) + ' expected to end Critical' : 'No forecast',
+      l1: w
+        ? plural(w.due, 'pass', 'passes') + ' due, about ' + w.expected.toFixed(1) + ' expected to end Critical' + (w.unknown ? ' (' + w.unknown + ' with too little history, not counted)' : '')
+        : 'No forecast',
       l2: 'Forecast from events already reported (dotted line). Click to jump to this run.',
     };
   });

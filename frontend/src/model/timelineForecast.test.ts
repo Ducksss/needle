@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { realData } from '../test/fixtures';
+import { ev, forecastOf, realData, replayOf } from '../test/fixtures';
 import { buildDock, dockHours, futureWindows } from './dock';
 import { forecastAt } from './forecast';
 import { isKnown, stateAt } from './replay';
@@ -44,6 +44,15 @@ describe('timeline forecast', () => {
     expect(w.reduce((a, x) => a + x.due, 0)).toBe(due);
     expect(w.some((x) => x.start >= T + 24 && x.start < T + 72 && x.due > 0)).toBe(true);
     expect(w.every((x) => x.expected <= x.due)).toBe(true);
+  });
+
+  it('counts passes with too little history apart, and says so in the window card', () => {
+    const r = replayOf([ev(1, 100, [[10, -5, 3000]]), ev(2, 100, [[10, -3.5, 1500]])]);
+    const c = runCtx(r, 2, 10, NO_DECISIONS);
+    const w = futureWindows(c, forecastOf(), dockHours(r)).find((x) => x.due > 0)!;
+    expect([w.due, w.expected, w.unknown]).toEqual([2, 0.7, 1]);
+    const d = buildDock(c, null, null, 'coa4', new Set(), forecastOf());
+    expect(d.density[w.start / 8].l1).toBe('2 passes due, about 0.7 expected to end Critical (1 with too little history, not counted)');
   });
 
   it('draws no forecast without forecast.json', () => {

@@ -33,6 +33,14 @@ try {
 const old = join(here, '..', 'public', '.data-old');
 rmSync(old, { recursive: true, force: true });
 if (existsSync(dst)) renameSync(dst, old);
-renameSync(stage, dst);
+try {
+  renameSync(stage, dst);
+} catch (err) {
+  // Put the previous copy back so the console keeps working.
+  if (existsSync(old)) renameSync(old, dst);
+  rmSync(stage, { recursive: true, force: true });
+  console.error(`sync-data: ${err.message}; public/data restored`);
+  process.exit(1);
+}
 rmSync(old, { recursive: true, force: true });
 for (const f of files) console.log(`sync-data: ${f} (${(statSync(join(dst, f)).size / 1024).toFixed(1)} KB)`);

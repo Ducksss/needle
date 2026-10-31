@@ -119,7 +119,13 @@ describe('forecast in the console', () => {
   it('ranks the Watch tab by the forecast chance of ending Critical', () => {
     const ctx = runCtx(rp, 30, 10, NO_DECISIONS);
     const q = buildQueue(ctx, snapshot(ctx), 'watch', null, new Set(), data.forecast!);
-    const ps = q.rows.map((r) => (r.col1 === 'no history' ? -1 : r.col1 === 'under 1%' ? 0 : Number(r.col1.replace('%', ''))));
+    // The unrounded chances, so two events that both show 20% still have to be in order.
+    const known = snapshot(ctx).watching;
+    const ps = q.rows.map((r) => {
+      const x = known.find((k) => k.e.id === r.id)!;
+      return forecastAt(data.forecast, x.e, x.s)?.pCritical ?? -1;
+    });
+    expect(ps.length).toBeGreaterThan(5);
     expect(ps).toEqual([...ps].sort((a, b) => b - a));
     expect(q.col).toBe('P(final Crit.)');
   });

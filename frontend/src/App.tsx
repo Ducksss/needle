@@ -151,7 +151,7 @@ export function App() {
   return (
     <>
       <div className="page">
-        <Header kpis={view.kpis} budget={view.budget} facts={view.facts} onBudget={(budget) => dispatch({ type: 'budget', budget })} />
+        <Header kpis={view.kpis} budget={view.budget} facts={view.facts} satellites={view.satellites} onBudget={(budget) => dispatch({ type: 'budget', budget })} />
         <NextDecision next={view.next} onOpen={(id) => pickAndReveal(id, 'needs')} />
         <div className="main">
           <div className="col col-left">

@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react';
 import type { OptionKey } from '../data/types';
 import type { ForecastCardView, MsgRow, OptionsView, OtherView, WorkspaceView } from '../model/workspace';
 import { CostOfWaiting, EncounterPlane, MessageHistory } from './Charts';
@@ -77,13 +78,26 @@ export function Workspace({ ws, budget, onOpt, onReview, onDefer }: WorkspacePro
 }
 
 function Options({ opts, onOpt, onReview, onDefer }: { opts: OptionsView; onOpt: (k: OptionKey) => void; onReview: () => void; onDefer: () => void }) {
+  const off = (o: OptionsView['rows'][number]) => (opts.locked || o.passed) && !o.on;
+  const live = opts.rows.filter((o) => !off(o));
+  const tabKey = (opts.rows.find((o) => o.on) ?? live[0])?.key;
+  // Radio group pattern: one tab stop; arrow keys move focus and the choice together, skipping disabled options.
+  const onKey = (ev: KeyboardEvent<HTMLDivElement>) => {
+    const d = ev.key === 'ArrowDown' || ev.key === 'ArrowRight' ? 1 : ev.key === 'ArrowUp' || ev.key === 'ArrowLeft' ? -1 : 0;
+    if (!d || live.length < 2) return;
+    ev.preventDefault();
+    const cur = Math.max(0, live.findIndex((o) => o.key === tabKey));
+    const next = live[(cur + d + live.length) % live.length];
+    ev.currentTarget.querySelector<HTMLButtonElement>('[data-key="' + next.key + '"]')?.focus();
+    onOpt(next.key);
+  };
   return (
     <div className="ws-cell" style={{ gap: 8 }}>
       <div className="card-head">
         <span className="ws-cell-title">Options</span>
         <span className="meta">{opts.basis}</span>
       </div>
-      <div role="radiogroup" aria-label="Burn options" className="options">
+      <div role="radiogroup" aria-label="Burn options" className="options" onKeyDown={onKey}>
         <div className="opt-grid opt-head" aria-hidden="true">
           <span>Option</span>
           <span>Δv</span>
@@ -96,8 +110,10 @@ function Options({ opts, onOpt, onReview, onDefer }: { opts: OptionsView; onOpt:
             type="button"
             role="radio"
             aria-checked={o.on}
+            data-key={o.key}
+            tabIndex={o.key === tabKey ? 0 : -1}
             className="opt-grid opt"
-            disabled={(opts.locked || o.passed) && !o.on}
+            disabled={off(o)}
             title={opts.locked && !o.on ? 'The approved option is fixed.' : o.passed && !o.on ? 'This option’s burn time has passed.' : undefined}
             onClick={() => onOpt(o.key)}
           >

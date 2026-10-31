@@ -450,7 +450,8 @@ function buildOther(ctx: RunCtx, e: ReplayEvent, s: KnownState): { other: OtherV
       facts: [
         { k: 'Peak Pc so far', v: pcTxt(peak) },
         { k: 'Rule triggered', v: rule },
-        { k: 'Next message', v: 'about ' + ctx.replay.runH + ' h (next run)' },
+        // Stated as the expected cadence: whether the replay holds a later message is future knowledge.
+        { k: 'Next message', v: 'expected in about ' + ctx.replay.runH + ' h (next run)' },
       ],
     };
   }
@@ -669,7 +670,8 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
   const live = planOf(e, st, ctx.T, ctx.budget);
   // An approved burn stays the one approved, even when a later message brings a new plan.
   const stored = approvedAt(ctx, e.id) != null ? ctx.dec.approvedPlan[e.id] : undefined;
-  const plan = live && stored && e.coa[String(stored.key)] ? planAt(e, stored.key, ctx.T, ctx.budget) : live;
+  // That holds even when the planner stops producing a plan (the Pc falls below 1e-4, or closest approach is under 3 h).
+  const plan = stored && st.phase === 'open' && e.coa[String(stored.key)] ? planAt(e, stored.key, ctx.T, ctx.budget) : live;
   const opt = stored && plan ? (orderedFeasible(plan.c.opts).find((o) => o.key === stored.opt) ?? null) : pickOption(plan, optKey, e);
   const fc = forecastAt(forecast, e, st);
   const header = buildHeader(ctx, e, st, plan, mission);

@@ -168,3 +168,35 @@ describe('Next decision: a recommended burn above the budget says so', () => {
     expect(seen).toBeGreaterThan(0);
   });
 });
+
+describe('Approved plan stays when the planner stops producing one', () => {
+  it('keeps the planner for an approved open event at runs where the live plan is gone', () => {
+    // Approve each Decide event at its first Decide run, then look for a later run where it is open with no live plan.
+    let checked = 0;
+    for (const e of rp.events) {
+      const first = Array.from({ length: rp.runs }, (_, r) => r).find((r) => {
+        const s = stateAt(e, r * rp.runH, rp.runH);
+        return isKnown(s) && s.phase === 'open' && planOf(e, s, r * rp.runH, 10) != null;
+      });
+      if (first == null) continue;
+      const u = ui(first, e.id);
+      const dec = approve(u, buildView(data, u));
+      if (dec === u.dec) continue;
+      for (let r = first + 1; r < rp.runs; r++) {
+        const s = stateAt(e, r * rp.runH, rp.runH);
+        if (!isKnown(s) || s.phase !== 'open' || planOf(e, s, r * rp.runH, 10) != null) continue;
+        const v = buildView(data, ui(r, e.id, { dec }));
+        expect(v.ws.kind === 'event' && v.ws.planner?.opts.approved).toBe(true);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+});
+
+describe('Header satellite count', () => {
+  it('comes from the loaded fleet', () => {
+    expect(buildView(data, ui(4, null)).satellites).toBe(data.fleet.missions.length);
+    expect(buildView({ ...data, fleet: { ...data.fleet, missions: data.fleet.missions.slice(0, 5) } }, ui(4, null)).satellites).toBe(5);
+  });
+});

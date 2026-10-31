@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { dataUrls, loadConsoleData } from './source';
+import { realData } from '../test/fixtures';
+import { checkForecast, dataUrls, isReplayEvent, loadConsoleData } from './source';
 
 describe('dataUrls', () => {
   it('reads the static copies when no API is set', () => {
@@ -21,8 +22,9 @@ describe('dataUrls', () => {
 describe('loadConsoleData', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  const FORECAST = { leadEdgesDays: [0, null], missEdgesM: [0, null], cells: [[{}]], validation: { coverage10to90: 0.8, heldOutEvents: 10 } };
-  const BODY: Record<string, object> = { 'fleet.json': { missions: [] }, 'replay.json': { events: [] }, 'metrics.json': {}, 'forecast.json': FORECAST };
+  const CELL = { n: 100, ratioQ10: 0.6, ratioQ50: 1, ratioQ90: 1.8, pUnder1km: 0.15, pCritical: 0.15, pooled: false };
+  const FORECAST = { leadEdgesDays: [0, null], missEdgesM: [0, null], cells: [[CELL]], validation: { coverage10to90: 0.8, heldOutEvents: 10 } };
+  const BODY: Record<string, object> = { 'fleet.json': { missions: [] }, 'replay.json': { runs: 64, runH: 8, events: [] }, 'metrics.json': {}, 'forecast.json': FORECAST };
   const respond = (missing: string[], body = BODY) =>
     vi.fn(async (url: string) => {
       if (missing.some((m) => url.endsWith(m))) return new Response('not found', { status: 404 });
@@ -35,7 +37,7 @@ describe('loadConsoleData', () => {
     const data = await loadConsoleData(dataUrls(undefined, '/'));
     expect(data.fleet).toEqual({ url: '/data/fleet.json', missions: [] });
     expect(data.metrics).toBeNull();
-    expect(data.replay).toEqual({ url: '/data/replay.json', events: [] });
+    expect(data.replay).toEqual({ url: '/data/replay.json', runs: 64, runH: 8, events: [] });
     expect(data.forecast).toEqual({ url: '/data/forecast.json', ...FORECAST });
   });
 
@@ -53,6 +55,29 @@ describe('loadConsoleData', () => {
 
   it('fails when a file parses but is not the contract shape', async () => {
     vi.stubGlobal('fetch', respond([], { ...BODY, 'replay.json': { runs: 64 } }));
-    await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/replay.json: missing events');
+    await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/replay.json: missing events, runs or runH');
+  });
+
+  it('fails into the error state when one event lacks its messages', async () => {
+    const good = { id: 1, sat: 'ESA-01', mi: 0, obj: 'Debris', inc: 97, tca: 30, m: [[10, -5, 900]], coa: {} };
+    vi.stubGlobal('fetch', respond([], { ...BODY, 'replay.json': { runs: 64, runH: 8, events: [good, { ...good, id: 2, m: undefined }] } }));
+    await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/replay.json: event 1 is not in the contract shape');
+  });
+});
+
+describe('contract checks', () => {
+  const data = realData();
+
+  it('accept the committed replay and forecast', () => {
+    expect(data.replay.events.every(isReplayEvent)).toBe(true);
+    const f = checkForecast(data.forecast)!;
+    expect([f.pCriticalByPc != null, f.pcForecast != null, f.validation.pcForecast?.ceilingSamples]).toEqual([true, true, 4355]);
+  });
+
+  it('reject a miss cell without its numbers, and drop only a malformed Pc outlook', () => {
+    const f = data.forecast!;
+    expect(checkForecast({ ...f, cells: [[{ ...f.cells[0][0], n: undefined }]] })).toBeNull();
+    const noPc = checkForecast({ ...f, pcForecast: { ...f.pcForecast!, cells: [[{ n: 3 }]] } })!;
+    expect([noPc.pcForecast, noPc.cells.length]).toEqual([undefined, f.cells.length]);
   });
 });
