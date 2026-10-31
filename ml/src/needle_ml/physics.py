@@ -31,7 +31,8 @@ DIRS = [(a, 0) for a in range(0, 360, 10)]
 # Wider direction grid with out-of-plane tilts, used by the legacy test-set check in coa.py.
 GRID = [(a, b) for a in range(0, 360, 10) for b in (-60, -30, 0, 30, 60)]
 
-# (key, lead offset s, Pc limit, miss limit m): coa1 Recommended, coa2 More margin, coa3 Wait 24 h
+# (key, lead offset s, Pc limit, miss limit m): coa1 Minimum, coa2 More margin, coa3 Wait 24 h.
+# coa4 Robust is added per CDM from the forecast's 10th-percentile miss shrink (see forecast.py).
 COA_TARGETS = (("coa1", 0, PC_ACTION, MISS_ACTION_M),
                ("coa2", 0, 1e-6, 2000.0),
                ("coa3", -86400, PC_ACTION, MISS_ACTION_M))
@@ -189,10 +190,17 @@ def burn_option(enc, key, res, lead_s):
             "m2After": [round(float(x)) for x in m2]}
 
 
-def burn_options(enc, dirs=DIRS, dvs=DVS_MM_S):
-    """coa1, coa2 and coa3 for an encounter. Options with no solution on the grid, or under 3 h lead, are left out."""
+def burn_options(enc, dirs=DIRS, dvs=DVS_MM_S, robust_miss_m=None):
+    """coa1, coa2 and coa3 for an encounter, plus coa4 (Robust) when robust_miss_m is above 1 km.
+
+    coa4 burns now, like coa1, but sizes the burn so the forecast's 10th-percentile miss stays at or
+    above 1 km. Options with no solution on the grid, or under 3 h lead, are left out.
+    """
+    targets = list(COA_TARGETS)
+    if robust_miss_m and robust_miss_m > MISS_ACTION_M:
+        targets.append(("coa4", 0, PC_ACTION, float(robust_miss_m)))
     opts = []
-    for key, offset, pc_max, miss_min in COA_TARGETS:
+    for key, offset, pc_max, miss_min in targets:
         lead_s = enc.lead_s + offset
         if lead_s < MIN_LEAD_S:
             continue
@@ -231,7 +239,7 @@ def wait_envelope(enc):
     return wait
 
 
-def coa_entry(cdm):
+def coa_entry(cdm, robust_miss_m=None):
     """The replay.json `coa` entry for one CDM with Pc >= 1e-4 and at least 3 h to closest approach."""
     enc = encounter(cdm)
     wait = wait_envelope(enc)
@@ -239,7 +247,9 @@ def coa_entry(cdm):
             "tca": round(float(cdm["time_to_tca"]), 2), "relSpeed": round(float(np.linalg.norm(enc.v_rel)) / 1000, 2),
             "crossDeg": round(enc.cross_deg, 1), "altKm": round(float(enc.a_km - R_EARTH_KM)),
             "m2": [round(float(x)) for x in enc.m0], "ell": enc.ell,
-            "hbrEff": round(float(enc.hbr_eff), 2), "pcModelOk": enc.pc_model_ok, "opts": burn_options(enc)}
+            "hbrEff": round(float(enc.hbr_eff), 2), "pcModelOk": enc.pc_model_ok,
+            "robustMissM": round(float(robust_miss_m or MISS_ACTION_M)),
+            "opts": burn_options(enc, robust_miss_m=robust_miss_m)}
 
 
 def pc_from_cdm(cdm):
@@ -254,7 +264,7 @@ def pc_from_cdm(cdm):
             "model": "encounter-plane"}
 
 
-def plan_burns(cdm, budget_mm_s=10.0):
+def plan_burns(cdm, budget_mm_s=10.0, robust_miss_m=None):
     """Burn options and cost-of-waiting envelope for one CDM, in the replay.json shapes.
 
     The search runs to 80 mm/s like the replay. An option is `feasible` when its Δv is within
@@ -265,7 +275,7 @@ def plan_burns(cdm, budget_mm_s=10.0):
     if _get(cdm, "time_to_tca") is None:
         raise ValueError("CDM is missing time_to_tca")
     enc = encounter(cdm)
-    opts = burn_options(enc)
+    opts = burn_options(enc, robust_miss_m=robust_miss_m)
     if budget_mm_s is not None:
         for o in opts:
             o["feasible"] = bool(o["dv"] <= budget_mm_s)

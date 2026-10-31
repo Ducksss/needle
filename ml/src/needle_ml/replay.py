@@ -8,6 +8,7 @@ least 3 h to closest approach.
 import numpy as np
 import pandas as pd
 
+from . import forecast
 from .data import latest_cdm
 from .physics import coa_entry
 
@@ -41,8 +42,12 @@ def choose_events(tr, rng):
     return chosen, high
 
 
-def build(tr, fleet, log=print):
-    """Build replay.json from train and the fleet labels. Seeded, so two builds match."""
+def build(tr, fleet, fc=None, log=print):
+    """Build replay.json from train and the fleet labels. Seeded, so two builds match.
+
+    With a forecast table `fc`, each burn-option CDM also gets coa4 (Robust), sized for the
+    forecast's 10th-percentile miss at that CDM's lead time.
+    """
     label = {m["mid"]: (i, m["label"]) for i, m in enumerate(fleet["missions"])}
     rng = np.random.default_rng(SEED)
     chosen, high = choose_events(tr, rng)
@@ -64,7 +69,7 @@ def build(tr, fleet, log=print):
             rtn.append([round(float(r.relative_position_r)), round(float(r.relative_position_t)),
                         round(float(r.relative_position_n))])
             if r.risk >= -4 and r.time_to_tca * 24 >= 3:
-                c = coa_entry(r)
+                c = coa_entry(r, robust_miss_m=forecast.robust_miss_m(fc, r.time_to_tca) if fc else None)
                 if c["opts"]:
                     coas[str(k)] = c
         events.append({"id": int(eid), "sat": sat, "mi": mi, "obj": e.c_object_type.iloc[0].title(),

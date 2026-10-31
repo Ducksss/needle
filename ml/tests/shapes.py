@@ -6,11 +6,12 @@ PC_EVENT_KEYS = {"id", "sat", "obj", "risk", "miss", "tca", "speed", "r", "t", "
 
 REPLAY_KEYS = {"runs", "runH", "windowH", "note", "events"}
 REPLAY_EVENT_KEYS = {"id", "sat", "mi", "obj", "inc", "tca", "m", "rtn", "coa"}
-COA_KEYS = {"risk", "miss", "tca", "relSpeed", "crossDeg", "altKm", "m2", "ell", "hbrEff", "pcModelOk", "wait", "opts"}
+COA_KEYS = {"risk", "miss", "tca", "relSpeed", "crossDeg", "altKm", "m2", "ell", "hbrEff", "pcModelOk", "robustMissM",
+            "wait", "opts"}
 ELL_KEYS = {"a", "b", "deg"}
 OPT_KEYS = {"key", "feasible", "dv", "alpha", "beta", "leadH", "pcAfter", "missAfter",
             "dR", "dT", "dN", "burnS", "propG", "dA", "m2After"}
-OPT_NAMES = {"coa1", "coa2", "coa3"}
+OPT_NAMES = {"coa1", "coa2", "coa3", "coa4"}
 
 PREDICTION_COLUMNS = ["row", "event_id", "time_to_tca", "miss_distance_m", "pred_log10_pc",
                       "p_pc_below_1e-6", "p_pc_1e-6_to_1e-4", "p_pc_at_least_1e-4", "pred_tier", "reason"]
