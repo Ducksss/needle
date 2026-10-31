@@ -49,7 +49,7 @@ uv run pytest                           # tests that need the CSVs skip when NEE
 - Test predictions (classifier + miss): row accuracy 0.971, macro F1 0.972, Critical recall 0.993, Critical precision 0.988. Miss-distance rule only: accuracy 0.954.
 - Physics Pc within 0.02 orders of magnitude of ESA `risk` for 20 of the 23 Pc-confirmed test events (latest CDM). The other 3 use a calibrated hard-body radius.
 - CW displacement matches two-body propagation (0.00% along-track error in the legacy check). Example: event 891 needs 7.0 mm/s retrograde for a 1,056 m miss and Pc 9.1e-5.
-- Replay: 280 events, 24 escalate to Pc ≥ 1e-4, 119 escalation CDMs with burn options, Pc model within 0.1 orders for 106 of them. Median Δv ratio for a 24 h delay is 1.25×.
+- Replay: 280 events, 23 escalate to Pc ≥ 1e-4 (24 before the 2-decimal rounding fix), 119 escalation CDMs with burn options, Pc model within 0.1 orders for 106 of them. Median Δv ratio for a 24 h delay is 1.25×.
 
 ## Tests (pytest)
 
