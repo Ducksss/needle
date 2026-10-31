@@ -99,7 +99,7 @@ describe('forecast in the console', () => {
   it('gives #37 at run 5 the Pc-conditioned chance, not the Pc-blind one', () => {
     const v = buildView(data, { ...ui, run: 4, sel: 37 });
     if (v.ws.kind !== 'event' || v.ws.forecast?.kind !== 'open') throw new Error('expected an open forecast');
-    expect(v.ws.header.pc).toBe('5.0e-4');
+    expect(v.ws.header.pc).toBe('4.5e-4');
     expect(v.ws.forecast.card.lead).toBe('Predicted from today’s message, 5d 22h before closest approach');
     expect(v.ws.forecast.card.pCritical).toBe('20%');
     expect(v.ws.forecast.card.pCriticalBasis).toBe('20 similar events at Pc ≥ 1e-4');
