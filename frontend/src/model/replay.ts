@@ -120,12 +120,10 @@ export function planAt(e: ReplayEvent, key: number, T: number, budget: number): 
 
 const isRtn = (v: unknown): v is Rtn => Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === 'number' && Number.isFinite(x));
 
-/** Relative position for message i, from Cdm[3] or the event's rtn array; null while replay.json does not carry it. */
+/** Relative position for message i, or null when replay.json does not carry it. */
 export function rtnAt(e: ReplayEvent, i: number): Rtn | null {
-  const fromMsg = e.m[i]?.[3];
-  if (isRtn(fromMsg)) return fromMsg;
-  const fromEvent = e.rtn?.[i];
-  return isRtn(fromEvent) ? fromEvent : null;
+  const v = e.rtn?.[i];
+  return isRtn(v) ? v : null;
 }
 
 /** Index of the 6 h cost-of-waiting window that contains the current time. */

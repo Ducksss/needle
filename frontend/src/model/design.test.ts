@@ -106,21 +106,19 @@ describe('charts', () => {
 });
 
 describe('relative position (brief update, 31 Oct)', () => {
-  const msgs = (): [number, number, number, [number, number, number]][] => [
-    [0, -5, 1200, [30, -1100, 400]],
-    [8, -4.5, 900, [20, -800, 350]],
+  const m = (): [number, number, number][] => [
+    [0, -5, 1200],
+    [8, -4.5, 900],
   ];
 
-  it('reads r, t, n from each message or from an event-level array', () => {
-    const a = ev(1, 100, msgs());
-    expect(rtnAt(a, 1)).toEqual([20, -800, 350]);
-    const b = ev(2, 100, [[0, -5, 1200], [8, -4.5, 900]], { rtn: [[1, 2, 3], [4, 5, 6]] });
-    expect(rtnAt(b, 0)).toEqual([1, 2, 3]);
-    expect(rtnAt(ev(3, 100, [[0, -5, 1200]]), 0)).toBeNull();
+  it('reads r, t, n from the event rtn array, aligned with m', () => {
+    const e = ev(1, 100, m(), { rtn: [[30, -1100, 400], [20, -800, 350]] });
+    expect(rtnAt(e, 1)).toEqual([20, -800, 350]);
+    expect(rtnAt(ev(2, 100, m()), 0)).toBeNull();
   });
 
   it('draws the three components on a symmetric round axis', () => {
-    const e = ev(1, 100, msgs());
+    const e = ev(1, 100, m(), { rtn: [[30, -1100, 400], [20, -800, 350]] });
     const s = stateAt(e, 10, 8);
     if (!isKnown(s)) throw new Error('unreported');
     const v = buildRtn(e, s, (hb) => 316 - hb);
@@ -128,10 +126,21 @@ describe('relative position (brief update, 31 Oct)', () => {
     expect(v?.t.split(' ')).toHaveLength(2);
   });
 
-  it('shows the empty state on the committed replay, which has no r, t, n yet', () => {
+  it('draws on the committed replay, one point per message received', () => {
     const data = realData();
     const start = initialSelection(data.replay.events, data.replay.runH, data.replay.runs);
     const v = buildView(data, { run: start.run, tab: 'needs', sel: start.sel, opt: 'coa1', budget: 10, dec: NO_DECISIONS });
+    if (v.ws.kind !== 'event') throw new Error('expected an event');
+    expect(v.ws.hist.rtn).not.toBeNull();
+    expect(v.ws.hist.rtn!.r.split(' ')).toHaveLength(Number(v.ws.header.msgs));
+    for (const e of data.replay.events) expect(e.rtn?.length).toBe(e.m.length);
+  });
+
+  it('shows the empty state for an older replay without r, t, n', () => {
+    const data = realData();
+    const start = initialSelection(data.replay.events, data.replay.runH, data.replay.runs);
+    const old = { ...data, replay: { ...data.replay, events: data.replay.events.map(({ rtn: _rtn, ...e }) => e) } };
+    const v = buildView(old, { run: start.run, tab: 'needs', sel: start.sel, opt: 'coa1', budget: 10, dec: NO_DECISIONS });
     expect(v.ws.kind === 'event' && v.ws.hist.rtn).toBeNull();
   });
 });
