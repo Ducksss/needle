@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { coa, ev, forecastOf, realData, replayOf } from '../test/fixtures';
-import { binOf, forecastAt, forecastLine, inTen, pctTxt, rangeTxt } from './forecast';
+import { binOf, forecastAt, forecastCard, forecastLine, inTen, pcBandOf, pctTxt, rangeTxt } from './forecast';
 import { buildNext } from './header';
 import { buildQueue } from './queue';
 import { initialSelection, isKnown, stateAt } from './replay';
@@ -39,8 +39,37 @@ describe('forecast lookup', () => {
     const s = stateAt(e, 41, 8);
     if (!isKnown(s)) throw new Error('unreported');
     const line = forecastLine(forecastAt(forecastOf(), e, s)!);
-    expect([line.median, line.range, line.cover, line.pUnder1km, line.pCritical]).toEqual(['1.5 km', '0.9–2.7 km', '8 in 10', '15%', '50%']);
+    expect([line.median, line.range, line.cover, line.pUnder1km, line.pCritical]).toEqual(['1.5 km', '0.9–2.7 km', '8 in 10', '15%', '30%']);
     expect(line.tip[0]).toBe('8 in 10 similar events ended inside this band (checked on 2,529 held-out events); n = 100.');
+  });
+
+  it('conditions the chance of ending Critical on the latest Pc band', () => {
+    const f = forecastOf();
+    expect([-9, -6, -5, -4, -3].map((r) => pcBandOf(f, r))).toEqual([0, 1, 1, 2, 2]);
+    const at = (risk: number, miss: number) => {
+      const e = ev(1, 100, [[40, risk, miss]]);
+      const s = stateAt(e, 41, 8);
+      if (!isKnown(s)) throw new Error('unreported');
+      return forecastAt(f, e, s)!;
+    };
+    expect(at(-9, 1500).pCritical).toBe(0.3);
+    expect(at(-3.3, 1500).pCritical).toBe(0.7);
+    expect(at(-5, 3000).pCritical).toBeNull();
+    expect(forecastLine(at(-5, 3000)).pCritical).toBe('not enough history');
+  });
+
+  it('lays out the range card on a log axis with the 1 km line', () => {
+    const e = ev(1, 100, [[40, -3.3, 1500]]);
+    const s = stateAt(e, 41, 8);
+    if (!isKnown(s)) throw new Error('unreported');
+    const c = forecastCard(forecastAt(forecastOf(), e, s)!);
+    const pos = (x: string) => Number(x.replace('%', ''));
+    expect(c.lead).toBe('Predicted from today’s message, 2d 12h before closest approach');
+    expect(pos(c.band.left)).toBeLessThan(pos(c.oneKm));
+    expect(pos(c.now.left)).toBeGreaterThan(pos(c.oneKm));
+    expect(c.risk).not.toBeNull();
+    expect([c.pUnder1km, c.pCritical]).toEqual(['15%', '70%']);
+    expect(c.footnote).toMatch(/^From 100 past events at the same lead time and distance; the band held 8 times in 10 on 2,529 held-out events\./);
   });
 
   it('formats ranges and shares', () => {
@@ -58,24 +87,32 @@ describe('forecast in the console', () => {
   const start = initialSelection(rp.events, rp.runH, rp.runs);
   const ui = { run: start.run, tab: 'needs' as const, sel: start.sel, opt: DEFAULT_OPTION, budget: 10, dec: NO_DECISIONS };
 
-  it('fans the miss chart and adds the header line for an open event', () => {
+  it('fans the miss chart and puts the forecast card first for an open event', () => {
     const v = buildView(data, ui);
     if (v.ws.kind !== 'event') throw new Error('expected an event');
-    expect(v.ws.hist.fan?.label).toMatch(/^likely final /);
-    expect(v.ws.header.forecast?.cover).toBe('8 in 10');
+    expect(v.ws.hist.fan?.label).toMatch(/^forecast · likely final /);
+    expect(v.ws.forecast?.kind).toBe('open');
+  });
+
+  it('gives #37 at run 5 the Pc-conditioned chance, not the Pc-blind one', () => {
+    const v = buildView(data, { ...ui, run: 4, sel: 37 });
+    if (v.ws.kind !== 'event' || v.ws.forecast?.kind !== 'open') throw new Error('expected an open forecast');
+    expect(v.ws.header.pc).toBe('5.0e-4');
+    expect(v.ws.forecast.card.lead).toBe('Predicted from today’s message, 5d 22h before closest approach');
+    expect(v.ws.forecast.card.pCritical).toBe('20%');
   });
 
   it('shows no fan or line for a passed event', () => {
     const last = rp.runs - 1;
     const passed = buildView(data, { ...ui, run: last, tab: 'passed', sel: null }).queue.rows[0].id;
     const v = buildView(data, { ...ui, run: last, tab: 'passed', sel: passed });
-    expect(v.ws.kind === 'event' && v.ws.hist.fan === null && v.ws.header.forecast === null).toBe(true);
+    expect(v.ws.kind === 'event' && v.ws.hist.fan === null && v.ws.forecast?.kind === 'passed').toBe(true);
   });
 
   it('ranks the Watch tab by the forecast chance of ending Critical', () => {
     const ctx = runCtx(rp, 30, 10, NO_DECISIONS);
     const q = buildQueue(ctx, snapshot(ctx), 'watch', null, new Set(), data.forecast!);
-    const ps = q.rows.map((r) => (r.col1 === 'under 1%' ? 0 : Number(r.col1.replace('%', ''))));
+    const ps = q.rows.map((r) => (r.col1 === 'no history' ? -1 : r.col1 === 'under 1%' ? 0 : Number(r.col1.replace('%', ''))));
     expect(ps).toEqual([...ps].sort((a, b) => b - a));
     expect(q.col).toBe('P(final Crit.)');
   });

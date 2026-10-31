@@ -3,7 +3,7 @@
 import type { CoaOption, Forecast, Mission, OptionKey, ReplayEvent } from '../data/types';
 import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, sci } from './format';
 import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, TIER_TIP, bucketOf, isKnown, planAt, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
-import { type ForecastLine, type MissForecast, forecastAt, forecastLine, rangeTxt } from './forecast';
+import { type ForecastCard, type MissForecast, forecastAt, forecastCard, forecastLine, rangeTxt } from './forecast';
 import { type Chip, type RunCtx, OPTION_NAMES, approvedAt, chipFor, isDeferredNow, orderedFeasible } from './run';
 import { BUCKET_COLOR, C, TONE, type Tone } from './theme';
 
@@ -23,9 +23,10 @@ export interface EventHeader {
   tcaTxt: string;
   msgs: string;
   status: string;
-  /** Final-miss forecast for open events, when forecast.json is present. */
-  forecast: ForecastLine | null;
 }
+
+/** The "Forecast at closest approach" card: the forecast for an open event, or a note once it has passed. */
+export type ForecastCardView = { kind: 'open'; card: ForecastCard } | { kind: 'passed'; text: string };
 
 export interface RtnView {
   r: string;
@@ -206,7 +207,16 @@ export interface PlannerView {
 
 export type WorkspaceView =
   | { kind: 'empty'; text: string }
-  | { kind: 'event'; header: EventHeader; hist: HistoryView; planner: PlannerView | null; other: OtherView | null; msgRows: MsgRow[] };
+  | {
+      kind: 'event';
+      header: EventHeader;
+      /** Null without forecast.json. */
+      forecast: ForecastCardView | null;
+      hist: HistoryView;
+      planner: PlannerView | null;
+      other: OtherView | null;
+      msgRows: MsgRow[];
+    };
 
 export interface WorkspaceFacts {
   medianWaitRatio24h: number | null;
@@ -246,7 +256,7 @@ export function buildHistory(e: ReplayEvent, s: KnownState, T: number, fc: MissF
       cone: 'M' + x0.toFixed(1) + ',' + y0.toFixed(1) + 'L316,' + top.toFixed(1) + 'L316,' + yMs(fc.q10M).toFixed(1) + 'Z',
       median: 'M' + x0.toFixed(1) + ',' + y0.toFixed(1) + 'L316,' + yMs(fc.q50M).toFixed(1),
       clipY: yMs(1000).toFixed(1),
-      label: 'likely final ' + rangeTxt(fc.q10M, fc.q90M),
+      label: 'forecast · likely final ' + rangeTxt(fc.q10M, fc.q90M),
       tip: forecastLine(fc).tip,
     };
   }
@@ -286,7 +296,7 @@ export function buildRtn(e: ReplayEvent, s: KnownState, xp: (hoursBefore: number
   return { r: line(0), t: line(1), n: line(2), maxTxt: top >= 1000 ? top / 1000 + ' km' : top + ' m' };
 }
 
-function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | null, mission: Mission | undefined, fc: MissForecast | null): EventHeader {
+function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | null, mission: Mission | undefined): EventHeader {
   const resolved = s.phase === 'resolved';
   const appr = approvedAt(ctx, e.id);
   let status: string;
@@ -316,7 +326,6 @@ function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | nu
     tcaTxt: dh(e.tca - ctx.T),
     msgs: String(s.k + 1),
     status,
-    forecast: fc ? forecastLine(fc) : null,
   };
 }
 
@@ -569,8 +578,15 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
   const plan = live && stored && e.coa[String(stored.key)] ? planAt(e, stored.key, ctx.T, ctx.budget) : live;
   const opt = pickOption(plan, stored ? stored.opt : optKey);
   const fc = forecastAt(forecast, e, st);
-  const header = buildHeader(ctx, e, st, plan, mission, fc);
+  const header = buildHeader(ctx, e, st, plan, mission);
   const hist = buildHistory(e, st, ctx.T, fc);
+  const fcCard: ForecastCardView | null = !forecast
+    ? null
+    : fc
+      ? { kind: 'open', card: forecastCard(fc, e.tca - ctx.T) }
+      : st.phase === 'resolved'
+        ? { kind: 'passed', text: 'Closest approach has passed: the final miss was ' + mTxt(st.last[2]) + '. Nothing left to forecast.' }
+        : null;
   if (plan && opt) {
     const appr = approvedAt(ctx, e.id);
     const optsAll = orderedFeasible(plan.c.opts);
@@ -593,8 +609,8 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
       reviewLabel: appr != null ? 'View approved plan' : 'Review and approve',
     };
     const planner: PlannerView = { plan, opt, wc: buildCostOfWaiting(ctx, plan, facts), bp: buildEncounterPlane(plan, opt), opts, modal: buildModal(ctx, e, plan, opt) };
-    return { kind: 'event', header, hist, planner, other: null, msgRows: [] };
+    return { kind: 'event', header, forecast: fcCard, hist, planner, other: null, msgRows: [] };
   }
   const { other, msgRows } = buildOther(ctx, e, st);
-  return { kind: 'event', header, hist, planner: null, other, msgRows };
+  return { kind: 'event', header, forecast: fcCard, hist, planner: null, other, msgRows };
 }

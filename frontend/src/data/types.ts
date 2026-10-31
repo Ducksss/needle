@@ -115,6 +115,10 @@ export interface Forecast {
   /** cells[leadBin][missBin]. */
   cells: ForecastCell[][];
   robustRatioQ10: number[];
+  /** Chance of ending Critical by the latest message's Pc band, then lead and miss bins. p is null with too little history. */
+  pCriticalByPc?: { p: number | null; n: number; pooledOver?: string }[][][];
+  /** Pc band edges, log10: below the first is band 0, between is band 1, at or above the last is band 2. */
+  pcEdgesLog10?: number[];
   validation: { heldOutEvents: number; coverage10to90: number; coverageByLeadBin?: Record<string, number> };
 }
 

@@ -8,6 +8,7 @@ interface TimelineProps {
   dock: DockView;
   /** Replay time of this run, hours: the clock ticks to it through the time-lapse. */
   T: number;
+  runH: number;
   lapse: Lapse | null;
   /** Highlight bars whose state changed since the previous run. */
   flash: boolean;
@@ -32,9 +33,13 @@ const SWATCH: Record<string, string> = {
   band: 'sw sw-band',
 };
 
-export function Timeline({ dock, T, lapse, flash, legend, clock, run, runs, playing, onPlay, onStep, onRun, onPick }: TimelineProps) {
+export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs, playing, onPlay, onStep, onRun, onPick }: TimelineProps) {
+  // Run number, clock and playhead label all tick together through the time-lapse, so they never disagree.
   const h = Math.round(useTween(T));
-  const ticking = 'Run ' + (run + 1) + ' of ' + runs + ' · Day ' + (Math.floor(h / 24) + 1) + ', ' + String(((h % 24) + 24) % 24).padStart(2, '0') + ':00';
+  const hh = String(((h % 24) + 24) % 24).padStart(2, '0');
+  const day = Math.floor(h / 24) + 1;
+  const ticking = 'Run ' + (Math.round(h / runH) + 1) + ' of ' + runs + ' · Day ' + day + ', ' + hh + ':00';
+  const playLabel = 'Day ' + day + ' · ' + hh + ':00';
   return (
     <section aria-label="Replay timeline" className="card dock">
       <div className="dock-bar">
@@ -124,7 +129,7 @@ export function Timeline({ dock, T, lapse, flash, legend, clock, run, runs, play
           ))}
           <div className="playhead" style={{ left: dock.playLeft }} />
           <span className="playhead-label" style={{ left: dock.playLeft }}>
-            {dock.playLabel}
+            {playLabel}
           </span>
         </div>
       </div>

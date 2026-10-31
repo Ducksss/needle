@@ -1,7 +1,7 @@
 // Queue panel: Decide, Watch and Passed tabs.
 
 import type { Forecast } from '../data/types';
-import { pctTxt, forecastAt } from './forecast';
+import { NOT_ENOUGH, forecastAt, pctTxt } from './forecast';
 import { clamp, dh, mTxt, pcOdds, pcTxt } from './format';
 import { PC_ACTION } from './replay';
 import { type Chip, type KnownRow, type NeedRow, type RunCtx, type Snapshot, chipFor } from './run';
@@ -58,7 +58,8 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
     { key: 'passed', label: 'Passed', count: snap.passed.length, on: tab === 'passed' },
   ];
   // Watch ranks by forecast risk of ending Critical when forecast.json is present, else by Pc.
-  const pCrit = new Map(snap.watching.map((x) => [x.e.id, forecastAt(forecast, x.e, x.s)?.cell.pCritical ?? null]));
+  // Pc-conditioned chance of ending Critical; events without enough history rank last.
+  const pCrit = new Map(snap.watching.map((x) => [x.e.id, forecastAt(forecast, x.e, x.s)?.pCritical ?? null]));
   const byRisk = forecast ? [...snap.watching].sort((a, b) => (pCrit.get(b.e.id) ?? -1) - (pCrit.get(a.e.id) ?? -1) || b.s.last[1] - a.s.last[1]) : snap.watching;
   const list: KnownRow[] = tab === 'needs' ? snap.needs : tab === 'watch' ? byRisk : snap.passed;
   const rows = list.map((x): QueueRow => {
@@ -85,9 +86,9 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
       }
     } else if (tab === 'watch') {
       const p = pCrit.get(x.e.id);
-      if (forecast && p != null) {
-        col1 = pctTxt(p);
-        col1Color = p >= 0.5 ? C.risk : p >= 0.1 ? C.hidden : C.slate;
+      if (forecast) {
+        col1 = p == null ? 'no history' : pctTxt(p);
+        col1Color = p == null ? C.faint : p >= 0.5 ? C.risk : p >= 0.1 ? C.hidden : C.slate;
         col2 = mTxt(x.s.last[2]);
       } else {
         col1 = mTxt(x.s.last[2]);
@@ -111,7 +112,10 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
       col1Color,
       col2,
       on: sel === x.e.id,
-      title: tab === 'watch' && forecast ? 'Closest approach in ' + dh(x.e.tca - T) + '. Forecast chance of ending Critical, from the latest miss and time left.' : undefined,
+      title:
+        tab === 'watch' && forecast
+          ? 'Closest approach in ' + dh(x.e.tca - T) + '. ' + (pCrit.get(x.e.id) == null ? 'Chance of ending Critical: ' + NOT_ENOUGH + '.' : 'Forecast chance of ending Critical, from the latest Pc band, miss and time left.')
+          : undefined,
       urgency,
       changed: changed.has(x.e.id),
     };

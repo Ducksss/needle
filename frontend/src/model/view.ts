@@ -29,6 +29,8 @@ export interface ConsoleView {
   runs: number;
   /** Replay time of this run, hours. */
   T: number;
+  /** Hours between screening runs. */
+  runH: number;
   /** The fast-forward from the previous run, or null on first load. */
   lapse: Lapse | null;
   clock: string;
@@ -73,6 +75,7 @@ export function buildView(data: ConsoleData, ui: UiState): ConsoleView {
     run: ui.run,
     runs: replay.runs,
     T: ctx.T,
+    runH: replay.runH,
     lapse,
     clock: 'Run ' + (ui.run + 1) + ' of ' + replay.runs + ' · Day ' + day + ', ' + hh + ':00',
     budget: ui.budget,

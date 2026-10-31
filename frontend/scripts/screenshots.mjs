@@ -116,6 +116,22 @@ for (const [width, height] of [
   await page.close();
 }
 
+// Forecast card: #37 at run 5 (Pc 5.0e-4, 2.91 km, 5d 22h out), a Watch event and a passed event.
+page = await open(1440, 1000, 2);
+const ws = ['section[aria-label="Workspace"] .ws-head', 'section[aria-label="Forecast at closest approach"]'];
+await page.locator('.qrow', { hasText: '#37' }).click();
+await page.waitForTimeout(100);
+await shot(page, '16-forecast-card-37.png', { fullPage: true, clip: await pageBox(page, ws) });
+await page.getByRole('button', { name: /^Watch/ }).click();
+await page.locator('.qrow', { hasText: '#7678' }).click();
+await page.waitForTimeout(100);
+await shot(page, '16b-forecast-card-watch.png', { fullPage: true, clip: await pageBox(page, ws) });
+await page.getByRole('button', { name: /^Passed/ }).click();
+await page.locator('.qrow').first().click();
+await page.waitForTimeout(100);
+await shot(page, '16c-forecast-card-passed.png', { fullPage: true, clip: await pageBox(page, ws) });
+await page.close();
+
 // Forecast: the robust option panel at the default run, and a 1 to 2 km Watch event 2 to 3 days out.
 page = await open(1440, 1000, 2);
 await shot(page, '14-options-robust.png', { fullPage: true, clip: await pageBox(page, ['section[aria-label="Workspace"] [role="radiogroup"]', 'section[aria-label="Workspace"] .actions']) });

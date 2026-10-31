@@ -165,6 +165,7 @@ export function App() {
         <Timeline
           dock={view.dock}
           T={view.T}
+          runH={view.runH}
           lapse={view.lapse}
           flash={s.flash}
           legend={view.legend}

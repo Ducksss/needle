@@ -13,7 +13,18 @@ const cell = (over: Partial<ForecastCell> = {}): ForecastCell => ({ n: 100, rati
 
 /** Two lead bins (under and over 2 days) by two miss bins (under and over 2 km). */
 export function forecastOf(cells: ForecastCell[][] = [[cell({ pCritical: 0.9 }), cell()], [cell({ pCritical: 0.5 }), cell({ pCritical: 0.02 })]]): Forecast {
-  return { leadEdgesDays: [0, 2, null], missEdgesM: [0, 2000, null], quantiles: [0.1, 0.5, 0.9], cells, robustRatioQ10: [0.9, 0.6], validation: { heldOutEvents: 2529, coverage10to90: 0.799 } };
+  const band = (p: (number | null)[][]) => p.map((row) => row.map((x) => ({ p: x, n: 50 })));
+  return {
+    leadEdgesDays: [0, 2, null],
+    missEdgesM: [0, 2000, null],
+    quantiles: [0.1, 0.5, 0.9],
+    cells,
+    robustRatioQ10: [0.9, 0.6],
+    // By Pc band (below 1e-6, 1e-6 to 1e-4, 1e-4 and up), then lead and miss bins.
+    pCriticalByPc: [band([[0.8, 0.05], [0.3, 0.01]]), band([[0.9, 0.2], [0.5, null]]), band([[0.95, 0.6], [0.7, 0.4]])],
+    pcEdgesLog10: [-6, -4],
+    validation: { heldOutEvents: 2529, coverage10to90: 0.799 },
+  };
 }
 
 export function coa(over: Partial<Coa> = {}): Coa {

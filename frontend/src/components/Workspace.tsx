@@ -1,5 +1,5 @@
 import type { OptionKey } from '../data/types';
-import type { MsgRow, OptionsView, OtherView, WorkspaceView } from '../model/workspace';
+import type { ForecastCardView, MsgRow, OptionsView, OtherView, WorkspaceView } from '../model/workspace';
 import { CostOfWaiting, EncounterPlane, MessageHistory } from './Charts';
 import { Chip } from './Chip';
 import { Hover } from './Hover';
@@ -58,19 +58,9 @@ export function Workspace({ ws, budget, onOpt, onReview, onDefer }: WorkspacePro
             <dd>{h.msgs}</dd>
           </div>
         </dl>
-        {h.forecast && (
-          <p className="ws-forecast">
-            <span className="caps">Forecast at closest approach</span>{' '}
-            <Hover className="help" title="Forecast at closest approach" lines={h.forecast.tip}>
-              <span className="dotted">
-                Predicted final miss <b className="mono">{h.forecast.median}</b> ({h.forecast.cover}: <span className="mono">{h.forecast.range}</span>)
-              </span>
-            </Hover>{' '}
-            · P(ends under 1 km) <b className="mono">{h.forecast.pUnder1km}</b> · P(ends Critical) <b className="mono">{h.forecast.pCritical}</b>
-          </p>
-        )}
       </div>
       <div className="ws-grid">
+        {ws.forecast && <ForecastPanel f={ws.forecast} />}
         <MessageHistory h={ws.hist} />
         {ws.planner && (
           <>
@@ -191,5 +181,65 @@ function MessagesReceived({ rows }: { rows: MsgRow[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+/** The forecast at closest approach, first in the workspace: where the miss is likely to end and how risky that is. */
+function ForecastPanel({ f }: { f: ForecastCardView }) {
+  if (f.kind === 'passed') {
+    return (
+      <section className="ws-cell span-all b-bottom fc" aria-label="Forecast at closest approach">
+        <span className="ws-cell-title">Forecast at closest approach</span>
+        <span className="meta">{f.text}</span>
+      </section>
+    );
+  }
+  const c = f.card;
+  return (
+    <section className="ws-cell span-all b-bottom fc" aria-label="Forecast at closest approach">
+      <div className="card-head">
+        <span className="ws-cell-title">Forecast at closest approach</span>
+        <span className="meta">{c.lead}</span>
+      </div>
+      <div className="fc-body">
+        <div className="fc-range" role="img" aria-label={`Miss distance: ${c.now.label}, ${c.pred.label}, 8 in 10 band ${c.band.label}, on a log scale with the 1 km line.`}>
+          <div className="fc-bar">
+            <span className="fc-track" />
+            <span className="fc-band" style={{ left: c.band.left, width: c.band.width }} />
+            {c.risk && <span className="fc-band-risk" style={{ left: c.risk.left, width: c.risk.width }} />}
+            <span className="fc-1km" style={{ left: c.oneKm }}>
+              <i>1 km</i>
+            </span>
+            <span className="fc-now" style={{ left: c.now.left }}>
+              <i>{c.now.label}</i>
+            </span>
+            <span className="fc-pred" style={{ left: c.pred.left }}>
+              <i>{c.pred.label}</i>
+            </span>
+          </div>
+          <div className="fc-axis" aria-hidden="true">
+            {c.ticks.map((t) => (
+              <span key={t.label} style={{ left: t.left }}>
+                {t.label}
+              </span>
+            ))}
+          </div>
+          <span className="fc-band-key">
+            <i /> band: {c.band.label}
+          </span>
+        </div>
+        <dl className="fc-numbers">
+          <div>
+            <dt>Chance it ends under 1 km</dt>
+            <dd className="mono">{c.pUnder1km}</dd>
+          </div>
+          <div>
+            <dt>Chance it ends Critical</dt>
+            <dd className={'mono' + (c.pCriticalMissing ? ' fc-missing' : '')}>{c.pCritical}</dd>
+          </div>
+        </dl>
+      </div>
+      <span className="fc-foot">{c.footnote}</span>
+    </section>
   );
 }
