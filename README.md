@@ -30,7 +30,7 @@ shields state facts that hold while the repo is private.
     <a href="contracts/README.md"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="#usage">View Demo</a>
+    <a href="https://needle-lyart.vercel.app"><strong>View Demo</strong></a>
     &middot;
     <a href="https://github.com/Ducksss/needle/issues/new?labels=bug">Report Bug</a>
     &middot;
@@ -79,7 +79,7 @@ What it adds over a distance alarm:
 * **A burn plan the operator can check.** For each escalation, Needle searches thrust direction and Δv with Clohessy-Wiltshire relative motion. It shows the predicted miss and Pc after the burn, and lists the checks it did not run (drag, J2, execution error, re-screening).
 * **A replay over time.** 280 real ESA CDM histories play on a 21-day calendar of 8 h screening runs. Events move through Decide, Watch and Passed instead of being flagged all at once. High-risk events are over-sampled about 7×, and the console says so.
 
-[![Needle console][product-screenshot]](#usage)
+[![Needle console][product-screenshot]](https://needle-lyart.vercel.app)
 
 | Tier | Rule (from the brief) |
 |---|---|
@@ -173,7 +173,7 @@ Each segment's README lists its full commands and tests.
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-**In the console**
+**In the console** ([live demo](https://needle-lyart.vercel.app))
 
 1. Press **Play**, or drag the screening-run slider at the bottom. New CDMs arrive every 8 h of replay time.
 2. Read the **Next decision** bar: the event with the closest deadline, and the Δv it needs now.
@@ -205,7 +205,7 @@ curl http://localhost:8000/api/metrics
 - [x] `needle_ml` package with one-command artifact build ([#2](https://github.com/Ducksss/needle/pull/2))
 - [x] API service ([#1](https://github.com/Ducksss/needle/pull/1))
 - [ ] React console with the Next 24 h warnings view
-- [ ] Hosted demo
+- [x] Hosted demo: [needle-lyart.vercel.app](https://needle-lyart.vercel.app)
 - [ ] Pc dilution check with a "request tracking" action
 - [ ] Wait-or-burn advice from historical downgrade rates
 - [ ] Real approach trajectory in place of the illustrative globe
@@ -265,8 +265,8 @@ Project Link: [https://github.com/Ducksss/needle](https://github.com/Ducksss/nee
 [data-url]: https://kelvins.esa.int/collision-avoidance-challenge/
 [recall-shield]: https://img.shields.io/badge/Critical_recall_2_days_out-0.898-F97316?style=for-the-badge
 [results-url]: #results
-[product-cover]: docs/brand/needle-cover.png
-[product-screenshot]: docs/images/console-a3plus.png
+[product-cover]: docs/brand/needle-cover@2x.png
+[product-screenshot]: docs/images/console.png
 [Python-badge]: https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white
 [Python-url]: https://www.python.org/
 [sklearn-badge]: https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white

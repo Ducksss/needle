@@ -145,8 +145,9 @@ border-radius:8px;background:rgba(11,18,32,0.88);font:400 12.5px/1 'IBM Plex Mon
 </div></body></html>"""
 
 
-def render(html_path, png_path, w, h, transparent=False):
-    args = [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--force-device-scale-factor=1",
+def render(html_path, png_path, w, h, transparent=False, scale=2):
+    """Screenshot at `scale` device pixels per CSS pixel: 2 gives retina-sharp text and edges."""
+    args = [CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars", f"--force-device-scale-factor={scale}",
             f"--window-size={w},{h}", "--virtual-time-budget=6000", f"--screenshot={png_path}"]
     if transparent:
         args.append("--default-background-color=00000000")
@@ -162,7 +163,9 @@ def main():
         render(p, OUT / f"{name}.png", 520, 136, transparent=True)
     p = SRC / "cover.html"
     p.write_text(cover_html())
-    render(p, OUT / "needle-cover.png", 1280, 640)
+    # 1280 x 640 is GitHub's social-preview size; the @2x file is for the README and slides
+    render(p, OUT / "needle-cover.png", 1280, 640, scale=1)
+    render(p, OUT / "needle-cover@2x.png", 1280, 640, scale=2)
     print("built", sorted(x.name for x in OUT.iterdir() if x.is_file()))
 
 
