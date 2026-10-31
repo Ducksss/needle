@@ -1,0 +1,10 @@
+.git
+data
+frontend
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+**/*.parquet
+**/*.csv
+!artifacts/test_predictions.csv
