@@ -41,6 +41,7 @@ Real ESA training-set CDM histories placed on a simulated 21-day calendar. Messa
     "obj": "Unknown", "inc": 97.9,                 // chaser object type, chaser inclination (deg)
     "tca": 101.4,                                  // closest approach, hours from replay start
     "m": [[arrivalH, risk, missM]],                // one entry per CDM, oldest first; risk = log10 Pc (floor -30)
+    "rtn": [[r, t, n]],                            // relative position per CDM in metres, aligned with "m"
     "coa": {                                       // keyed by CDM index (string) for CDMs with Pc >= 1e-4 and >= 3 h to TCA
       "4": {
         "risk": -3.6, "miss": 334, "tca": 3.21,    // tca in days before closest approach at that CDM
@@ -66,9 +67,25 @@ Real ESA training-set CDM histories placed on a simulated 21-day calendar. Messa
 
 Assumed spacecraft: 1,000 kg, 1 N thruster, Isp 220 s.
 
-### `test_predictions.csv`
+### `test_event_predictions.csv` (the task's predictions)
 
-One row per `test_data.csv` row, same order.
+One row per test event: the final tier predicted from its messages (all 2+ days out). Written by `ml/analysis/event_forecast.py --write`.
+
+| Column | Meaning |
+|---|---|
+| `event_id` | test event ID (IDs restart per file; never join with train) |
+| `messages`, `latest_time_to_tca_days`, `latest_tier` | the event's messages and its latest tier |
+| `p_safe`, `p_elevated`, `p_critical` | model probabilities for the final tier |
+| `model_tier` | the model's tier from those probabilities |
+| `pred_final_tier` | shipped rule: `model_tier`, raised to Critical when `latest_tier` is Critical |
+
+### `event_metrics.json`
+
+Held-out scores for the final-tier task: `heldOut.all` and `heldOut.finalUnder2Days`, each keyed by method name with `events`, `accuracy`, `macroF1`, `criticalRecall`, `criticalPrecision`, `criticalCaught`, `criticalMissed`, `falseCriticalAlarms` and `confusion` (rows true Safe, Elevated, Critical). Also `thresholds`, `shippedRule`, `split` and `testPredictions`.
+
+### `test_predictions.csv` (superseded per-message scores)
+
+One row per `test_data.csv` row, same order. Kept for reference; the updated brief scores the event-level task above.
 
 | Column | Meaning |
 |---|---|

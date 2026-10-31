@@ -57,16 +57,19 @@ def build(tr, fleet, log=print):
             lo, hi = 0, WINDOW_H + 7 * 24
         tca_h = float(rng.uniform(lo, hi))
         mi, sat = label[int(e.mission_id.iloc[0])]
-        msgs, coas = [], {}
+        msgs, rtn, coas = [], [], {}
         for k, (_, r) in enumerate(e.iterrows()):
             arr = tca_h - max(r.time_to_tca, 0) * 24
             msgs.append([round(arr, 1), round(float(r.risk), 1), round(float(r.miss_distance))])
+            rtn.append([round(float(r.relative_position_r)), round(float(r.relative_position_t)),
+                        round(float(r.relative_position_n))])
             if r.risk >= -4 and r.time_to_tca * 24 >= 3:
                 c = coa_entry(r)
                 if c["opts"]:
                     coas[str(k)] = c
         events.append({"id": int(eid), "sat": sat, "mi": mi, "obj": e.c_object_type.iloc[0].title(),
-                       "inc": round(float(e.c_j2k_inc.iloc[0]), 1), "tca": round(tca_h, 1), "m": msgs, "coa": coas})
+                       "inc": round(float(e.c_j2k_inc.iloc[0]), 1), "tca": round(tca_h, 1), "m": msgs, "rtn": rtn,
+                       "coa": coas})
         if coas:
             log(f"replay: event {eid} {sat}: {len(coas)} burn-option CDMs")
     events.sort(key=lambda x: x["tca"])
