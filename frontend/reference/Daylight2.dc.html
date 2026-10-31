@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Needle replay console</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#F3F5F7}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible{outline:2px solid #0F766E;outline-offset:2px}
+input[type=range]{accent-color:#0F766E}
+.tw{position:absolute}
+.tt{display:none;position:absolute;z-index:40;top:calc(100% + 6px);width:max-content;max-width:280px;padding:8px 10px;border-radius:8px;background:#0F172A;color:#CBD5E1;font:500 12px/1.45 'Manrope',system-ui,sans-serif;letter-spacing:0;text-transform:none;text-align:left;white-space:normal;box-shadow:0 10px 28px rgba(15,23,42,.28);pointer-events:none}
+.tt b{display:block;margin-bottom:3px;color:#FFFFFF;font-weight:700}
+.tt span{display:block}
+.tw:hover>.tt,.tw:focus-within>.tt{display:block}
+</style>
+</helmet>
+<div style="position: relative; min-height: 1480px; background: #F3F5F7; color: #0F172A; font-family: 'Manrope', system-ui, sans-serif; font-size: 13px; line-height: 1.45;">
+<div style="max-width: 1440px; margin: 0 auto; padding: 16px 24px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;">
+
+<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<svg width="24" height="24" viewBox="0 0 26 26" fill="none" stroke="#0F766E" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="13" cy="13" r="10.5"></circle><line x1="6.5" y1="19.5" x2="19.5" y2="6.5"></line></svg>
+<span style="font-size: 18px; font-weight: 800; letter-spacing: -0.01em;">Needle</span>
+<span style="color: #64748B;">Conjunction triage · 19 ESA satellites</span>
+</div>
+<dl style="margin: 0; display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline;">
+<sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+<div class="tw" tabindex="0" style="position: relative; display: flex; align-items: baseline; gap: 6px; cursor: help;"><dt style="font-size: 12px; color: #64748B; border-bottom: 1px dotted #CBD5E1;">{{k.label}}</dt><dd style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 18px; color: {{k.color}};">{{k.v}}</dd><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: {{k.dColor}};">{{k.d}}</span><span class="tt" role="tooltip" style="left: 0;"><b>{{k.label}}</b>{{k.tip}}</span></div>
+</sc-for>
+</dl>
+<span style="padding: 4px 10px; border: 1px solid #E3E8EE; border-radius: 6px; background: #FFFFFF; font-size: 12px; color: #475569;">Demo replay · real CDMs · simulated calendar · high-risk events about 7× over-sampled</span>
+</header>
+
+<section aria-label="Next decision" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 14px; background: {{next.bg}}; border: 1px solid {{next.border}}; border-radius: 10px;">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: {{next.labelColor}};">{{next.label}}</span>
+<span style="flex: 1 1 520px; color: #0F172A;">{{next.text}}</span>
+<sc-if value="{{next.has}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{next.go}}" style="min-height: 34px; padding: 0 14px; border: 1px solid #0F172A; border-radius: 6px; background: #0F172A; color: #FFFFFF; font-weight: 700; cursor: pointer;">Open in workspace</button>
+</sc-if>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch;">
+
+<section aria-label="Queue" style="flex: 1 1 300px; max-width: 340px; min-width: 0; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 10px; display: flex; flex-direction: column;">
+<div style="padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #EEF2F5;">
+<div style="display: flex; justify-content: space-between; align-items: baseline;"><h2 style="margin: 0; font-size: 14px; font-weight: 700;">Queue</h2><span style="font-size: 12px; color: #64748B;">{{queueMeta}}</span></div>
+<div role="group" aria-label="Queue view" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; padding: 3px; background: #EEF2F5; border-radius: 8px;">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+<button type="button" onClick="{{t.pick}}" aria-pressed="{{t.on}}" style="min-height: 32px; border: 0; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; {{t.style}}">{{t.label}} <span style="font-family: 'IBM Plex Mono', monospace; font-weight: 500;">{{t.count}}</span></button>
+</sc-for>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: 1fr 86px; gap: 8px; padding: 8px 14px 4px; font-size: 11px; color: #64748B; text-transform: uppercase; letter-spacing: 0.06em;"><span>Event</span><span style="text-align: right;">{{queueCol}}</span></div>
+<div style="flex: 1; max-height: 640px; overflow-y: auto; padding: 0 6px 8px;">
+<sc-for list="{{qrows}}" as="r" hint-placeholder-count="8">
+<button type="button" onClick="{{r.pick}}" aria-pressed="{{r.on}}" style="width: 100%; display: grid; grid-template-columns: 1fr 86px; gap: 8px; align-items: center; min-height: 52px; padding: 6px 8px; border: 0; border-radius: 6px; background: {{r.bg}}; cursor: pointer; text-align: left;">
+<span style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+<span style="display: flex; align-items: center; gap: 6px;"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500;">#{{r.id}}</span><span style="padding: 0 6px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 16px; {{r.chipStyle}}" title="{{r.chipTip}}">{{r.chip}}</span></span>
+<span style="font-size: 12px; color: #64748B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{r.sat}} · {{r.obj}} · Pc <span style="font-family: 'IBM Plex Mono', monospace; color: {{r.pcColor}};">{{r.pc}}</span></span>
+</span>
+<span style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; white-space: nowrap;"><span style="color: {{r.col1Color}}; font-weight: 500;">{{r.col1}}</span><span style="color: #64748B;">{{r.col2}}</span></span>
+</button>
+</sc-for>
+<sc-if value="{{queueEmpty}}" hint-placeholder-val="{{false}}"><p style="margin: 0; padding: 14px 8px; color: #64748B;">Nothing in this view at this run.</p></sc-if>
+</div>
+</section>
+
+<section aria-label="Workspace" style="flex: 999 1 560px; min-width: 0; background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 10px; display: flex; flex-direction: column;">
+<sc-if value="{{hasWs}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column;">
+<div style="padding: 14px 16px 12px; border-bottom: 1px solid #EEF2F5; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 10px;">
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<span style="font-size: 12px; color: #64748B;">{{ws.sat}} vs {{ws.obj}}</span>
+<div style="display: flex; align-items: center; gap: 10px;"><h2 style="margin: 0; font-size: 22px; font-weight: 800;">Event <span style="font-family: 'IBM Plex Mono', monospace; font-weight: 500;">#{{ws.id}}</span></h2><span class="tw" tabindex="0" style="position: relative; display: inline-flex; cursor: help;"><span style="padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; {{ws.chipStyle}}">{{ws.chip}}</span><span class="tt" role="tooltip" style="left: 0;"><b>{{ws.chip}}</b>{{ws.chipTip}}</span></span></div>
+<span style="color: #334155;">{{ws.status}}</span>
+</div>
+<dl style="margin: 0; display: grid; grid-template-columns: repeat(4, auto); gap: 2px 22px; font-family: 'IBM Plex Mono', monospace;">
+<dt style="font-family: 'Manrope', sans-serif; font-size: 11px; color: #64748B;">{{ws.pcLabel}}</dt><dt style="font-family: 'Manrope', sans-serif; font-size: 11px; color: #64748B;">Miss</dt><dt style="font-family: 'Manrope', sans-serif; font-size: 11px; color: #64748B;">{{ws.tcaLabel}}</dt><dt style="font-family: 'Manrope', sans-serif; font-size: 11px; color: #64748B;">Messages</dt>
+<dd style="margin: 0; font-size: 17px; color: {{ws.color}};">{{ws.pc}}</dd><dd style="margin: 0; font-size: 17px;">{{ws.miss}}</dd><dd style="margin: 0; font-size: 17px;">{{ws.tcaTxt}}</dd><dd style="margin: 0; font-size: 17px;">{{ws.msgs}}</dd>
+</dl>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+<figure style="margin: 0; padding: 12px 16px; border-bottom: 1px solid #EEF2F5; border-right: 1px solid #EEF2F5; display: flex; flex-direction: column; gap: 6px;">
+<figcaption style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-weight: 700;">Message history</span><span style="font-size: 12px; color: #64748B;">{{hist.trend}}</span></figcaption>
+<span style="font-size: 11px; color: #64748B; text-transform: uppercase; letter-spacing: 0.06em;">Collision probability</span>
+<svg viewBox="0 0 320 96" style="width: 100%; height: auto;" role="img" aria-label="Collision probability for each message received so far">
+<line x1="40" x2="316" y1="19.3" y2="19.3" stroke="#C2410C" stroke-dasharray="3 3"></line>
+<line x1="40" x2="316" y1="86" y2="86" stroke="#E3E8EE"></line>
+<text x="36" y="22" text-anchor="end" font-size="9" fill="#C2410C" font-family="IBM Plex Mono, monospace">1e-4</text>
+<text x="36" y="89" text-anchor="end" font-size="9" fill="#94A3B8" font-family="IBM Plex Mono, monospace">≤1e-14</text>
+<line x1="{{hist.nowX}}" x2="{{hist.nowX}}" y1="4" y2="88" stroke="#0F766E" stroke-dasharray="2 3"></line>
+<polyline points="{{hist.pcPts}}" fill="none" stroke="#0F172A" stroke-width="1.6" stroke-linejoin="round"></polyline>
+<path d="{{hist.pcDots}}" fill="#0F172A"></path>
+<path d="{{hist.pcHot}}" fill="#C2410C"></path>
+</svg>
+<span style="font-size: 11px; color: #64748B; text-transform: uppercase; letter-spacing: 0.06em;">Miss distance</span>
+<svg viewBox="0 0 320 84" style="width: 100%; height: auto;" role="img" aria-label="Miss distance for each message received so far">
+<line x1="40" x2="316" y1="{{hist.y5}}" y2="{{hist.y5}}" stroke="#B45309" stroke-dasharray="3 3"></line>
+<line x1="40" x2="316" y1="{{hist.y1}}" y2="{{hist.y1}}" stroke="#C2410C" stroke-dasharray="3 3"></line>
+<line x1="40" x2="316" y1="70" y2="70" stroke="#E3E8EE"></line>
+<text x="36" y="{{hist.y5L}}" text-anchor="end" font-size="9" fill="#B45309" font-family="IBM Plex Mono, monospace">5 km</text>
+<text x="36" y="{{hist.y1L}}" text-anchor="end" font-size="9" fill="#C2410C" font-family="IBM Plex Mono, monospace">1 km</text>
+<text x="40" y="82" font-size="9" fill="#94A3B8" font-family="IBM Plex Mono, monospace">7 d before</text>
+<text x="316" y="82" text-anchor="end" font-size="9" fill="#94A3B8" font-family="IBM Plex Mono, monospace">TCA</text>
+<line x1="{{hist.nowX}}" x2="{{hist.nowX}}" y1="4" y2="72" stroke="#0F766E" stroke-dasharray="2 3"></line>
+<polyline points="{{hist.missPts}}" fill="none" stroke="#0F172A" stroke-width="1.6" stroke-linejoin="round"></polyline>
+<path d="{{hist.missDots}}" fill="#0F172A"></path>
+</svg>
+</figure>
+
+<sc-if value="{{mode.coa}}" hint-placeholder-val="{{true}}">
+<figure style="margin: 0; padding: 12px 16px; border-bottom: 1px solid #EEF2F5; display: flex; flex-direction: column; gap: 6px;">
+<figcaption style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-weight: 700;">Encounter plane</span><span style="font-size: 12px; color: #64748B;">seen along the relative velocity</span></figcaption>
+<div style="position: relative; width: 100%; max-width: 250px; aspect-ratio: 1 / 1; margin: 0 auto;">
+<svg viewBox="0 0 300 300" style="position: absolute; inset: 0; width: 100%; height: 100%;" role="img" aria-label="Uncertainty ellipse, 1 km ring, and where the debris passes now and after the selected burn">
+<line x1="150" x2="150" y1="8" y2="292" stroke="#EEF2F5"></line><line x1="8" x2="292" y1="150" y2="150" stroke="#EEF2F5"></line>
+<ellipse cx="150" cy="150" rx="{{bp.rx3}}" ry="{{bp.ry3}}" transform="rotate({{bp.rot}} 150 150)" fill="#0F766E" fill-opacity="0.06" stroke="#0F766E" stroke-opacity="0.35" stroke-dasharray="3 3"></ellipse>
+<ellipse cx="150" cy="150" rx="{{bp.rx1}}" ry="{{bp.ry1}}" transform="rotate({{bp.rot}} 150 150)" fill="#0F766E" fill-opacity="0.16" stroke="#0F766E" stroke-opacity="0.6"></ellipse>
+<circle cx="150" cy="150" r="{{bp.ring}}" fill="none" stroke="#C2410C" stroke-width="1.2" stroke-dasharray="5 4"></circle>
+<line x1="{{bp.bx}}" y1="{{bp.by}}" x2="{{bp.ax}}" y2="{{bp.ay}}" stroke="#6D28D9" stroke-width="1.5" stroke-dasharray="4 3"></line>
+<circle cx="150" cy="150" r="{{bp.hbr}}" fill="#0F172A"></circle>
+<circle cx="{{bp.bx}}" cy="{{bp.by}}" r="5.5" fill="#C2410C" stroke="#FFFFFF" stroke-width="2"></circle>
+<circle cx="{{bp.ax}}" cy="{{bp.ay}}" r="5.5" fill="#6D28D9" stroke="#FFFFFF" stroke-width="2"></circle>
+</svg>
+<sc-for list="{{bp.labels}}" as="bl" hint-placeholder-count="2">
+<span style="position: absolute; left: {{bl.left}}; top: {{bl.top}}; transform: {{bl.tf}}; padding: 1px 5px; border-radius: 4px; background: {{bl.bg}}; color: {{bl.color}}; font-family: 'IBM Plex Mono', monospace; font-size: 10px; white-space: nowrap; pointer-events: none;">{{bl.text}}</span>
+</sc-for>
+</div>
+<span style="font-size: 12px; color: #64748B;">Shaded: combined 1σ and 3σ ({{bp.sigTxt}}). Dashed ring: 1 km. Plot half-width {{bp.scaleTxt}}.</span>
+</figure>
+</sc-if>
+
+<sc-if value="{{mode.coa}}" hint-placeholder-val="{{true}}">
+<figure style="margin: 0; padding: 12px 16px; border-right: 1px solid #EEF2F5; display: flex; flex-direction: column; gap: 6px;">
+<figcaption style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-weight: 700;">Cost of waiting</span><span style="font-size: 12px; color: #64748B;">lowest Δv per 6 h window</span></figcaption>
+<div style="position: relative; width: 100%; aspect-ratio: 320 / 150;">
+<svg viewBox="0 0 320 150" style="position: absolute; inset: 0; width: 100%; height: 100%;" role="img" aria-label="Lowest burn size needed if the burn happens in each later 6 hour window, with the Δv budget and the decision deadline">
+<rect x="{{wc.dlX}}" y="8" width="{{wc.dlW}}" height="118" fill="#FEE2E2" fill-opacity="0.7"></rect>
+<line x1="36" x2="312" y1="10" y2="10" stroke="#EEF2F5"></line>
+<line x1="36" x2="312" y1="126" y2="126" stroke="#CBD5E1"></line>
+<line x1="36" x2="312" y1="{{wc.budgetY}}" y2="{{wc.budgetY}}" stroke="#C2410C" stroke-dasharray="4 3"></line>
+<line x1="{{wc.nowX}}" x2="{{wc.nowX}}" y1="8" y2="128" stroke="#0F766E" stroke-dasharray="2 3"></line>
+<path d="{{wc.path}}" fill="none" stroke="#0F172A" stroke-width="1.8"></path>
+<path d="{{wc.over}}" fill="#C2410C"></path>
+<text x="32" y="129" text-anchor="end" font-size="9" fill="#94A3B8" font-family="IBM Plex Mono, monospace">0</text>
+<text x="36" y="142" font-size="9" fill="#94A3B8" font-family="IBM Plex Mono, monospace">planning message</text>
+<text x="312" y="142" text-anchor="end" font-size="9" fill="#94A3B8" font-family="IBM Plex Mono, monospace">TCA − 3 h</text>
+</svg>
+<span style="position: absolute; right: 89.4%; top: 6.67%; transform: translateY(-50%); padding-right: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #94A3B8; white-space: nowrap;">{{wc.topTxt}}</span>
+<span style="position: absolute; left: 12.5%; top: {{wc.budgetPct}}; transform: translateY(-120%); font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #C2410C; white-space: nowrap;">budget {{budget}} mm/s</span>
+<span style="position: absolute; left: 12.5%; top: 6.67%; transform: translateY(-50%); padding: 0 3px; background: #FFFFFF; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #94A3B8; white-space: nowrap;">mm/s</span>
+</div>
+<span style="font-size: 12px; color: #334155;">{{wc.caption}}</span>
+<span style="font-size: 12px; color: #64748B;">{{wc.note}}</span>
+</figure>
+</sc-if>
+
+<sc-if value="{{mode.coa}}" hint-placeholder-val="{{true}}">
+<div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-weight: 700;">Options</span><span style="font-size: 12px; color: #64748B;">{{opts.basis}}</span></div>
+<div role="radiogroup" aria-label="Burn options" style="display: flex; flex-direction: column; border: 1px solid #E3E8EE; border-radius: 8px; overflow: hidden;">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 62px 54px 60px; gap: 6px; padding: 6px 10px 6px 11px; background: #F8FAFB; font-size: 11px; color: #64748B;"><span>Option</span><span>Δv</span><span>Pc after</span><span>Miss after</span></div>
+<sc-for list="{{opts.rows}}" as="o" hint-placeholder-count="3">
+<button type="button" role="radio" aria-checked="{{o.on}}" onClick="{{o.pick}}" style="display: grid; grid-template-columns: minmax(0, 1fr) 62px 54px 60px; gap: 6px; align-items: center; min-height: 44px; padding: 5px 10px 5px 8px; border: 0; border-left: 3px solid {{o.ring}}; border-top: 1px solid #EEF2F5; background: {{o.bg}}; cursor: pointer; text-align: left; font-size: 12px;">
+<span style="display: flex; flex-direction: column; min-width: 0;"><span style="font-weight: 600; white-space: nowrap;">{{o.name}}</span><span style="font-size: 11px; color: #64748B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{o.dir}}</span></span>
+<span style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap;">{{o.dvTxt}}</span>
+<span style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap;">{{o.pcAfter}}</span>
+<span style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap;">{{o.missAfter}}</span>
+</button>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px;">
+<button type="button" onClick="{{openModal}}" style="min-height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: {{opts.reviewBg}}; color: #FFFFFF; font-weight: 700; cursor: pointer;">{{opts.reviewLabel}}</button>
+<sc-if value="{{opts.canDefer}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{defer}}" style="min-height: 36px; padding: 0 14px; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; font-weight: 600; cursor: pointer;">Defer to next run</button>
+</sc-if>
+<span style="font-size: 12px; color: #64748B;">{{opts.decision}}</span>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{mode.other}}" hint-placeholder-val="{{false}}">
+<div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;">
+<span style="font-weight: 700;">{{other.title}}</span>
+<span style="color: #334155;">{{other.text}}</span>
+<dl style="margin: 4px 0 0; display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px;">
+<sc-for list="{{other.facts}}" as="fx" hint-placeholder-count="3">
+<dt style="color: #64748B;">{{fx.k}}</dt><dd style="margin: 0; font-family: 'IBM Plex Mono', monospace;">{{fx.v}}</dd>
+</sc-for>
+</dl>
+</div>
+</sc-if>
+
+<sc-if value="{{mode.other}}" hint-placeholder-val="{{false}}">
+<div style="grid-column: 1 / -1; padding: 12px 16px; border-top: 1px solid #EEF2F5; display: flex; flex-direction: column; gap: 6px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline;"><span style="font-weight: 700;">Messages received</span><span style="font-size: 12px; color: #64748B;">newest first · brief tier against Needle queue</span></div>
+<div role="table" aria-label="Messages received for this event" style="display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; font-size: 12px;">
+<div role="row" style="position: sticky; top: 0; display: grid; grid-template-columns: 36px 1fr 1fr 1fr 1fr 1.4fr; gap: 8px; padding: 4px 0; border-bottom: 1px solid #EEF2F5; background: #FFFFFF; font-size: 11px; color: #64748B;"><span role="columnheader">Msg</span><span role="columnheader">Before TCA</span><span role="columnheader">Pc</span><span role="columnheader">Miss</span><span role="columnheader">Brief tier</span><span role="columnheader">Needle queue</span></div>
+<sc-for list="{{msgRows}}" as="mr" hint-placeholder-count="5">
+<div role="row" style="display: grid; grid-template-columns: 36px 1fr 1fr 1fr 1fr 1.4fr; gap: 8px; align-items: center; min-height: 26px; border-bottom: 1px solid #F3F5F7; font-family: 'IBM Plex Mono', monospace;"><span role="cell" style="color: #64748B;">{{mr.n}}</span><span role="cell">{{mr.before}}</span><span role="cell" style="color: {{mr.pcColor}};">{{mr.pc}}</span><span role="cell">{{mr.miss}}</span><span role="cell"><span style="padding: 1px 6px; border-radius: 4px; font-family: 'Manrope', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; {{mr.tierStyle}}" title="{{mr.tierTip}}">{{mr.tier}}</span></span><span role="cell" style="font-family: 'Manrope', sans-serif; color: #334155;">{{mr.bucket}}</span></div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{noWs}}" hint-placeholder-val="{{false}}">
+<p style="margin: 0; padding: 18px 16px; color: #64748B;">{{noWsText}}</p>
+</sc-if>
+</section>
+
+<aside aria-label="Context" style="flex: 1 1 300px; max-width: 340px; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+<section aria-label="Orbit context" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline;"><h2 style="margin: 0; font-size: 14px; font-weight: 700;">Orbit context</h2><span style="font-size: 12px; color: #64748B;">orientation illustrative</span></div>
+<div style="position: relative; width: 100%; max-width: 300px; aspect-ratio: 1 / 1; margin: 0 auto;">
+<svg viewBox="0 0 900 900" style="position: absolute; inset: 0; width: 100%; height: 100%;" role="img" aria-label="Selected satellite orbit, open conjunctions, debris track and proposed path">
+<path d="{{g.backDim}}" fill="none" stroke="#E6EBF0" stroke-width="1.5"></path>
+<path d="{{g.backSel}}" fill="none" stroke="#0F766E" stroke-width="1.5" stroke-opacity="0.3"></path>
+<circle cx="450" cy="450" r="268.4" fill="#EDF1F5" stroke="#CBD5E1" stroke-width="2"></circle>
+<path d="{{g.grat}}" fill="none" stroke="#D7DFE7" stroke-width="1.5"></path>
+<path d="{{g.frontDim}}" fill="none" stroke="#AAB7C6" stroke-width="1.5"></path>
+<path d="{{g.dots0}}" fill="#94A3B8"></path>
+<path d="{{g.dots1}}" fill="#2563EB"></path>
+<path d="{{g.dots2}}" fill="#B45309"></path>
+<path d="{{g.dots3}}" fill="#C2410C"></path>
+<path d="{{g.frontSel}}" fill="none" stroke="#0F766E" stroke-width="3"></path>
+<path d="{{g.chaser}}" fill="none" stroke="#C2410C" stroke-width="5" stroke-dasharray="0.1 12" stroke-linecap="round"></path>
+<path d="{{g.ahead}}" fill="none" stroke="#0F766E" stroke-width="5" stroke-dasharray="16 11" stroke-linecap="round"></path>
+<path d="{{g.prop}}" fill="none" stroke="#6D28D9" stroke-width="5" stroke-dasharray="14 10" stroke-linecap="round"></path>
+<path d="{{g.icoPanels}}" fill="#FFFFFF" stroke="#64748B" stroke-width="1.5" stroke-linejoin="round"></path>
+<path d="{{g.icoBody}}" fill="#64748B"></path>
+<path d="{{g.evRing}}" fill="none" stroke="{{g.evColor}}" stroke-width="4"></path>
+<path d="{{g.evDot}}" fill="{{g.evColor}}"></path>
+<path d="{{g.selPanels}}" fill="#FFFFFF" stroke="#0F172A" stroke-width="2.5" stroke-linejoin="round"></path>
+<path d="{{g.selBody}}" fill="#0F172A"></path>
+</svg>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 11px; color: #475569;">
+<span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 14px; border-top: 2px dashed #0F766E;"></span>path ahead</span>
+<span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 14px; border-top: 2px dashed #6D28D9;"></span>proposed (exaggerated)</span>
+<span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 14px; border-top: 2px dotted #C2410C;"></span>debris track</span>
+</div>
+</section>
+
+<section aria-label="Since last run" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline;"><h2 style="margin: 0; font-size: 14px; font-weight: 700;">Since last run</h2><span style="font-size: 12px; color: #64748B;">{{digest.meta}}</span></div>
+<sc-for list="{{digest.groups}}" as="dg" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<span style="font-size: 12px; font-weight: 700; color: {{dg.color}};">{{dg.title}}</span>
+<sc-for list="{{dg.items}}" as="di" hint-placeholder-count="2">
+<button type="button" onClick="{{di.pick}}" style="display: flex; justify-content: space-between; gap: 8px; min-height: 28px; padding: 0 6px; border: 0; border-radius: 4px; background: transparent; cursor: pointer; text-align: left; font-size: 12px;"><span><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 500;">#{{di.id}}</span> <span style="color: #64748B;">{{di.sat}}</span></span><span style="font-family: 'IBM Plex Mono', monospace; color: #475569;">{{di.v}}</span></button>
+</sc-for>
+</div>
+</sc-for>
+<sc-if value="{{digest.quiet}}" hint-placeholder-val="{{false}}"><span style="color: #64748B;">No escalations, downgrades or passes this run.</span></sc-if>
+</section>
+
+<section aria-label="Decision log" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline;"><h2 style="margin: 0; font-size: 14px; font-weight: 700;">Decision log</h2><span style="font-size: 12px; color: #64748B;">this replay</span></div>
+<sc-for list="{{logRows}}" as="lg" hint-placeholder-count="2">
+<div style="display: grid; grid-template-columns: 52px 1fr; gap: 8px; font-size: 12px;"><span style="font-family: 'IBM Plex Mono', monospace; color: #64748B;">{{lg.run}}</span><span>{{lg.text}}</span></div>
+</sc-for>
+<sc-if value="{{logEmpty}}" hint-placeholder-val="{{true}}"><span style="color: #64748B;">No decisions yet. Approvals and deferrals are recorded here with their run.</span></sc-if>
+</section>
+</aside>
+</div>
+
+<section aria-label="Replay timeline" style="background: #FFFFFF; border: 1px solid #E3E8EE; border-radius: 10px; padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px;">
+<div style="display: flex; gap: 6px;">
+<button type="button" onClick="{{stepBack}}" aria-label="Previous screening run" style="width: 36px; height: 36px; border: 1px solid #E3E8EE; border-radius: 6px; background: #FFFFFF; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" aria-hidden="true"><polyline points="9,2 4,7 9,12"></polyline></svg></button>
+<button type="button" onClick="{{togglePlay}}" aria-pressed="{{playing}}" style="min-width: 84px; height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: #0F172A; color: #FFFFFF; cursor: pointer; font-weight: 700;">{{playLabel}}</button>
+<button type="button" onClick="{{stepFwd}}" aria-label="Next screening run" style="width: 36px; height: 36px; border: 1px solid #E3E8EE; border-radius: 6px; background: #FFFFFF; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" aria-hidden="true"><polyline points="5,2 10,7 5,12"></polyline></svg></button>
+</div>
+<span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px;">{{clock}}</span>
+<div style="margin-left: auto; display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #475569;">
+<sc-for list="{{legend}}" as="lgd" hint-placeholder-count="6">
+<span class="tw" tabindex="0" style="position: relative; display: inline-flex; align-items: center; gap: 5px; cursor: help;"><span style="{{lgd.swatch}}"></span><span style="border-bottom: 1px dotted #CBD5E1;">{{lgd.label}}</span><span class="tt" role="tooltip" style="right: 0;"><b>{{lgd.name}}</b>{{lgd.tip}}</span></span>
+</sc-for>
+</div>
+</div>
+<div style="display: flex; gap: 10px;">
+<div style="flex: 0 0 76px; display: flex; flex-direction: column;">
+<div style="height: 22px;"></div>
+<div style="height: 34px; display: flex; align-items: center; font-size: 11px; color: #64748B;">Open events</div>
+<sc-for list="{{dock.lanes}}" as="ln" hint-placeholder-count="6">
+<div style="height: {{ln.h}}; display: flex; align-items: center; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: {{ln.color}}; box-sizing: border-box;">{{ln.sat}}</div>
+</sc-for>
+</div>
+<div style="flex: 1 1 auto; min-width: 0; position: relative;">
+<div style="position: relative; height: 22px; border-bottom: 1px solid #E3E8EE;">
+<sc-for list="{{dock.ticks}}" as="tk" hint-placeholder-count="12">
+<span style="position: absolute; left: {{tk.left}}; bottom: 0; height: {{tk.h}}; border-left: 1px solid #CBD5E1;"></span>
+<span style="position: absolute; left: {{tk.left}}; top: 0; transform: translateX(4px); font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #64748B; white-space: nowrap;">{{tk.label}}</span>
+</sc-for>
+</div>
+<div style="position: relative; height: 34px; border-bottom: 1px solid #EEF2F5;">
+<sc-for list="{{dock.density}}" as="d" hint-placeholder-count="20">
+<span class="tw" style="left: {{d.left}}; width: {{d.w}}; top: 0; bottom: 0;">
+<span style="position: absolute; left: 0; right: 0; bottom: 0; height: {{d.h}}; background: {{d.color}}; border-radius: 1px 1px 0 0;"></span>
+<span style="position: absolute; left: 0; right: 0; bottom: 0; height: {{d.nh}}; background: #F97316;"></span>
+<span class="tt" role="tooltip" style="{{d.side}}"><b>{{d.title}}</b><span>{{d.l1}}</span><span>{{d.l2}}</span></span>
+</span>
+</sc-for>
+</div>
+<sc-for list="{{dock.lanes}}" as="ln" hint-placeholder-count="6">
+<div style="position: relative; height: {{ln.h}}; border-bottom: 1px solid #F1F5F9; box-sizing: border-box;">
+<sc-for list="{{ln.bars}}" as="b" hint-placeholder-count="2">
+<span class="tw" style="left: {{b.left}}; width: {{b.w}}; top: {{b.top}}; height: 18px;">
+<sc-if value="{{b.futureShow}}" hint-placeholder-val="{{true}}">
+<span style="position: absolute; left: {{b.kw}}; right: 0; top: 2px; height: 14px; border: 1.5px dashed #94A3B8; border-left: 0; border-radius: 0 4px 4px 0; box-sizing: border-box;"></span>
+</sc-if>
+<button type="button" onClick="{{b.pick}}" aria-label="{{b.aria}}" style="position: absolute; left: 0; top: 0; width: {{b.kw}}; min-width: 8px; height: 18px; padding: 0; border: {{b.border}}; border-radius: 4px; background: #E2E8F0; cursor: pointer; overflow: hidden; box-sizing: border-box; text-align: left;">
+<sc-for list="{{b.segs}}" as="sg" hint-placeholder-count="1">
+<span style="position: absolute; left: {{sg.left}}; width: {{sg.w}}; top: 0; bottom: 0; background: #F97316;"></span>
+</sc-for>
+<span style="position: relative; padding: 0 5px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; line-height: 16px; white-space: nowrap; color: #0F172A;">{{b.label}}</span>
+</button>
+<span class="tt" role="tooltip" style="{{b.side}}"><b>{{b.tipTitle}}</b><sc-for list="{{b.tip}}" as="tl" hint-placeholder-count="4"><span style="color: {{tl.c}};">{{tl.t}}</span></sc-for></span>
+</span>
+<sc-if value="{{b.dlShow}}" hint-placeholder-val="{{false}}">
+<span class="tw" style="left: {{b.dlLeft}}; top: {{b.top}}; width: 12px; height: 18px; margin-left: -6px; cursor: help;">
+<span style="position: absolute; left: 5px; top: 0; width: 2px; height: 18px; background: #DC2626;"></span>
+<span class="tt" role="tooltip" style="{{b.dlSide}}"><b>{{b.dlTitle}}</b><span>{{b.dl1}}</span><span>{{b.dl2}}</span><span>{{b.dl3}}</span></span>
+</span>
+</sc-if>
+<sc-if value="{{b.endShow}}" hint-placeholder-val="{{false}}">
+<span class="tw" style="left: {{b.endLeft}}; top: {{b.dTop}}; width: 14px; height: 14px; margin: -2px 0 0 -7px; cursor: help;">
+<span style="position: absolute; left: 2px; top: 2px; width: 10px; height: 10px; border-radius: 50%; background: {{b.endColor}}; border: 2px solid #FFFFFF; box-sizing: border-box;"></span>
+<span class="tt" role="tooltip" style="{{b.endSide}}"><b>{{b.endTitle}}</b><span>{{b.end1}}</span><span>{{b.end2}}</span></span>
+</span>
+</sc-if>
+</sc-for>
+<sc-for list="{{ln.marks}}" as="mk" hint-placeholder-count="1">
+<span class="tw" style="left: {{mk.left}}; top: {{mk.top}}; height: 20px; cursor: help;">
+<span style="display: inline-block; height: 20px; padding: 0 8px; border: 1px solid {{mk.border}}; border-radius: 999px; background: {{mk.bg}}; color: {{mk.color}}; font-size: 11px; font-weight: 700; line-height: 18px; white-space: nowrap; transform: translateX(6px); box-sizing: border-box;">{{mk.text}}</span>
+<span class="tt" role="tooltip" style="{{mk.side}}"><b>{{mk.title}}</b><span>{{mk.l1}}</span><span>{{mk.l2}}</span><span>{{mk.l3}}</span></span>
+</span>
+</sc-for>
+</div>
+</sc-for>
+<div style="position: absolute; top: 0; bottom: 0; left: {{dock.playLeft}}; width: 2px; margin-left: -1px; background: #0F766E; pointer-events: none;"></div>
+<span style="position: absolute; top: -2px; left: {{dock.playLeft}}; transform: translateX(-50%); padding: 1px 7px; border-radius: 4px; background: #0F766E; color: #FFFFFF; font-family: 'IBM Plex Mono', monospace; font-size: 10px; white-space: nowrap; pointer-events: none;">{{dock.playLabel}}</span>
+</div>
+</div>
+<div style="display: flex; gap: 10px; align-items: center;">
+<label for="replay-run" style="flex: 0 0 76px; font-size: 11px; color: #64748B;">Screening run</label>
+<input id="replay-run" type="range" min="0" max="63" step="1" value="{{run}}" onChange="{{setRun}}" style="flex: 1 1 auto; min-width: 0; min-height: 24px; margin: 0;">
+</div>
+</section>
+
+<p style="margin: 0; font-size: 12px; color: #64748B;">Data notes: each message is a real ESA training-set CDM, with timing kept relative to closest approach; the 21-day calendar is simulated. Pc model: encounter plane from the CDM's relative state, both covariances and object sizes; it reproduces ESA's Pc within 0.1 orders of magnitude for 106 of 119 escalation messages. Burn response: Clohessy-Wiltshire, checked against two-body propagation. Not modelled: drag, J2, burn execution error, re-screening against the full catalogue. Spacecraft: 1,000 kg, 1 N, Isp 220 s assumed. Δv budget is a tweak (now {{budget}} mm/s).</p>
+</div>
+
+<sc-if value="{{modalOpen}}" hint-placeholder-val="{{false}}">
+<div style="position: fixed; inset: 0; z-index: 50; background: rgba(15, 23, 42, 0.55); display: flex; align-items: flex-start; justify-content: center; padding: 28px 16px; box-sizing: border-box; overflow-y: auto;">
+<div role="dialog" aria-modal="true" aria-labelledby="coa-title" style="width: 100%; max-width: 1120px; background: #FFFFFF; border-radius: 12px; box-shadow: 0 30px 80px rgba(15, 23, 42, 0.35); display: flex; flex-direction: column; overflow: hidden;">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 20px; background: #0F172A; color: #F1F5F9;">
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<span style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #94A3B8;">Approve manoeuvre · {{clock}}</span>
+<h2 id="coa-title" style="margin: 0; font-size: 19px; font-weight: 800;">Event #{{m.id}} · {{m.sat}} vs {{m.obj}} · {{m.optName}}</h2>
+</div>
+<div style="display: flex; align-items: center; gap: 10px;">
+<span style="padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; {{m.statusStyle}}">{{m.status}}</span>
+<button type="button" onClick="{{closeModal}}" aria-label="Close" style="width: 34px; height: 34px; border: 1px solid #334155; border-radius: 6px; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 14 14" stroke="#F1F5F9" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="2" x2="12" y2="12"></line><line x1="12" y1="2" x2="2" y2="12"></line></svg></button>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap;">
+<div style="flex: 1 1 360px; min-width: 0; padding: 18px; display: flex; flex-direction: column; gap: 14px; border-right: 1px solid #E3E8EE;">
+<span style="font-size: 11px; color: #64748B; text-transform: uppercase; letter-spacing: 0.08em;">Burn plan</span>
+<div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center;">
+<div style="position: relative; width: 190px; height: 190px; flex: 0 0 auto;">
+<svg viewBox="0 0 220 220" style="position: absolute; inset: 0; width: 100%; height: 100%;" role="img" aria-label="Thruster attitude relative to the velocity and radial axes">
+<circle cx="110" cy="110" r="84" fill="#F8FAFB" stroke="#CBD5E1"></circle>
+<line x1="20" x2="200" y1="110" y2="110" stroke="#CBD5E1"></line><line x1="110" x2="110" y1="20" y2="200" stroke="#CBD5E1"></line>
+<g font-family="IBM Plex Mono, monospace" font-size="9" fill="#64748B"><text x="204" y="106" text-anchor="end">VELOCITY</text><text x="16" y="106">ANTI-VEL.</text><text x="114" y="18">RADIAL OUT</text><text x="114" y="212">RADIAL IN</text></g>
+<line x1="110" y1="110" x2="186" y2="110" stroke="#0F766E" stroke-width="2" stroke-dasharray="4 3"></line>
+<path d="{{att.arc}}" fill="none" stroke="#6D28D9" stroke-width="1.5"></path>
+<line x1="110" y1="110" x2="{{att.x}}" y2="{{att.y}}" stroke="#6D28D9" stroke-width="4" stroke-linecap="round"></line>
+<path d="{{att.head}}" fill="#6D28D9"></path>
+<rect x="100" y="104" width="20" height="12" rx="2" fill="#0F172A"></rect><rect x="84" y="107" width="14" height="6" fill="#FFFFFF" stroke="#0F172A"></rect><rect x="122" y="107" width="14" height="6" fill="#FFFFFF" stroke="#0F172A"></rect>
+</svg>
+</div>
+<dl style="flex: 1 1 200px; margin: 0; display: grid; grid-template-columns: 110px 1fr; gap: 7px 10px;">
+<dt style="color: #64748B;">Planned for</dt><dd style="margin: 0; font-weight: 600;">{{m.when}}</dd>
+<dt style="color: #64748B;">Δv</dt><dd style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 17px;">{{m.dv}}</dd>
+<dt style="color: #64748B;">Thrust direction</dt><dd style="margin: 0;">{{m.dirLong}}</dd>
+<dt style="color: #64748B;">Out of plane</dt><dd style="margin: 0;">{{m.beta}}°</dd>
+<dt style="color: #64748B;">Burn duration</dt><dd style="margin: 0;">{{m.burn}}</dd>
+<dt style="color: #64748B;">Propellant</dt><dd style="margin: 0;">{{m.prop}}</dd>
+<dt style="color: #64748B;">Orbit change</dt><dd style="margin: 0;">{{m.dA}}</dd>
+</dl>
+</div>
+<p style="margin: 0; padding: 10px 12px; background: #F5F3FF; border-radius: 8px; color: #3B2A73;"><span style="font-weight: 700;">Why this works. </span>{{m.rationale}}</p>
+</div>
+<div style="flex: 1 1 340px; min-width: 0; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+<span style="font-size: 11px; color: #64748B; text-transform: uppercase; letter-spacing: 0.08em;">Predicted outcome at closest approach</span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+<div style="padding: 10px 12px; background: #F8FAFB; border-radius: 8px; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 12px; color: #64748B;">Miss distance</span><span style="font-family: 'IBM Plex Mono', monospace;"><span style="color: #C2410C;">{{m.missNow}}</span> → <span style="color: #6D28D9; font-size: 16px;">{{m.missAfter}}</span></span></div>
+<div style="padding: 10px 12px; background: #F8FAFB; border-radius: 8px; display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 12px; color: #64748B;">Collision probability</span><span style="font-family: 'IBM Plex Mono', monospace;"><span style="color: #C2410C;">{{m.pcNow}}</span> → <span style="color: #6D28D9; font-size: 16px;">{{m.pcAfter}}</span></span></div>
+</div>
+<span style="font-size: 11px; color: #64748B; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px;">Gate checks</span>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px;">
+<sc-for list="{{checks}}" as="c" hint-placeholder-count="6">
+<li style="display: grid; grid-template-columns: 20px 1fr; gap: 8px;"><span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: {{c.bg}}; color: #FFFFFF; font-size: 11px; font-weight: 800;">{{c.icon}}</span><span><span style="font-weight: 600;">{{c.title}}</span> <span style="color: #64748B;">{{c.detail}}</span></span></li>
+</sc-for>
+</ul>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 20px; border-top: 1px solid #E3E8EE; background: #FBFCFD;">
+<span style="font-size: 12px; color: #64748B;">The planner proposes; the gate checks are deterministic; the operator approves. The gate reuses the planner's model, so flight dynamics must still verify.</span>
+<div style="display: flex; gap: 8px;">
+<button type="button" onClick="{{closeModal}}" style="min-height: 38px; padding: 0 16px; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; cursor: pointer; font-weight: 600;">Cancel</button>
+<button type="button" onClick="{{approve}}" style="min-height: 38px; padding: 0 18px; border: 0; border-radius: 6px; background: {{m.approveBg}}; color: #FFFFFF; cursor: pointer; font-weight: 700;">{{m.approveLabel}}</button>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"budget":{"editor":"int","default":10,"min":2,"max":40,"unit":"mm/s"},"$preview":{"width":1440,"height":1480}}'>
+class Component extends DCLogic {
+  state = { fleet: null, rp: null, failed: false, run: 0, playing: false, tab: 'needs', sel: null, opt: 'coa1', modal: false, approved: {}, approvedTxt: {}, deferred: {}, log: [] };
+
+  componentDidMount() {
+    Promise.all([
+      fetch('/_blob/7cbd4667ac8a4820d66b144d9d5895a5').then((r) => r.json()),
+      fetch('/_blob/2c9f19570a39528260f32d2ad4a70c74').then((r) => r.json()),
+    ]).then(([fleet, rp]) => {
+      const firstHi = rp.events.find((e) => e.m[e.m.length - 1][1] >= -4 && Object.keys(e.coa).length);
+      const k0 = firstHi ? Math.min.apply(null, Object.keys(firstHi.coa).map(Number)) : 0;
+      const run = firstHi ? Math.min(63, Math.max(0, Math.ceil(firstHi.m[k0][0] / rp.runH))) : 12;
+      this.setState({ fleet, rp, run, sel: firstHi ? firstHi.id : null });
+    }).catch(() => this.setState({ failed: true }));
+    this.timer = setInterval(() => {
+      if (this.state.playing && this.state.rp) {
+        if (this.state.run >= 63) this.setState({ playing: false });
+        else this.setState({ run: this.state.run + 1 });
+      }
+    }, 1200);
+  }
+
+  componentWillUnmount() { clearInterval(this.timer); }
+
+  renderVals() {
+    const st = this.state;
+    const rp = st.rp, f = st.fleet;
+    const evs = rp ? rp.events : [];
+    const runH = rp ? rp.runH : 8;
+    const T = st.run * runH, prevT = T - runH;
+    const ms = f ? f.missions : [];
+    const budget = this.props.budget ?? 10;
+    const COL = { pc: '#C2410C', hidden: '#B45309', distance: '#2563EB', elevated: '#0F766E', quiet: '#94A3B8' };
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const mTxt = (v) => (Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(2) + ' km' : Math.round(Math.abs(v)) + ' m');
+    const sci = (p) => { if (!(p > 0) || p <= 1.0001e-30) return '≤1e-30'; const e = Math.floor(Math.log10(p)); return (Math.floor(p / Math.pow(10, e) * 10) / 10).toFixed(1) + 'e' + e; };
+    const pcTxt = (r) => sci(Math.pow(10, r));
+    const dh = (h) => { const a = Math.round(Math.abs(h)); return Math.floor(a / 24) + 'd ' + String(a % 24).padStart(2, '0') + 'h'; };
+    const at = (h) => { if (h < 0) return 'before Day 1'; const mn = Math.round(h * 60); return 'Day ' + (Math.floor(mn / 1440) + 1) + ' ' + String(Math.floor((mn % 1440) / 60)).padStart(2, '0') + ':' + String(mn % 60).padStart(2, '0'); };
+    const bucketOf = (msg) => (msg[1] >= -4 ? 'pc' : msg[2] > 5000 && msg[1] >= -6 ? 'hidden' : msg[2] < 1000 ? 'distance' : (msg[1] >= -6 || msg[2] <= 5000) ? 'elevated' : 'quiet');
+    const dirShort = (o) => { const a = o.alpha; if (a === 0) return 'Prograde'; if (a === 180) return 'Retrograde'; if (a < 90) return 'Prograde ' + a + '° up'; if (a < 180) return 'Retrograde ' + (180 - a) + '° up'; if (a < 270) return 'Retrograde ' + (a - 180) + '° down'; return 'Prograde ' + (360 - a) + '° down'; };
+    const dirLong = (o) => { const a = o.alpha; if (a === 0) return 'Prograde, along the velocity vector'; if (a === 180) return 'Retrograde, against the velocity vector'; if (a < 90) return a + '° above the velocity vector, toward radial-out'; if (a < 180) return (180 - a) + '° above the anti-velocity vector'; if (a < 270) return (a - 180) + '° below the anti-velocity vector'; return (360 - a) + '° below the velocity vector, toward radial-in'; };
+
+    const stateAt = (e, t) => {
+      let k = -1;
+      for (let i = 0; i < e.m.length; i++) if (e.m[i][0] <= t) k = i;
+      if (k < 0) return { phase: 'future' };
+      const last = e.m[k];
+      return { phase: e.tca <= t ? 'resolved' : 'open', k, last, bucket: bucketOf(last), peaked: e.m.slice(0, k + 1).some((m) => m[1] >= -4), isNew: e.m[0][0] > t - runH };
+    };
+    const planOf = (e, s) => {
+      if (!s || s.phase !== 'open' || s.bucket !== 'pc') return null;
+      const ks = Object.keys(e.coa).map(Number).filter((k) => k <= s.k);
+      if (!ks.length) return null;
+      const key = Math.max.apply(null, ks), c = e.coa[String(key)];
+      const msgT = e.m[key][0], age = T - msgT;
+      let firstOver = null;
+      for (const [h, dv] of c.wait) { if (dv == null || dv > budget) { firstOver = h; break; } }
+      const endRel = (e.tca - msgT) - 3;
+      const dlRel = firstOver == null ? endRel : firstOver;
+      return { key, c, msgT, age, dlAbs: msgT + dlRel, left: msgT + dlRel - T, overNow: dlRel <= age };
+    };
+
+    const S = evs.map((e) => ({ e, s: stateAt(e, T), p: stateAt(e, prevT) }));
+    const open = S.filter((x) => x.s.phase === 'open');
+    const isAppr = (x, run) => st.approved[x.e.id] != null && st.approved[x.e.id] <= run;
+    const needs = open.filter((x) => x.s.bucket === 'pc' && !isAppr(x, st.run + 1)).map((x) => Object.assign(x, { plan: planOf(x.e, x.s) }));
+    const watching = open.filter((x) => (x.s.bucket !== 'pc' && (x.s.bucket !== 'quiet' || x.s.peaked)) || isAppr(x, st.run + 1));
+    const quiet = open.length - needs.length - watching.length;
+    const passed = S.filter((x) => x.s.phase === 'resolved' && x.e.tca >= 0).sort((a, b) => b.e.tca - a.e.tca);
+    const openPrev = S.filter((x) => x.p.phase === 'open').length, needsPrev = S.filter((x) => x.p.phase === 'open' && x.p.bucket === 'pc' && !isAppr(x, st.run)).length;
+    const approvedN = Object.keys(st.approved).length;
+    const sgn = (n) => (n > 0 ? '+' + n : n < 0 ? String(n) : '±0');
+
+    const chipFor = (e, s) => {
+      if (s.phase === 'resolved') {
+        if (st.approved[e.id] != null) return ['PASSED · BURN', 'background: #CCFBF1; color: #115E59;'];
+        if (s.last[1] >= -4) return ['PASSED · UNMITIGATED', 'background: #FEE2E2; color: #991B1B;'];
+        return ['PASSED', 'background: #F1F5F9; color: #475569;'];
+      }
+      if (st.approved[e.id] != null) return ['APPROVED', 'background: #CCFBF1; color: #115E59;'];
+      if (s.bucket === 'pc') return st.deferred[e.id] === st.run + 1 ? ['DEFERRED', 'background: #EDE9FE; color: #5B21B6;'] : ['DECIDE', 'background: #FDE8DD; color: #9A3412;'];
+      if (s.peaked) return ['DOWNGRADED', 'background: #E2E8F0; color: #334155;'];
+      if (s.isNew) return ['NEW', 'background: #DBEAFE; color: #1E40AF;'];
+      return ['WATCH', 'background: #FEF3C7; color: #92400E;'];
+    };
+    const CHIP_TIP = {
+      'DECIDE': 'Latest Pc is at or above 1e-4, the action threshold. A burn decision is due before the deadline.',
+      'DEFERRED': 'The operator deferred the decision at this run. It returns to Decide at the next run.',
+      'APPROVED': 'A burn was approved (simulated). Watching until closest approach.',
+      'DOWNGRADED': 'Pc reached 1e-4 earlier, then fell back below it. The plan was withdrawn; still watching.',
+      'NEW': 'First message arrived in the last screening run. Below the action threshold.',
+      'WATCH': 'Below the action threshold, but Pc is at least 1e-6 or the miss is under 5 km. Re-scored every run.',
+      'PASSED': 'Closest approach has passed with Pc below 1e-4.',
+      'PASSED · BURN': 'Closest approach has passed. A burn was approved for it.',
+      'PASSED · UNMITIGATED': 'Closest approach passed with Pc still at or above 1e-4 and no approved burn. Flag for review.',
+    };
+    const chipTip = (e, s) => CHIP_TIP[chipFor(e, s)[0]] || '';
+
+    // queue
+    const needsSorted = needs.slice().sort((a, b) => (a.plan ? a.plan.left : 1e9) - (b.plan ? b.plan.left : 1e9));
+    const tabs = [['needs', 'Decide', needs.length], ['watch', 'Watch', watching.length], ['passed', 'Passed', passed.length]].map(([k, label, n]) => ({
+      label, count: n, on: st.tab === k,
+      style: st.tab === k ? 'background: #FFFFFF; color: ' + (k === 'needs' ? '#C2410C' : '#0F172A') + '; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.10);' : 'background: transparent; color: #475569;',
+      pick: () => this.setState({ tab: k }),
+    }));
+    const list = st.tab === 'needs' ? needsSorted : st.tab === 'watch' ? watching.slice().sort((a, b) => b.s.last[1] - a.s.last[1]) : passed.slice(0, 80);
+    const qrows = list.map((x) => {
+      const c = chipFor(x.e, x.s), on = st.sel === x.e.id;
+      let col1 = '', col1Color = '#0F172A', col2 = '';
+      if (st.tab === 'needs') {
+        if (!x.plan) { col1 = 'too late'; col1Color = '#991B1B'; col2 = 'TCA ' + dh(x.e.tca - T); }
+        else if (x.plan.overNow) { col1 = 'over budget'; col1Color = '#991B1B'; col2 = 'TCA ' + dh(x.e.tca - T); }
+        else { col1 = 'in ' + dh(x.plan.left); col1Color = x.plan.left < 24 ? '#C2410C' : '#0F172A'; col2 = 'TCA ' + dh(x.e.tca - T); }
+      } else if (st.tab === 'watch') { col1 = mTxt(x.s.last[2]); col2 = 'TCA ' + dh(x.e.tca - T); }
+      else { col1 = 'final ' + pcTxt(x.s.last[1]); col1Color = x.s.last[1] >= -4 ? '#991B1B' : '#475569'; col2 = dh(T - x.e.tca) + ' ago'; }
+      return { id: x.e.id, sat: x.e.sat, obj: x.e.obj.toLowerCase(), chip: c[0], chipStyle: c[1], chipTip: chipTip(x.e, x.s), pc: pcTxt(x.s.last[1]), pcColor: COL[x.s.bucket] || '#475569', col1, col1Color, col2, on, bg: on ? '#ECF6F5' : 'transparent', pick: () => this.setState({ sel: x.e.id, opt: 'coa1', modal: false }) };
+    });
+    const queueCol = st.tab === 'needs' ? 'Decide within' : st.tab === 'watch' ? 'Miss' : 'Final Pc';
+    const queueMeta = st.tab === 'needs' ? 'soonest deadline first' : st.tab === 'watch' ? quiet + ' quiet events hidden' : 'most recent first';
+
+    // next decision
+    const urgent = needsSorted.find((x) => x.plan && st.approved[x.e.id] == null);
+    let next;
+    if (urgent) {
+      const wiU = Math.min(urgent.plan.c.wait.length - 1, Math.floor(urgent.plan.age / 6));
+      const w0 = urgent.plan.c.wait[wiU] ? urgent.plan.c.wait[wiU][1] : null;
+      next = {
+        has: true, label: 'Next decision', bg: '#FFF7ED', border: '#FED7AA', labelColor: '#9A3412',
+        text: '#' + urgent.e.id + ' · ' + urgent.e.sat + ' vs ' + urgent.e.obj.toLowerCase() + ' · Pc ' + pcTxt(urgent.s.last[1]) + '. '
+          + (urgent.plan.overNow ? 'Already above the ' + budget + ' mm/s budget: decide now or accept a larger burn.' : 'Decide within ' + dh(urgent.plan.left) + ' (by ' + at(urgent.plan.dlAbs) + ') to stay inside the ' + budget + ' mm/s budget. Lowest burn now: ' + (w0 != null ? w0.toFixed(1) + ' mm/s.' : 'above 80 mm/s.')),
+        go: () => this.setState({ sel: urgent.e.id, opt: 'coa1', tab: 'needs' }),
+      };
+    } else if (!rp) {
+      next = { has: false, label: st.failed ? 'Data error' : 'Loading', bg: '#F8FAFB', border: '#E3E8EE', labelColor: '#475569', text: st.failed ? 'Could not load the replay data.' : 'Loading the replay data.', go: () => {} };
+    } else {
+      next = { has: false, label: 'No decision due', bg: '#F0FDF4', border: '#BBF7D0', labelColor: '#166534', text: open.length + ' events open; none needs a decision at this run.', go: () => {} };
+    }
+
+    // selected event
+    const selX = S.find((x) => x.e.id === st.sel) || null;
+    const ev0 = selX ? selX.e : null, s0 = selX ? selX.s : null;
+    const plan = ev0 && s0 ? planOf(ev0, s0) : null;
+    const cev = plan ? plan.c : null;
+    const optsAll = cev ? cev.opts.filter((o) => o.feasible) : [];
+    const opt = optsAll.find((o) => o.key === st.opt) || optsAll[0] || null;
+    const names = { coa1: 'Recommended', coa2: 'More margin', coa3: 'Wait 24 h' };
+
+    let ws = {}, hist = {}, wc = {}, bp = { labels: [] }, opts = { rows: [] }, other = { facts: [] }, att = {}, m = {}, checks = [], msgRows = [];
+    const hasWs = !!(ev0 && s0 && s0.phase !== 'future');
+    const mode = { coa: !!(cev && opt), other: false };
+    if (hasWs) {
+      const c = chipFor(ev0, s0), vis = ev0.m.slice(0, s0.k + 1);
+      const xp = (hb) => 40 + (168 - clamp(hb, 0, 168)) / 168 * 276;
+      const yPc = (r) => 6 + (-2 - clamp(r, -14, -2)) / 12 * 80;
+      const maxMiss = Math.max.apply(null, vis.map((v) => v[2]));
+      const yMax = clamp(Math.max(6000, maxMiss * 1.15), 6000, 40000);
+      const yMs = (v) => 70 - Math.min(v, yMax) / yMax * 62;
+      const dot = (x, y, r) => 'M' + (x - r).toFixed(1) + ' ' + y.toFixed(1) + 'a' + r + ' ' + r + ' 0 1 0 ' + 2 * r + ' 0a' + r + ' ' + r + ' 0 1 0 ' + -2 * r + ' 0';
+      const pcP = vis.map((v) => [xp(ev0.tca - v[0]), yPc(v[1]), v[1]]);
+      const msP = vis.map((v) => [xp(ev0.tca - v[0]), yMs(v[2])]);
+      const lastTwo = vis.slice(-2);
+      const trend = lastTwo.length < 2 ? 'first message' : (lastTwo[1][1] - lastTwo[0][1] > 0.3 ? 'Pc rising' : lastTwo[1][1] - lastTwo[0][1] < -0.3 ? 'Pc falling' : 'Pc steady') + ' · miss ' + (lastTwo[1][2] < lastTwo[0][2] ? 'shrinking' : 'growing');
+      hist = {
+        pcPts: pcP.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '), pcDots: pcP.filter((p) => p[2] < -4).map((p) => dot(p[0], p[1], 2.2)).join(''), pcHot: pcP.filter((p) => p[2] >= -4).map((p) => dot(p[0], p[1], 3)).join(''),
+        missPts: msP.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '), missDots: msP.map((p) => dot(p[0], p[1], 2.2)).join(''),
+        y1: yMs(1000).toFixed(1), y5: yMs(5000).toFixed(1), y1L: (yMs(1000) + 3).toFixed(1), y5L: (yMs(5000) + 3).toFixed(1),
+        nowX: xp(Math.max(0, ev0.tca - T)).toFixed(1), trend,
+      };
+      const resolved = s0.phase === 'resolved';
+      ws = {
+        id: ev0.id, sat: ev0.sat, obj: ev0.obj.toLowerCase(), chip: c[0], chipStyle: c[1], chipTip: chipTip(ev0, s0),
+        pc: pcTxt(s0.last[1]), pcLabel: resolved ? 'Final Pc' : 'Pc', color: resolved ? '#475569' : (COL[s0.bucket] || '#475569'),
+        miss: mTxt(s0.last[2]), msgs: String(vis.length), tcaTxt: dh(ev0.tca - T), tcaLabel: resolved ? 'Since TCA' : 'To TCA',
+        status: resolved ? (s0.last[1] >= -4 && st.approved[ev0.id] == null ? 'Passed with Pc still at or above 1e-4 and no approved burn. Flag for post-event review.' : 'Closest approach has passed.')
+          : st.approved[ev0.id] != null ? 'Burn approved at run ' + st.approved[ev0.id] + ' (simulated). Later messages are the real recorded ones, so they do not show the burn\u2019s effect.'
+          : s0.bucket === 'pc' ? (plan ? 'Pc at or above 1e-4. Choose a burn, or defer to the next screening run.' : 'Pc at or above 1e-4, but closest approach is under 3 h away. Hand over to flight dynamics.')
+          : s0.peaked ? 'Pc reached 1e-4 earlier and has fallen back. The plan was withdrawn; watching to closest approach.'
+          : 'Below the action threshold. Re-scored at every screening run.',
+      };
+      if (!mode.coa) {
+        mode.other = true;
+        const tierOf = (v) => (v[1] >= -4 || v[2] < 1000 ? ['CRITICAL', 'background: #FDE8DD; color: #9A3412;', 'Brief rule: Critical when Pc is at least 1e-4 or the miss is under 1 km.'] : v[1] >= -6 || v[2] <= 5000 ? ['ELEVATED', 'background: #FEF3C7; color: #92400E;', 'Brief rule: Elevated when Pc is 1e-6 to 1e-4, or the miss is 1 to 5 km.'] : ['SAFE', 'background: #F1F5F9; color: #475569;', 'Brief rule: Safe when Pc is below 1e-6 and the miss is over 5 km.']);
+        const bucketName = { pc: 'Decide', hidden: 'Watch · Pc high, far', distance: 'Watch · miss under 1 km', elevated: 'Watch', quiet: 'Quiet' };
+        msgRows = vis.map((v, i) => { const t = tierOf(v), b = bucketOf(v); return { n: String(i + 1), before: dh(ev0.tca - v[0]), pc: pcTxt(v[1]), pcColor: COL[b] || '#475569', miss: mTxt(v[2]), tier: t[0], tierStyle: t[1], tierTip: t[2], bucket: bucketName[b] }; }).reverse();
+        const peak = Math.max.apply(null, vis.map((v) => v[1]));
+        if (resolved) other = { title: 'Outcome', text: st.approved[ev0.id] != null ? 'A burn was approved at run ' + st.approved[ev0.id] + ' (simulated). The recorded messages do not include it; without the burn, the final Pc was ' + pcTxt(s0.last[1]) + '.' : s0.last[1] >= -4 ? 'No burn was approved, and the final Pc was still at or above 1e-4. Flag for post-event review.' : 'No burn was needed: the final Pc was below 1e-4.', facts: [{ k: 'Peak Pc', v: pcTxt(peak) }, { k: 'Final Pc', v: pcTxt(s0.last[1]) }, { k: 'Final miss', v: mTxt(s0.last[2]) }, { k: 'Messages', v: String(vis.length) }] };
+        else if (s0.bucket === 'pc') other = { title: 'Too close to plan', text: 'A burn this close to closest approach needs flight-dynamics planning outside this tool.', facts: [{ k: 'Pc', v: pcTxt(s0.last[1]) }, { k: 'To TCA', v: dh(ev0.tca - T) }] };
+        else other = { title: s0.peaked ? 'Why it was downgraded' : 'Why it is on watch', text: s0.peaked ? 'Tracking improved and Pc fell below 1e-4. In ESA’s training histories, 141 of 154 events that reached Pc 1e-4 fell back below it by their last message.' : 'It meets a watch rule but not the action rule (Pc ≥ 1e-4). The planner runs automatically if a later message crosses it.', facts: [{ k: 'Peak Pc so far', v: pcTxt(peak) }, { k: 'Rule triggered', v: s0.last[2] < 1000 ? 'miss under 1 km' : s0.last[2] > 5000 && s0.last[1] >= -6 ? 'Pc ≥ 1e-6 though far' : s0.last[1] >= -6 ? 'Pc ≥ 1e-6' : s0.peaked ? 'earlier Pc ≥ 1e-4' : 'miss under 5 km' }, { k: 'Next message', v: 'about 8 h (next run)' }] };
+      }
+    }
+    if (mode.coa) {
+      // cost of waiting
+      const w = cev.wait, H = w.length ? w[w.length - 1][0] + 6 : 6;
+      const dvs = w.map((x) => x[1]).filter((v) => v != null);
+      const yTop = Math.ceil(clamp(Math.max(budget * 1.6, (dvs.length ? Math.max.apply(null, dvs) : budget) * 1.1), 4, 80));
+      const X = (h) => 36 + clamp(h, 0, H) / H * 276, Y = (dv) => 126 - Math.min(dv, yTop) / yTop * 116;
+      let path = '', over = '';
+      w.forEach(([h, dv], i) => {
+        if (dv == null) { over += 'M' + X(h).toFixed(1) + ' 8H' + X(h + 6).toFixed(1) + 'V12H' + X(h).toFixed(1) + 'Z'; return; }
+        path += (path && w[i - 1] && w[i - 1][1] != null ? 'V' : 'M' + X(h).toFixed(1) + ' ') + Y(dv).toFixed(1) + 'H' + X(h + 6).toFixed(1);
+      });
+      const dlRel = plan.dlAbs - plan.msgT;
+      const wi = Math.min(w.length - 1, Math.floor(plan.age / 6));
+      const wNow = w[wi] ? w[wi][1] : null, w24 = w[wi + 4] ? w[wi + 4][1] : null;
+      wc = {
+        path, over, budgetY: Y(budget).toFixed(1), budgetPct: (Y(budget) / 1.5).toFixed(2) + '%', topTxt: String(yTop), nowX: X(plan.age).toFixed(1),
+        dlX: X(dlRel).toFixed(1), dlW: Math.max(0, X(H) - X(dlRel)).toFixed(1),
+        caption: plan.overNow ? 'Past the ' + budget + ' mm/s deadline since ' + at(plan.dlAbs) + '. The current window needs ' + (wNow != null ? wNow.toFixed(1) + ' mm/s.' : 'over 80 mm/s.') : 'Burn in the current window: ' + (wNow != null ? wNow.toFixed(1) : 'over 80') + ' mm/s. One day later: ' + (w24 != null ? w24.toFixed(1) + ' mm/s' + (wNow ? ' (' + (w24 / wNow).toFixed(2) + '×)' : '') : 'not possible before closest approach') + '. Budget holds until ' + at(plan.dlAbs) + ', in ' + dh(plan.left) + '.',
+        note: 'Best burn time inside each window (orbital phase matters). Shaded: past the decision deadline. Across all escalations, waiting 24 h costs a median 1.25× the Δv.',
+      };
+      // encounter plane
+      const m0 = cev.m2, m1 = opt.m2After;
+      const fit = Math.max(Math.hypot(m0[0], m0[1]), Math.hypot(m1[0], m1[1]), 2.2 * cev.ell.a, 1300) * 1.12, sc = 140 / fit;
+      const P2 = (v) => [150 + v[1] * sc, 150 - v[0] * sc];
+      const b0 = P2(m0), a1 = P2(m1);
+      bp = {
+        rx1: Math.max(1.5, cev.ell.a * sc).toFixed(1), ry1: Math.max(1.5, cev.ell.b * sc).toFixed(1), rx3: Math.max(3, 3 * cev.ell.a * sc).toFixed(1), ry3: Math.max(3, 3 * cev.ell.b * sc).toFixed(1),
+        rot: (cev.ell.deg - 90).toFixed(1), ring: (1000 * sc).toFixed(1), hbr: Math.max(2.5, cev.hbrEff * sc).toFixed(1),
+        bx: b0[0].toFixed(1), by: b0[1].toFixed(1), ax: a1[0].toFixed(1), ay: a1[1].toFixed(1),
+        sigTxt: mTxt(cev.ell.a) + ' × ' + mTxt(cev.ell.b), scaleTxt: mTxt(fit),
+        labels: [
+          { left: (b0[0] / 3).toFixed(2) + '%', top: (b0[1] / 3).toFixed(2) + '%', tf: 'translate(8px, -130%)', bg: '#FDE8DD', color: '#9A3412', text: 'now ' + mTxt(cev.miss) },
+          { left: (a1[0] / 3).toFixed(2) + '%', top: (a1[1] / 3).toFixed(2) + '%', tf: 'translate(8px, 30%)', bg: '#EDE9FE', color: '#5B21B6', text: 'after ' + mTxt(opt.missAfter) },
+        ],
+      };
+      // options
+      const decided = st.approved[ev0.id] != null ? 'Approved at run ' + st.approved[ev0.id] + '.' : st.deferred[ev0.id] === st.run + 1 ? 'Deferred at this run; re-check after the next message.' : 'Not decided.';
+      opts = {
+        basis: 'planned at message ' + (plan.key + 1) + ', ' + Math.round(plan.age) + ' h ago',
+        rows: optsAll.map((o) => { const on = o.key === opt.key; return { name: names[o.key], dvTxt: o.dv.toFixed(1) + ' mm/s', dir: dirShort(o), pcAfter: sci(o.pcAfter), missAfter: mTxt(o.missAfter), on, bg: on ? '#F5F3FF' : '#FFFFFF', ring: on ? '#6D28D9' : 'transparent', pick: () => this.setState({ opt: o.key }) }; }),
+        decision: decided, canDefer: st.approved[ev0.id] == null, reviewLabel: st.approved[ev0.id] != null ? 'View approved plan' : 'Review and approve', reviewBg: st.approved[ev0.id] != null ? '#0F766E' : '#6D28D9',
+      };
+      // modal
+      const a = opt.alpha * Math.PI / 180, L = 72, tx = 110 + L * Math.cos(a), ty = 110 - L * Math.sin(a), hx = 110 + (L + 12) * Math.cos(a), hy = 110 - (L + 12) * Math.sin(a), px = 7 * Math.sin(a), py = 7 * Math.cos(a);
+      att = { x: tx.toFixed(1), y: ty.toFixed(1), head: 'M' + hx.toFixed(1) + ',' + hy.toFixed(1) + 'L' + (tx + px).toFixed(1) + ',' + (ty + py).toFixed(1) + 'L' + (tx - px).toFixed(1) + ',' + (ty - py).toFixed(1) + 'Z', arc: opt.alpha === 0 ? '' : 'M140,110A30,30 0 ' + (opt.alpha > 180 ? 1 : 0) + ' 0 ' + (110 + 30 * Math.cos(a)).toFixed(1) + ',' + (110 - 30 * Math.sin(a)).toFixed(1) };
+      const approved = st.approved[ev0.id] != null;
+      const aheadTxt = opt.dT >= 0 ? 'arrive about ' + (opt.dT / 1000).toFixed(1) + ' km earlier along the track' : 'arrive about ' + (-opt.dT / 1000).toFixed(1) + ' km later along the track';
+      m = {
+        id: ev0.id, sat: ev0.sat, obj: ev0.obj.toLowerCase(), optName: names[opt.key],
+        status: approved ? 'Approved · queued for upload' : 'Awaiting approval', statusStyle: approved ? 'background: #0F766E; color: #FFFFFF;' : 'background: #FDE68A; color: #78350F;',
+        when: 'Message ' + (plan.key + 1) + (opt.key === 'coa3' ? ' + 24 h, ' : ' time, ') + Math.round(opt.leadH) + ' h before closest approach',
+        dv: opt.dv.toFixed(1) + ' mm/s', dirLong: dirLong(opt), beta: opt.beta,
+        burn: 'about ' + Math.max(1, Math.round(opt.burnS)) + ' s at 1 N', prop: 'about ' + opt.propG.toFixed(1) + ' g', dA: 'semi-major axis ' + (opt.dA >= 0 ? '+' : '') + opt.dA.toFixed(1) + ' m',
+        missNow: mTxt(cev.miss), missAfter: mTxt(opt.missAfter), pcNow: pcTxt(cev.risk), pcAfter: sci(opt.pcAfter),
+        rationale: 'The ' + (ev0.obj.toLowerCase() === 'unknown' ? 'unidentified object' : ev0.obj.toLowerCase()) + ' passes ' + mTxt(cev.miss) + ' away at ' + cev.relSpeed.toFixed(1) + ' km/s on a ' + Math.round(cev.crossDeg) + '° crossing. This ' + dirShort(opt).toLowerCase() + ' burn makes us ' + aheadTxt + ' by closest approach, which opens the encounter-plane miss to ' + mTxt(opt.missAfter) + ' and cuts Pc to ' + sci(opt.pcAfter) + '.',
+        approveLabel: approved ? 'Approved' : 'Approve and queue upload', approveBg: approved ? '#0F766E' : '#6D28D9',
+      };
+      const ok = (b) => (b ? { icon: '✓', bg: '#0F766E' } : { icon: '!', bg: '#B45309' });
+      checks = [
+        Object.assign(ok(opt.pcAfter < 1e-4), { title: 'Pc after burn below 1e-4.', detail: sci(opt.pcAfter) + '.' }),
+        Object.assign(ok(opt.missAfter > 1000), { title: 'Miss after burn above 1 km.', detail: mTxt(opt.missAfter) + '.' }),
+        Object.assign(ok(cev.pcModelOk), { title: cev.pcModelOk ? 'Model reproduces ESA’s Pc for this message.' : 'Model calibrated to ESA’s Pc.', detail: cev.pcModelOk ? 'Within 0.1 orders of magnitude.' : 'Effective radius ' + cev.hbrEff.toFixed(1) + ' m.' }),
+        Object.assign(ok(opt.dv <= budget), { title: opt.dv <= budget ? 'Within the Δv budget.' : 'Above the Δv budget.', detail: opt.dv.toFixed(1) + ' of ' + budget + ' mm/s.' }),
+        Object.assign(ok(plan.age < 6 || (wNow != null && wNow <= budget)), { title: 'Plan computed ' + Math.round(plan.age) + ' h ago.', detail: 'Best burn in the current window: ' + (wNow != null ? wNow.toFixed(1) + ' mm/s.' : 'over 80 mm/s.') }),
+        { icon: '!', bg: '#B45309', title: 'Not verified here:', detail: 'burn execution error, drag and J2, and re-screening the new orbit against the catalogue.' },
+      ];
+    }
+
+    // run digest
+    const groups = [];
+    const esc = S.filter((x) => x.s.phase === 'open' && x.s.bucket === 'pc' && !(x.p.phase === 'open' && x.p.bucket === 'pc'));
+    const down = S.filter((x) => x.s.phase === 'open' && x.s.bucket !== 'pc' && x.p.phase === 'open' && x.p.bucket === 'pc');
+    const pas = S.filter((x) => x.s.phase === 'resolved' && x.p.phase === 'open');
+    const newOnes = open.filter((x) => x.s.isNew);
+    const item = (x, v) => ({ id: x.e.id, sat: x.e.sat, v, pick: () => this.setState({ sel: x.e.id, opt: 'coa1' }) });
+    if (esc.length) groups.push({ title: 'Escalated to Pc ≥ 1e-4 · ' + esc.length, color: '#C2410C', items: esc.slice(0, 4).map((x) => item(x, pcTxt(x.s.last[1]))) });
+    if (down.length) groups.push({ title: 'Downgraded · ' + down.length, color: '#2563EB', items: down.slice(0, 4).map((x) => item(x, pcTxt(x.s.last[1]))) });
+    if (pas.length) groups.push({ title: 'Passed closest approach · ' + pas.length, color: '#475569', items: pas.slice(0, 4).map((x) => item(x, 'final ' + pcTxt(x.s.last[1]))) });
+    const digest = { groups, quiet: !groups.length, meta: newOnes.length + ' new event' + (newOnes.length === 1 ? '' : 's') + ' reported' };
+
+    // decision log
+    const logRows = st.log.slice().reverse().map((l) => ({ run: 'Run ' + l.run, text: l.text }));
+
+    // orbit context globe
+    const Re = 6371, EX = 3, C = 450, SC = 420 / (Re + 1200 * EX);
+    const cs = Math.cos(0.6), ss = Math.sin(0.6), ct = Math.cos(0.38), stl = Math.sin(0.38);
+    const proj = (x, y, z) => { const x1 = x * cs - y * ss, y1 = x * ss + y * cs; const y2 = y1 * ct - z * stl, z2 = y1 * stl + z * ct; return [C + x1 * SC, C - z2 * SC, y2 < 0 || Math.hypot(x1, z2) > Re + 1, y2]; };
+    const orbit3 = (r, inc, raan, u) => { const cO = Math.cos(raan), sO = Math.sin(raan), ci = Math.cos(inc), si = Math.sin(inc), cu = Math.cos(u), su = Math.sin(u); return [r * (cO * cu - sO * su * ci), r * (sO * cu + cO * su * ci), r * su * si]; };
+    const orbitPt = (r, inc, raan, u) => { const p = orbit3(r, inc, raan, u); return proj(p[0], p[1], p[2]); };
+    const path = (pts, want) => { let s = '', pen = false; for (const p of pts) { if (p[2] === want) { s += (pen ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); pen = true; } else pen = false; } return s; };
+    const gdot = (x, y, r) => 'M' + (x - r).toFixed(1) + ' ' + y.toFixed(1) + 'a' + r + ' ' + r + ' 0 1 0 ' + 2 * r + ' 0a' + r + ' ' + r + ' 0 1 0 ' + -2 * r + ' 0';
+    const hash = (n, s) => { const x = Math.sin(n * 12.9898 + s * 78.233) * 43758.5453; return x - Math.floor(x); };
+    const glyph = (cx, cy, ang, s) => { const c = Math.cos(ang + Math.PI / 2), sn = Math.sin(ang + Math.PI / 2); const Tf = (x, y) => (cx + (x * c - y * sn) * s).toFixed(1) + ',' + (cy + (x * sn + y * c) * s).toFixed(1); const rect = (x0, y0, x1, y1) => 'M' + Tf(x0, y0) + 'L' + Tf(x1, y0) + 'L' + Tf(x1, y1) + 'L' + Tf(x0, y1) + 'Z'; return { panels: rect(-15, -2.6, -5.5, 2.6) + rect(5.5, -2.6, 15, 2.6), body: rect(-3.4, -3.4, 3.4, 3.4) }; };
+    const heading = (r, inc, raan, u) => { const p1 = orbitPt(r, inc, raan, u - 0.01), p2 = orbitPt(r, inc, raan, u + 0.01); return Math.atan2(p2[1] - p1[1], p2[0] - p1[0]); };
+    if (!this.grat) {
+      let gr = '';
+      for (const lat of [-60, -30, 0, 30, 60]) { const la = lat * Math.PI / 180, pts = []; for (let k = 0; k <= 96; k++) { const lo = k / 96 * 2 * Math.PI; pts.push(proj(Re * Math.cos(la) * Math.cos(lo), Re * Math.cos(la) * Math.sin(lo), Re * Math.sin(la))); } gr += path(pts, true); }
+      for (let q = 0; q < 12; q++) { const lo = q / 12 * 2 * Math.PI, pts = []; for (let k = 0; k <= 48; k++) { const la = -Math.PI / 2 + k / 48 * Math.PI; pts.push(proj(Re * Math.cos(la) * Math.cos(lo), Re * Math.cos(la) * Math.sin(lo), Re * Math.sin(la))); } gr += path(pts, true); }
+      this.grat = gr;
+    }
+    const g = { grat: this.grat, backDim: '', backSel: '', frontDim: '', frontSel: '', prop: '', ahead: '', chaser: '', evRing: '', evDot: '', evColor: '#C2410C', dots0: '', dots1: '', dots2: '', dots3: '', icoPanels: '', icoBody: '', selPanels: '', selBody: '' };
+    const selSat = ev0 ? ev0.sat : null;
+    let selOrbit = null;
+    const orbits = ms.map((mm, k) => {
+      const r = Re + mm.alt * EX, inc = mm.inc * Math.PI / 180, raan = k / ms.length * Math.PI;
+      const pts = []; for (let j = 0; j <= 120; j++) pts.push(orbitPt(r, inc, raan, j / 120 * 2 * Math.PI));
+      if (mm.label === selSat) { g.frontSel += path(pts, true); g.backSel += path(pts, false); selOrbit = { r, inc, raan }; }
+      else { g.frontDim += path(pts, true); g.backDim += path(pts, false); const u = (k * 2.39996) % (2 * Math.PI), p = orbitPt(r, inc, raan, u); if (p[2]) { const gl = glyph(p[0], p[1], heading(r, inc, raan, u), 1.4); g.icoPanels += gl.panels; g.icoBody += gl.body; } }
+      return { r, inc, raan };
+    });
+    const code = { pc: 3, hidden: 2, distance: 1, elevated: 1, quiet: 0 }, sizes = [3, 5, 6.5, 9];
+    for (const x of open) {
+      if (ev0 && x.e.id === ev0.id) continue;
+      const o = orbits[x.e.mi]; if (!o) continue;
+      const p = orbitPt(o.r + (hash(x.e.id, 3) - 0.5) * 120, x.e.inc * Math.PI / 180, o.raan + (hash(x.e.id, 1) - 0.5) * 0.3, hash(x.e.id, 2) * 2 * Math.PI);
+      const cd = code[x.s.bucket]; if (p[2]) g['dots' + cd] += gdot(p[0], p[1], sizes[cd]);
+    }
+    if (hasWs && selOrbit) {
+      g.evColor = s0.phase === 'resolved' ? '#64748B' : (COL[s0.bucket] || '#C2410C');
+      let uEv = 0, best = Infinity;
+      for (let k = 0; k < 72; k++) { const u = k / 72 * 2 * Math.PI; const p = orbitPt(selOrbit.r, selOrbit.inc, selOrbit.raan, u); if (p[3] < best) { best = p[3]; uEv = u; } }
+      const evP = orbitPt(selOrbit.r, selOrbit.inc, selOrbit.raan, uEv);
+      g.evRing = gdot(evP[0], evP[1], 22); g.evDot = gdot(evP[0], evP[1], 9);
+      if (s0.phase === 'open') {
+        const uSat = uEv - 1.3, ahead = [];
+        for (let j = 0; j <= 40; j++) ahead.push(orbitPt(selOrbit.r, selOrbit.inc, selOrbit.raan, uSat + j / 40 * (uEv - uSat)));
+        g.ahead = path(ahead, true);
+        const sP = orbitPt(selOrbit.r, selOrbit.inc, selOrbit.raan, uSat);
+        if (sP[2]) { const gl = glyph(sP[0], sP[1], heading(selOrbit.r, selOrbit.inc, selOrbit.raan, uSat), 3.2); g.selPanels = gl.panels; g.selBody = gl.body; }
+        const P = orbit3(selOrbit.r, selOrbit.inc, selOrbit.raan, uEv), R = Math.hypot(P[0], P[1], P[2]), phi = Math.asin(P[2] / R), lam = Math.atan2(P[1], P[0]);
+        const ic = ev0.inc * Math.PI / 180, su = clamp(Math.sin(phi) / Math.max(Math.sin(ic), 0.05), -1, 1);
+        const wrap = (q) => Math.abs(Math.atan2(Math.sin(q), Math.cos(q)));
+        const cand = [Math.asin(su), Math.PI - Math.asin(su)].map((u) => ({ u, raan: lam - Math.atan2(Math.cos(ic) * Math.sin(u), Math.cos(u)) })).sort((p1, p2) => wrap(p2.raan - selOrbit.raan) - wrap(p1.raan - selOrbit.raan))[0];
+        const deb = []; for (let j = 0; j <= 50; j++) deb.push(orbitPt(R, ic, cand.raan, cand.u - 0.9 + j / 50 * 1.3));
+        g.chaser = path(deb, true);
+        if (opt) { const uB = opt.key === 'coa3' ? uEv - 0.6 : uSat, bump = clamp(Math.abs(opt.dT) / 1000 * 90, 60, 700), pts = []; for (let j = 0; j <= 60; j++) { const u = uB + j / 60 * (uEv + 0.4 - uB); const ww = clamp((u - uB) / (uEv - uB), 0, 1); pts.push(orbitPt(selOrbit.r + bump * ww * ww * (3 - 2 * ww), selOrbit.inc, selOrbit.raan, u)); } g.prop = path(pts, true); }
+      }
+    }
+
+    // timeline dock
+    if (rp && !this.counts) {
+      const counts = [];
+      for (let r = 0; r < 64; r++) { let o = 0, n = 0; for (const e of evs) { const s = stateAt(e, r * runH); if (s.phase === 'open') { o++; if (s.bucket === 'pc') n++; } } counts.push([o, n]); }
+      this.counts = counts;
+    }
+    const DOM = 528, pctH = (h) => (clamp(h, 0, DOM) / DOM * 100).toFixed(3) + '%', wH = (a2, b2) => Math.max(0.4, (clamp(b2, 0, DOM) - clamp(a2, 0, DOM)) / DOM * 100).toFixed(3) + '%';
+    const counts = this.counts || [], maxO = Math.max.apply(null, counts.map((c) => c[0]).concat([1])), barW = (runH / DOM * 100 * 0.78).toFixed(3) + '%';
+    const density = counts.map((c, r) => ({
+      left: pctH(r * runH), w: barW, h: (c[0] / maxO * 100).toFixed(1) + '%', nh: c[1] ? Math.max(10, c[1] / maxO * 100).toFixed(1) + '%' : '0%', color: r === st.run ? '#0F766E' : '#CBD5E1',
+      side: r > 40 ? 'right: 0;' : 'left: 0;', title: 'Run ' + (r + 1) + ' · ' + at(r * runH), l1: c[0] + ' events open (bar height)', l2: c[1] + ' at Pc ≥ 1e-4 (orange part)',
+    }));
+    const ticks = []; for (let d = 0; d <= 22; d++) ticks.push({ left: pctH(d * 24), h: d % 2 === 0 ? '10px' : '5px', label: d % 2 === 0 && d < 22 ? 'Day ' + (d + 1) : '' });
+    const hiEvents = evs.filter((e) => e.m.some((mm) => mm[1] >= -4));
+    const laneSats = Array.from(new Set(hiEvents.map((e) => e.sat))).sort();
+    const sideOf = (h, near) => (clamp(h, 0, DOM) / DOM > 0.62 ? 'right: 0;' : near || 'left: 0;');
+    const lanes = laneSats.map((sat) => {
+      const bars = [], lmarks = [];
+      const items = hiEvents.filter((x) => x.sat === sat && x.m[0][0] <= T).sort((p1, p2) => p1.m[0][0] - p2.m[0][0]);
+      const trackEnd = [], trackOf = {};
+      for (const e of items) { let tr = trackEnd.findIndex((end) => e.m[0][0] > end + 30); if (tr < 0) { tr = trackEnd.length; trackEnd.push(0); } trackEnd[tr] = e.tca + 60; trackOf[e.id] = tr; }
+      const nTr = Math.max(1, trackEnd.length);
+      for (const e of items) {
+        const s = stateAt(e, T), y = 5 + trackOf[e.id] * 22;
+        const start = e.m[0][0], kEnd = Math.min(T, e.tca), done = e.tca <= T;
+        const cs = clamp(start, 0, DOM), ck = clamp(kEnd, 0, DOM), ce = clamp(done ? kEnd : e.tca, 0, DOM), kSpan = Math.max(ck - cs, 1e-6);
+        const segs = [];
+        let hiH = 0;
+        for (let i = 0; i <= s.k; i++) {
+          if (e.m[i][1] < -4) continue;
+          const a2 = e.m[i][0], b2 = Math.min(i + 1 <= s.k ? e.m[i + 1][0] : kEnd, kEnd);
+          if (b2 > a2) { hiH += b2 - a2; segs.push({ left: ((clamp(a2, 0, DOM) - cs) / kSpan * 100).toFixed(2) + '%', w: ((clamp(b2, 0, DOM) - clamp(a2, 0, DOM)) / kSpan * 100).toFixed(2) + '%' }); }
+        }
+        const on = st.sel === e.id, appr = st.approved[e.id], pl = planOf(e, s), label = chipFor(e, s)[0];
+        const tip = [{ t: label + ': ' + chipTip(e, s), c: '#E2E8F0' }, { t: 'First message ' + at(start) + ' · ' + (s.k + 1) + (s.k ? ' messages' : ' message') + ' so far', c: '#CBD5E1' }, { t: 'Latest Pc ' + pcTxt(s.last[1]) + ' · miss ' + mTxt(s.last[2]), c: '#CBD5E1' }];
+        if (hiH > 0) tip.push({ t: 'Orange: ' + Math.round(hiH) + ' h of ' + Math.round(kEnd - start) + ' h at Pc ≥ 1e-4', c: '#FDBA74' });
+        tip.push({ t: done ? 'Closest approach ' + at(e.tca) + ', ' + dh(T - e.tca) + ' ago' : 'Dashed: ' + dh(e.tca - T) + ' to closest approach, ' + at(e.tca), c: '#CBD5E1' });
+        tip.push({ t: 'Click the bar to open it in the workspace.', c: '#94A3B8' });
+        bars.push({
+          top: y + 'px', dTop: (y + 4) + 'px', left: pctH(start), w: wH(start, done ? kEnd : e.tca), kw: ((ck - cs) / Math.max(ce - cs, 1e-6) * 100).toFixed(2) + '%', segs, label: '#' + e.id,
+          aria: 'Event ' + e.id + ', ' + label.toLowerCase() + '. Select to open in the workspace.', border: on ? '2px solid #0F172A' : '1px solid #CBD5E1',
+          pick: () => this.setState({ sel: e.id, opt: 'coa1', modal: false }), futureShow: !done,
+          side: sideOf(start), tipTitle: '#' + e.id + ' · ' + e.sat + ' vs ' + e.obj.toLowerCase(), tip,
+          dlShow: !!pl && !pl.overNow && appr == null, dlLeft: pl ? pctH(pl.dlAbs) : '0%', dlSide: pl ? sideOf(pl.dlAbs) : 'left: 0;',
+          dlTitle: pl ? 'Decision deadline · ' + at(pl.dlAbs) : '', dl1: 'After this, the cheapest burn needs more than ' + budget + ' mm/s.', dl2: pl ? 'Time left: ' + dh(pl.left) + '.' : '', dl3: pl ? 'Read from the cost-of-waiting curve for message ' + (pl.key + 1) + '.' : '',
+          endShow: done, endLeft: pctH(e.tca), endColor: appr != null ? '#0F766E' : (s.last[1] >= -4 ? '#DC2626' : '#64748B'), endSide: sideOf(e.tca),
+          endTitle: 'Closest approach · ' + at(e.tca), end1: 'Final Pc ' + pcTxt(s.last[1]) + ' · miss ' + mTxt(s.last[2]) + '.',
+          end2: appr != null ? 'Teal: a burn was approved at run ' + appr + '.' : s.last[1] >= -4 ? 'Red: Pc was still at or above 1e-4 and no burn was approved. Flag for review.' : 'Grey: final Pc below 1e-4. No action was needed.',
+        });
+        if (appr != null) {
+          lmarks.push({ top: (y - 1) + 'px', left: pctH((appr - 1) * runH), side: sideOf((appr - 1) * runH, 'left: 6px;'), text: 'Burn approved', bg: '#CCFBF1', border: '#0F766E', color: '#115E59',
+            title: 'Burn approved · run ' + appr, l1: st.approvedTxt[e.id] || '', l2: 'Simulated upload. Later messages are the real recorded ones, so they do not show the burn.', l3: '' });
+        } else if (pl) {
+          const o = (on ? pl.c.opts.find((x) => x.key === st.opt) : null) || pl.c.opts[0];
+          if (o) {
+            const hB = T + (o.key === 'coa3' ? 24 : 0);
+            lmarks.push({ top: (y - 1) + 'px', left: pctH(hB), side: sideOf(hB, 'left: 6px;'), text: 'Proposed burn · ' + o.dv.toFixed(1) + ' mm/s', bg: '#F5F3FF', border: '#6D28D9', color: '#5B21B6',
+              title: 'Proposed burn · ' + names[o.key], l1: o.dv.toFixed(1) + ' mm/s ' + dirShort(o).toLowerCase() + (o.key === 'coa3' ? ', 24 h after message ' : ', planned at message ') + (pl.key + 1) + '.',
+              l2: 'Pc after ' + sci(o.pcAfter) + ' · miss after ' + mTxt(o.missAfter) + '.', l3: 'Not approved yet. Click the bar to review.' });
+          }
+        }
+      }
+      return { sat, h: (6 + nTr * 22) + 'px', color: !!ev0 && ev0.sat === sat ? '#0F766E' : '#334155', bars, marks: lmarks };
+    });
+    const day = Math.floor(T / 24) + 1, hh = String(T % 24).padStart(2, '0');
+    const dock = { ticks, density, lanes, playLeft: pctH(T), playLabel: 'Day ' + day + ' · ' + hh + ':00' };
+
+    const pushLog = (text) => st.log.concat([{ run: st.run + 1, text }]);
+    let noWsText = 'Select an event from the queue, the timeline or the run digest.';
+    if (ev0 && s0 && s0.phase === 'future') noWsText = 'Event #' + ev0.id + ' has not been reported yet. Its first message arrives in ' + dh(ev0.m[0][0] - T) + '.';
+
+    return {
+      run: st.run, playing: st.playing, playLabel: st.playing ? 'Pause' : 'Play', budget,
+      togglePlay: () => this.setState({ playing: !st.playing }),
+      stepBack: () => this.setState({ run: Math.max(0, st.run - 1), playing: false }),
+      stepFwd: () => this.setState({ run: Math.min(63, st.run + 1), playing: false }),
+      setRun: (e) => this.setState({ run: Number(e.target.value), playing: false }),
+      clock: 'Run ' + (st.run + 1) + ' of 64 · Day ' + day + ', ' + hh + ':00',
+      kpis: [
+        { label: 'Open', v: String(open.length), color: '#0F172A', d: sgn(open.length - openPrev), dColor: '#64748B', tip: 'Events with at least one message whose closest approach is still ahead. The small number is the change since the last run.' },
+        { label: 'To decide', v: String(needs.length), color: '#C2410C', d: sgn(needs.length - needsPrev), dColor: needs.length > needsPrev ? '#C2410C' : '#64748B', tip: 'Open events whose latest Pc is at or above 1e-4 and that have no approved burn.' },
+        { label: 'Passed', v: String(passed.length), color: '#475569', d: '', dColor: '#64748B', tip: 'Events whose closest approach has passed during the replay.' },
+        { label: 'Approved', v: String(approvedN), color: '#0F766E', d: '', dColor: '#64748B', tip: 'Burns approved in this replay. Nothing is uploaded; later messages do not include the burn.' },
+      ],
+      next, tabs, qrows, queueCol, queueMeta, queueEmpty: !!rp && qrows.length === 0,
+      ws, hasWs, noWs: !hasWs, noWsText, hist, wc, bp, opts, other, mode, msgRows, digest, logRows, logEmpty: !st.log.length,
+      g, dock, att, m, checks,
+      legend: [
+        { label: 'known', name: 'Event bar', swatch: 'width: 16px; height: 9px; border-radius: 2px; background: #E2E8F0; border: 1px solid #CBD5E1;', tip: 'From the event\u2019s first message to now. Each event is its own stream of messages, about one every 8 h.' },
+        { label: 'Pc ≥ 1e-4', name: 'Orange stretch', swatch: 'width: 16px; height: 9px; border-radius: 2px; background: #F97316;', tip: 'Time when the latest message had Pc at or above 1e-4, the action threshold.' },
+        { label: 'to closest approach', name: 'Dashed outline', swatch: 'width: 16px; height: 9px; border-radius: 2px; border: 1.5px dashed #94A3B8; box-sizing: border-box;', tip: 'Time left until closest approach. Those messages have not arrived yet.' },
+        { label: 'proposed burn', name: 'Proposed burn', swatch: 'width: 16px; height: 9px; border-radius: 999px; background: #F5F3FF; border: 1px solid #6D28D9;', tip: 'The planner\u2019s lowest-Δv option that brings Pc below 1e-4 and the miss above 1 km. It waits for approval.' },
+        { label: 'decision deadline', name: 'Decision deadline', swatch: 'width: 2px; height: 12px; background: #DC2626;', tip: 'After this, the cheapest burn needs more than the ' + budget + ' mm/s Δv budget.' },
+        { label: 'passed unmitigated', name: 'Red end dot', swatch: 'width: 8px; height: 8px; border-radius: 50%; background: #DC2626;', tip: 'Closest approach passed with Pc still at or above 1e-4 and no approved burn. Grey: passed below 1e-4. Teal: burn approved.' },
+      ],
+      modalOpen: st.modal && mode.coa,
+      openModal: () => this.setState({ modal: true }), closeModal: () => this.setState({ modal: false }),
+      defer: () => ev0 && this.setState({ deferred: Object.assign({}, st.deferred, { [ev0.id]: st.run + 1 }), log: pushLog('Deferred #' + ev0.id + ' to the next run' + (plan && !plan.overNow ? ' (deadline in ' + dh(plan.left) + ')' : '') + '.') }),
+      approve: () => ev0 && opt && st.approved[ev0.id] == null && this.setState({ approved: Object.assign({}, st.approved, { [ev0.id]: st.run + 1 }), approvedTxt: Object.assign({}, st.approvedTxt, { [ev0.id]: names[opt.key] + ', ' + opt.dv.toFixed(1) + ' mm/s ' + dirShort(opt).toLowerCase() + '.' }), modal: false, log: pushLog('Approved #' + ev0.id + ': ' + names[opt.key].toLowerCase() + ', ' + opt.dv.toFixed(1) + ' mm/s ' + dirShort(opt).toLowerCase() + '.') }),
+      failed: st.failed,
+    };
+  }
+}
+</script>
+</body>
+</html>
