@@ -5,7 +5,7 @@ import { type DigestView, type LogRow, buildDigest, buildLog } from './digest';
 import { type DockView, type LegendItem, buildDock, buildLegend } from './dock';
 import { type ReplayFacts, replayFacts } from './facts';
 import { dirShort, dh } from './format';
-import { type GlobeView, buildGlobe } from './globe';
+import { type GlobeScene, buildGlobeScene } from './globe';
 import { type Kpi, type NextDecision, buildKpis, buildNext } from './header';
 import { type QueueTab, type QueueView, buildQueue } from './queue';
 import { type Decisions, type LogEntry, OPTION_NAMES, changedSincePrev, runCtx, snapshot } from './run';
@@ -30,7 +30,7 @@ export interface ConsoleView {
   next: NextDecision;
   queue: QueueView;
   ws: WorkspaceView;
-  globe: GlobeView;
+  globe: GlobeScene;
   digest: DigestView;
   log: LogRow[];
   dock: DockView;
@@ -70,7 +70,7 @@ export function buildView(data: ConsoleData, ui: UiState): ConsoleView {
     next: buildNext(snap, ui.budget, ui.sel),
     queue: buildQueue(ctx, snap, ui.tab, ui.sel, changed),
     ws,
-    globe: buildGlobe({ missions: fleet.missions, open: snap.open, sel: selRow, opt }),
+    globe: buildGlobeScene({ missions: fleet.missions, open: snap.open, sel: selRow, opt }),
     digest: buildDigest(snap),
     log: buildLog(ui.dec.log),
     dock: buildDock(ctx, ui.sel, selRow?.e.sat ?? null, ui.opt, changed),

@@ -1005,6 +1005,22 @@ h2 {
   margin: 0 auto;
 }
 
+.globe-canvas {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+  border-radius: 50%;
+}
+
+.globe-canvas:active {
+  cursor: grabbing;
+}
+
+.key-hint {
+  margin-left: auto;
+  color: var(--faint);
+}
+
 .key {
   display: flex;
   flex-wrap: wrap;

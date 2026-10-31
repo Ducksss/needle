@@ -1,7 +1,8 @@
 import type { DigestView, LogRow } from '../model/digest';
-import type { GlobeView } from '../model/globe';
+import type { GlobeScene } from '../model/globe';
+import { GlobeCanvas } from './GlobeCanvas';
 
-export function OrbitContext({ g }: { g: GlobeView }) {
+export function OrbitContext({ g }: { g: GlobeScene }) {
   return (
     <section aria-label="Orbit context" className="card side-card orbit-card">
       <div className="card-head">
@@ -9,27 +10,7 @@ export function OrbitContext({ g }: { g: GlobeView }) {
         <span className="meta">orientation illustrative</span>
       </div>
       <div className="globe">
-        <svg viewBox="0 0 900 900" className="fill" role="img" aria-label="Selected satellite orbit, open conjunctions, debris track and proposed path">
-          <path d={g.backDim} fill="none" stroke="#E6EBF0" strokeWidth="1.5" />
-          <path d={g.backSel} fill="none" stroke="#0F172A" strokeWidth="1.5" strokeOpacity="0.25" />
-          <circle cx="450" cy="450" r="268.4" fill="#EDF1F5" stroke="#CBD5E1" strokeWidth="2" />
-          <path d={g.grat} fill="none" stroke="#D7DFE7" strokeWidth="1.5" />
-          <path d={g.frontDim} fill="none" stroke="#AAB7C6" strokeWidth="1.5" />
-          <path d={g.dots[0]} fill="#94A3B8" />
-          <path d={g.dots[1]} fill="#2563EB" />
-          <path d={g.dots[2]} fill="#B45309" />
-          <path d={g.dots[3]} fill="#C2410C" />
-          <path d={g.frontSel} fill="none" stroke="#0F172A" strokeWidth="3" />
-          <path d={g.chaser} fill="none" stroke="#C2410C" strokeWidth="5" strokeDasharray="0.1 12" strokeLinecap="round" />
-          <path d={g.ahead} fill="none" stroke="#0F172A" strokeWidth="5" strokeDasharray="16 11" strokeLinecap="round" />
-          <path d={g.prop} fill="none" stroke="#6D28D9" strokeWidth="5" strokeDasharray="14 10" strokeLinecap="round" />
-          <path d={g.icoPanels} fill="#FFFFFF" stroke="#64748B" strokeWidth="1.5" strokeLinejoin="round" />
-          <path d={g.icoBody} fill="#64748B" />
-          <path d={g.evRing} fill="none" stroke={g.evColor} strokeWidth="4" />
-          <path d={g.evDot} fill={g.evColor} />
-          <path d={g.selPanels} fill="#FFFFFF" stroke="#0F172A" strokeWidth="2.5" strokeLinejoin="round" />
-          <path d={g.selBody} fill="#0F172A" />
-        </svg>
+        <GlobeCanvas scene={g} label="Selected satellite orbit, open conjunctions, debris track and proposed path, over an illustrative world map." />
       </div>
       <div className="key">
         <span>
@@ -44,6 +25,7 @@ export function OrbitContext({ g }: { g: GlobeView }) {
           <i style={{ borderTopColor: '#C2410C', borderTopStyle: 'dotted' }} />
           debris track
         </span>
+        <span className="key-hint">drag to turn</span>
       </div>
     </section>
   );

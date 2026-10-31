@@ -116,6 +116,19 @@ for (const [width, height] of [
   await page.close();
 }
 
+// The globe spins and pulses: three frames one second apart, then the reduced-motion view.
+page = await open(1440, 1000, 2);
+const globe = ['section[aria-label="Orbit context"]'];
+await page.locator(globe[0]).scrollIntoViewIfNeeded();
+for (const n of [1, 2, 3]) {
+  await shot(page, `12-globe-frame-${n}.png`, { fullPage: true, clip: await pageBox(page, globe) });
+  await page.waitForTimeout(1000);
+}
+await page.emulateMedia({ reducedMotion: 'reduce' });
+await page.waitForTimeout(200);
+await shot(page, '12-globe-reduced-motion.png', { fullPage: true, clip: await pageBox(page, globe) });
+await page.close();
+
 page = await open(375, 812, 2);
 await shot(page, '11-width-375-top.png');
 await page.locator('section[aria-label="Replay timeline"]').scrollIntoViewIfNeeded();
