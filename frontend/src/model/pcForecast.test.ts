@@ -29,8 +29,8 @@ describe('Pc outlook', () => {
     expect([po.pcBin, po.leadTxt, po.cell.n, po.cell.ceilingDelta]).toEqual([4, '3 to 5 days', 38, -0.43]);
     const t = pcOutlookText(po);
     expect(t.keys.map((k) => k.label)).toEqual(['worst likely: 1 in 10,000', '53% chance the risk drops to almost zero', '11% chance it’s still high at closest approach']);
-    expect(t.keys[0].tip[0]).toBe('9 out of 10 similar past events ended at or below this risk.');
-    expect(t.keys[0].tip[1]).toBe('Technical: Pc ceiling 9.7e-5, today’s Pc 2.6e-4 lowered by 0.43 orders of magnitude (ceilingDelta); held on 89.9% of held-out events.');
+    expect(t.keys[0].tip[0]).toBe('9 in 10 similar events ended at or below this. Checked on 4,355 forecasts for held-out events: held 89.9% of the time.');
+    expect(t.keys[0].tip[1]).toBe('Technical: Pc ceiling 9.7e-5, today’s Pc 2.6e-4 lowered by 0.43 orders of magnitude (ceilingDelta).');
     expect(t.keys[1].tip[0]).toBe('As tracking improves, the collision risk often turns out to be negligible.');
     expect(t.noteTip[0]).toBe('Technical: from 38 past events with Pc at or above 1e-4, 3 to 5 days before closest approach.');
 
@@ -39,8 +39,8 @@ describe('Pc outlook', () => {
     const fan = ws.hist.pcFc!;
     expect(fan.ceiling).not.toBeNull();
     expect(fan.keys.map((k) => k.kind)).toEqual(['ceiling', 'fade', 'ring']);
-    expect(ws.hist.pcNote.text).toBe('Collision risk rarely goes up from here. It usually stays the same or drops as better tracking arrives.');
-    expect(ws.hist.pcNote.text).toBe(PC_NOTE);
+    expect(ws.hist.pcNote?.text).toBe('Collision risk rarely goes up from here. It usually stays the same or drops as better tracking arrives.');
+    expect(ws.hist.pcNote?.text).toBe(PC_NOTE);
   });
 
   it('draws no ceiling at the floor and says the risk is already negligible', () => {
@@ -72,11 +72,14 @@ describe('Pc outlook', () => {
   it('shows nothing once closest approach has passed, and keeps the old note without pcForecast', () => {
     const e = ev(1, 30, [[10, -3.5, 400]]);
     expect(pcForecastAt(f, e, known(e, 40))).toBeNull();
+    const passed = buildWorkspace(runCtx({ runs: 64, runH: 8, windowH: 504, note: 'test', events: [e] }, 5, 10, NO_DECISIONS), e, DEFAULT_OPTION, { medianWaitRatio24h: null }, undefined, f);
+    if (passed.kind !== 'event') throw new Error('no event');
+    expect([passed.hist.pcFc, passed.hist.pcNote]).toEqual([null, null]);
     const { pcForecast: _drop, ...older } = f;
     expect(pcForecastAt(older, e, known(e, 20))).toBeNull();
     const ctx = runCtx({ runs: 64, runH: 8, windowH: 504, note: 'test', events: [e] }, 2, 10, NO_DECISIONS);
     const ws = buildWorkspace(ctx, e, DEFAULT_OPTION, { medianWaitRatio24h: null }, undefined, older);
     if (ws.kind !== 'event') throw new Error('no event');
-    expect([ws.hist.pcFc, ws.hist.pcNote.text]).toEqual([null, PC_NOTE_OLD]);
+    expect([ws.hist.pcFc, ws.hist.pcNote?.text]).toEqual([null, PC_NOTE_OLD]);
   });
 });

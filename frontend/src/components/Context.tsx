@@ -55,7 +55,7 @@ export function SinceLastRun({ d, onPick }: { d: DigestView; onPick: (id: number
                 </span>{' '}
                 <span style={{ color: 'var(--muted)' }}>{it.sat}</span>
               </span>
-              <span className="mono" style={{ color: 'var(--slate)' }} title={it.title}>
+              <span className="mono" style={{ color: it.vColor }} title={it.title}>
                 {it.v}
               </span>
             </button>

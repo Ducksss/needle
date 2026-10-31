@@ -40,7 +40,8 @@ describe('forecast lookup', () => {
     if (!isKnown(s)) throw new Error('unreported');
     const line = forecastLine(forecastAt(forecastOf(), e, s)!);
     expect([line.median, line.range, line.cover, line.pUnder1km, line.pCritical]).toEqual(['1.50 km', '900 m–2.70 km', '8 in 10', '15%', '30%']);
-    expect(line.tip[0]).toBe('8 in 10 similar events ended inside this band (checked on 2,529 held-out events); n = 100.');
+    expect(line.tip[0]).toBe('8 in 10 similar events ended inside this band. Checked on forecasts for 2,529 held-out events: held 79.9% of the time.');
+    expect(line.tip[1]).toMatch(/; n = 100 similar events\.$/);
   });
 
   it('conditions the chance of ending Critical on the latest Pc band', () => {
@@ -74,7 +75,7 @@ describe('forecast lookup', () => {
     expect(c.pCriticalTip[1]).toMatch(/\(Pc ≥ 1e-4\)\.$/);
     expect(c.pred.label).toBe('likely final distance 1.50 km');
     expect(c.band.label).toBe('8 out of 10 similar events ended between 900 m and 2.70 km');
-    expect(c.footnote).toMatch(/The range held 8 times out of 10 on 2,529 events held back for testing\./);
+    expect(c.footnote).toMatch(/8 in 10 similar events ended inside this band\. Checked on forecasts for 2,529 held-out events: held 79\.9% of the time\./);
   });
 
   it('formats ranges and shares', () => {

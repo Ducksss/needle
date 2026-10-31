@@ -64,8 +64,8 @@ export interface HistoryView {
   fan: FanView | null;
   /** Pc outlook right of the now line; null for passed events or without pcForecast. */
   pcFc: PcFanView | null;
-  /** The note under the Pc chart, with the sample behind the outlook when there is one. */
-  pcNote: { text: string; tip: string[] | null };
+  /** The note under the Pc chart, with the sample behind the outlook; null for a passed event when pcForecast exists. */
+  pcNote: { text: string; tip: string[] | null } | null;
 }
 
 /** Pc outlook drawn in the 320 × 96 view box of the Pc chart, with its plain-language key under the chart. */
@@ -206,8 +206,11 @@ export interface ModalView {
   prop: string;
   dA: string;
   missNow: string;
+  /** Today's values in their own band colours; the after-burn values use the proposed-burn violet. */
+  missNowColor: string;
   missAfter: string;
   pcNow: string;
+  pcNowColor: string;
   pcNowOdds: string | null;
   pcAfter: string;
   pcAfterOdds: string | null;
@@ -318,7 +321,8 @@ export function buildHistory(e: ReplayEvent, s: KnownState, T: number, fc: MissF
   return {
     fan,
     pcFc: po ? buildPcFan(po, nowX, yPc) : null,
-    pcNote: pcForecastOn ? { text: PC_NOTE, tip: po ? pcOutlookText(po).noteTip : null } : { text: PC_NOTE_OLD, tip: null },
+    // With pcForecast the note explains the outlook, so a passed event, which has none, gets no note.
+    pcNote: pcForecastOn ? (po ? { text: PC_NOTE, tip: pcOutlookText(po).noteTip } : null) : { text: PC_NOTE_OLD, tip: null },
     rtn: buildRtn(e, s, xp),
     pcPts: pcP.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '),
     pcDots: pcP.filter((p) => p[2] < PC_ACTION).map((p) => dotPath(p[0], p[1], 2.2)).join(''),
@@ -601,7 +605,7 @@ function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: CoaOption): Mo
   const T = plan.msgT + plan.age;
   // Pc now is ESA's Pc for the planning message, as everywhere else; the after value is the planner's model.
   const pcNow = e.m[plan.key][1];
-  const aheadTxt = opt.dT >= 0 ? 'arrive about ' + (opt.dT / 1000).toFixed(1) + ' km earlier along the track' : 'arrive about ' + (-opt.dT / 1000).toFixed(1) + ' km later along the track';
+  const aheadTxt = 'arrive about ' + mTxt(opt.dT) + (opt.dT >= 0 ? ' earlier' : ' later') + ' along the track';
   return {
     id: e.id,
     sat: e.sat,
@@ -619,8 +623,10 @@ function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: CoaOption): Mo
     prop: 'about ' + opt.propG.toFixed(1) + ' g',
     dA: 'semi-major axis ' + (opt.dA >= 0 ? '+' : '') + opt.dA.toFixed(1) + ' m',
     missNow: mTxt(cev.miss),
+    missNowColor: missColor(cev.miss),
     missAfter: mTxt(opt.missAfter),
     pcNow: pcTxt(pcNow),
+    pcNowColor: pcColor(pcNow),
     pcNowOdds: pcOdds(pcNow),
     pcAfter: sci(opt.pcAfter),
     pcAfterOdds: odds(opt.pcAfter),

@@ -2064,7 +2064,17 @@ h2 {
   animation: lapse-chip 2.6s ease-out forwards;
 }
 
+/* In the orbit card the chip sits over the globe's top-right corner, out of the header's flow, so a long "+19 d 16 h"
+   never wraps the header. */
+.orbit-card {
+  position: relative;
+}
+
 .orbit-card .lapse-chip {
+  position: absolute;
+  top: 40px;
+  right: 16px;
+  z-index: 1;
   margin-left: 0;
 }
 
@@ -2246,7 +2256,7 @@ h2 {
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--faint);
+  color: #cbd5e1;
 }
 
 .dialog-head h2 {

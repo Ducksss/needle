@@ -3,12 +3,14 @@
 import { pcOdds, pcTxt, plural } from './format';
 import { isKnown } from './replay';
 import type { KnownRow, LogEntry, Snapshot } from './run';
-import { C } from './theme';
+import { C, pcColor } from './theme';
 
 export interface DigestItem {
   id: number;
   sat: string;
   v: string;
+  /** The Pc's own band colour: risk at or above 1e-4, amber from 1e-6, otherwise muted. */
+  vColor: string;
   title: string | undefined;
 }
 
@@ -37,7 +39,7 @@ export function buildDigest(snap: Snapshot, run = 1): DigestView {
   const down = known.filter((r) => r.s.phase === 'open' && r.s.bucket !== 'pc' && wasPc(r));
   const pas = known.filter((r) => r.s.phase === 'resolved' && r.p.phase === 'open');
   const newOnes = snap.open.filter((r) => r.s.isNew);
-  const item = (r: KnownRow, v: string): DigestItem => ({ id: r.e.id, sat: r.e.sat, v, title: pcOdds(r.s.last[1]) ?? undefined });
+  const item = (r: KnownRow, v: string): DigestItem => ({ id: r.e.id, sat: r.e.sat, v, vColor: pcColor(r.s.last[1]), title: pcOdds(r.s.last[1]) ?? undefined });
   const groups: DigestGroup[] = [];
   if (esc.length) groups.push({ title: 'Escalated to Pc ≥ 1e-4 · ' + esc.length, color: C.risk, items: esc.slice(0, DIGEST_LIMIT).map((r) => item(r, pcTxt(r.s.last[1]))) });
   if (down.length) groups.push({ title: 'Downgraded · ' + down.length, color: C.watch, items: down.slice(0, DIGEST_LIMIT).map((r) => item(r, pcTxt(r.s.last[1]))) });

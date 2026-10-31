@@ -56,12 +56,17 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const playPct = parseFloat(dock.playLeft);
   const px = (pct: string) => (parseFloat(pct) / 100) * trackW;
   const nearPlayhead = (left: string, label: string) => {
     const lo = px(left) + 4 - px(dock.playLeft);
     return lo + label.length * MONO10_CH > -50 && lo < 50;
   };
+
+  // The forecast tag sits right of the current run's bar, clear of the "max" label; shorter, or left off, when the
+  // future part of the strip is too narrow, so it never lies over past bars.
+  const FORECAST_LONG = 'forecast: expected Critical passes';
+  const room = trackW - px(dock.playLeft) - px(dock.density[run]?.w ?? '0%') - 4 - 48;
+  const forecastTag = room >= FORECAST_LONG.length * MONO10_CH ? FORECAST_LONG : room >= 8 * MONO10_CH ? 'forecast' : null;
 
   // A burn pill starts at its burn time. When that would put it over the event's forecast ring, it moves left just
   // enough to end before the ring; with no room for that it shrinks to a small capsule at the burn time. Its card
@@ -181,9 +186,9 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
                 {dock.forecastLine && <path d={dock.forecastLine} fill="none" stroke="#C2410C" strokeWidth="1.6" strokeDasharray="1 3" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
               </svg>
             )}
-            {dock.forecastLine && (
-              <span className="forecast-tag" style={playPct > 70 ? { right: 44 } : { left: 'calc(' + dock.playLeft + ' + ' + (dock.density[run]?.w ?? '0%') + ' + 4px)' }}>
-                {trackW < 480 ? 'forecast' : 'forecast: expected Critical passes'}
+            {dock.forecastLine && forecastTag && (
+              <span className="forecast-tag" style={{ left: 'calc(' + dock.playLeft + ' + ' + (dock.density[run]?.w ?? '0%') + ' + 4px)' }}>
+                {forecastTag}
               </span>
             )}
             <span className="decide-max">{dock.decideMax ? 'max ' + dock.decideMax : 'none to decide'}</span>

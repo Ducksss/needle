@@ -338,7 +338,7 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
       ];
       if (hiH > 0) tip.push({ t: 'Orange: ' + (hiH < 1 ? 'under 1' : Math.round(hiH)) + ' h of ' + Math.round(kEnd - start) + ' h at Pc ≥ 1e-4', c: '#FDBA74' });
       tip.push({ t: done ? 'Closest approach ' + at(e.tca) + ', ' + dh(T - e.tca) + ' ago' : 'Dashed: ' + dh(e.tca - T) + ' to closest approach, ' + at(e.tca), c: '#CBD5E1' });
-      tip.push({ t: 'Click the bar to open it in the workspace.', c: C.faint });
+      tip.push({ t: 'Click the bar to open it in the workspace.', c: '#CBD5E1' });
       bars.push({
         id: e.id,
         top: y,

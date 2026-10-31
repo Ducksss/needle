@@ -90,12 +90,12 @@ export function MessageHistory({ h }: { h: HistoryView }) {
           ))}
         </ul>
       )}
-      {h.pcNote.tip ? (
+      {h.pcNote?.tip ? (
         <Hover className="chart-note help" title="Pc outlook" lines={h.pcNote.tip}>
           <span className="dotted">{h.pcNote.text}</span>
         </Hover>
       ) : (
-        <span className="chart-note">{h.pcNote.text}</span>
+        h.pcNote && <span className="chart-note">{h.pcNote.text}</span>
       )}
       <span className="caps">Miss distance</span>
       <div className="fan-wrap chart-wrap">

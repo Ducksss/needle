@@ -35,7 +35,7 @@ export interface MissForecast {
   q10M: number;
   q50M: number;
   q90M: number;
-  /** Share of held-out events that ended inside [q10, q90]. */
+  /** Share of held-out forecasts whose event ended inside [q10, q90]; one forecast per held-out event and lead-time bin. */
   coverage: number;
   heldOut: number;
 }
@@ -89,6 +89,10 @@ export const NOT_ENOUGH = 'not enough history';
 /** The Pc-conditioned chance of ending Critical, or "not enough history". */
 export const pCriticalTxt = (fc: MissForecast) => (fc.pCritical == null ? NOT_ENOUGH : pctTxt(fc.pCritical));
 
+/** How the miss band was checked: "8 in 10 similar events ended inside this band. Checked on forecasts for 2,529 held-out events: held 79.9% of the time." */
+export const bandCheckTxt = (fc: MissForecast) =>
+  inTen(fc.coverage) + ' similar events ended inside this band. Checked on forecasts for ' + fc.heldOut.toLocaleString('en-US') + ' held-out events: held ' + (fc.coverage * 100).toFixed(1) + '% of the time.';
+
 export interface ForecastLine {
   median: string;
   range: string;
@@ -106,8 +110,8 @@ export function forecastLine(fc: MissForecast): ForecastLine {
     pUnder1km: pctTxt(fc.cell.pUnder1km),
     pCritical: pCriticalTxt(fc),
     tip: [
-      inTen(fc.coverage) + ' similar events ended inside this band (checked on ' + fc.heldOut.toLocaleString('en-US') + ' held-out events); n = ' + fc.cell.n.toLocaleString('en-US') + '.',
-      'From the latest miss and the time left to closest approach (' + fc.leadDays.toFixed(1) + ' days).',
+      bandCheckTxt(fc),
+      'From the latest miss and the time left to closest approach (' + fc.leadDays.toFixed(1) + ' days); n = ' + fc.cell.n.toLocaleString('en-US') + ' similar events.',
     ],
   };
 }
@@ -200,8 +204,7 @@ export function forecastCard(fc: MissForecast, toTcaH = fc.leadDays * 24): Forec
       'From past events at the same lead time and distance that also shared today’s Pc band (' + PC_BAND_TXT[fc.pcBand] + ').',
     ],
     footnote:
-      'Based on how similar past events moved from the same point. The range held ' +
-      inTen(fc.coverage).replace(' in ', ' times out of ') + ' on ' + fc.heldOut.toLocaleString('en-US') + ' events held back for testing. The brief scores predictions made 2 or more days out; Needle updates this at every message.',
+      'Based on how similar past events moved from the same point. ' + bandCheckTxt(fc) + ' The brief scores predictions made 2 or more days out; Needle updates this at every message.',
   };
 }
 
@@ -221,8 +224,9 @@ export interface PcOutlook {
   risk: number;
   /** "3 to 5 days": the lead-time bin the cell covers. */
   leadTxt: string;
-  /** Share of held-out events that ended at or below the ceiling; null in an older forecast.json. */
+  /** Share of held-out forecasts whose event ended at or below the ceiling, and how many; null in an older forecast.json. */
   ceilingHeld: number | null;
+  ceilingSamples: number | null;
 }
 
 /** Pc outlook for an open event from the latest message seen by T, or null when it has passed or there is no pcForecast. */
@@ -239,7 +243,8 @@ export function pcForecastAt(f: Forecast | null | undefined, e: ReplayEvent, s: 
   const lo = f.leadEdgesDays[lb] ?? 0;
   const hi = f.leadEdgesDays[lb + 1];
   const leadTxt = hi == null ? lo + '+ days' : lo === 0 ? 'under ' + hi + (hi === 1 ? ' day' : ' days') : lo + ' to ' + hi + ' days';
-  return { leadDays, pcBin, cell, risk, leadTxt, ceilingHeld: f.validation.pcForecast?.ceilingHeld ?? null };
+  const v = f.validation.pcForecast;
+  return { leadDays, pcBin, cell, risk, leadTxt, ceilingHeld: v?.ceilingHeld ?? null, ceilingSamples: v?.ceilingSamples ?? null };
 }
 
 export interface PcOutlookKey {
@@ -273,9 +278,11 @@ export function pcOutlookText(po: PcOutlook): PcOutlookText {
       label: 'worst likely: ' + (pcOdds(top) ?? 'negligible'),
       title: 'Worst likely',
       tip: [
-        '9 out of 10 similar past events ended at or below this risk.',
-        'Technical: Pc ceiling ' + pcTxt(top) + ', today’s Pc ' + pcTxt(po.risk) + (c.ceilingDelta < 0 ? ' lowered' : ' raised') + ' by ' + Math.abs(c.ceilingDelta).toFixed(2) + ' orders of magnitude (ceilingDelta)' +
-          (po.ceilingHeld != null ? '; held on ' + (po.ceilingHeld * 100).toFixed(1) + '% of held-out events.' : '.'),
+        '9 in 10 similar events ended at or below this.' +
+          (po.ceilingHeld != null && po.ceilingSamples != null
+            ? ' Checked on ' + po.ceilingSamples.toLocaleString('en-US') + ' forecasts for held-out events: held ' + (po.ceilingHeld * 100).toFixed(1) + '% of the time.'
+            : ''),
+        'Technical: Pc ceiling ' + pcTxt(top) + ', today’s Pc ' + pcTxt(po.risk) + (c.ceilingDelta < 0 ? ' lowered' : ' raised') + ' by ' + Math.abs(c.ceilingDelta).toFixed(2) + ' orders of magnitude (ceilingDelta).',
       ],
     });
     keys.push({
