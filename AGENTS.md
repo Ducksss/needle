@@ -1,7 +1,7 @@
 # Working in this repo
 
 - Stay inside your segment folder (`ml/`, `api/` or `frontend/`). Read `contracts/README.md` first and code against it. If the contract is wrong, say so in your pull request; do not edit `contracts/` from a segment branch.
-- Never commit the ESA CSVs. Put them in `data/` (git-ignored) or point at them with `NEEDLE_DATA_DIR`.
+- Never commit the ESA CSVs. Put them in `data/` (git-ignored) or point at them with `NEEDLE_DATA_DIR`. The one exception, approved by Chai on 31 Oct 2026, is `submission/test_data.csv`: the organisers' test file, unchanged, for judges' scoring scripts (CC BY 4.0, credited in `submission/README.md`). Never add `train_data.csv`.
 - The brief allows only these columns for the scored model: event_id, time_to_tca, miss_distance, relative_speed, relative_position_r, relative_position_t, relative_position_n, c_object_type, c_sigma_r, t_sigma_r, max_risk_estimate, F10, AP. The physics Pc and burn planner may use the full CDM, and the UI must label it as the physics model.
 - Branches: `PinZheng/<topic>`. Commit subjects: `<area>(<type>): <short summary>`, for example `frontend(feat): add 24 h warnings panel`. Commit bodies hold summary, rationale and validation. Keep commit attribution user-owned.
 - Pull requests follow `.github/pull_request_template.md` and target `main`.

@@ -62,9 +62,16 @@ def test_replay_shape(replay_json):
                 check_opt(o)
 
 
+def test_replay_values_keep_the_tier_side():
+    from needle_ml.replay import miss_m, risk_2dp
+    assert risk_2dp(-4.04) == -4.05 + 0.01 - 0.01 or risk_2dp(-4.04) < -4
+    assert risk_2dp(-4.0) == -4.0 and risk_2dp(-3.996) >= -4 and risk_2dp(-6.004) < -6
+    assert miss_m(999.6) == 999 and miss_m(1000.4) == 1000 and miss_m(5000.4) == 5001 and miss_m(4999.6) == 5000
+
+
 def test_replay_facts(replay_json):
     s = replay.summary(replay_json)
-    assert (s["events"], s["escalated"], s["coaMessages"], s["pcModelWithin01"]) == (280, 24, 119, 106)
+    assert (s["events"], s["escalated"], s["coaMessages"], s["pcModelWithin01"]) == (280, 23, 119, 106)
     assert s["medianWaitRatio24h"] == 1.25
 
 

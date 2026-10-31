@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-31T16:19:29+08:00",
+  "generatedAt": "2026-10-31T16:28:47+08:00",
   "source": "needle-ml build (ml/src/needle_ml)",
   "test": {
     "rows": 24484,
@@ -486,7 +486,7 @@
   },
   "replay": {
     "events": 280,
-    "escalated": 24,
+    "escalated": 23,
     "coaMessages": 119,
     "pcModelWithin01": 106,
     "medianWaitRatio24h": 1.25,

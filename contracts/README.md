@@ -134,7 +134,7 @@ One row per `test_data.csv` row, same order. Kept for reference; the updated bri
   "test": { "rows": 24484, "methods": [{ "name": "Needle classifier + miss", "accuracy": 0.971, "macroF1": 0.972,
             "criticalRecall": 0.993, "criticalPrecision": 0.988, "confusion": [[...],[...],[...]] }] },
   "physics": { "pcEvents": 23, "within002": 20, "medianAbsErr": 0.01 },
-  "replay": { "events": 280, "escalated": 24, "coaMessages": 119, "pcModelWithin01": 106, "medianWaitRatio24h": 1.25 }
+  "replay": { "events": 280, "escalated": 23, "coaMessages": 119, "pcModelWithin01": 106, "medianWaitRatio24h": 1.25 }
 }
 ```
 
