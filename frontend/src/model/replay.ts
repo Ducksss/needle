@@ -1,6 +1,6 @@
 // Event state at a replay time, Needle buckets, brief tiers and burn plans.
 
-import type { Cdm, Coa, ReplayEvent } from '../data/types';
+import type { Cdm, Coa, ReplayEvent, Rtn } from '../data/types';
 
 /** Action threshold: Pc 1e-4, as log10. */
 export const PC_ACTION = -4;
@@ -105,6 +105,16 @@ export function planOf(e: ReplayEvent, s: EventState, T: number, budget: number)
   const endRel = e.tca - msgT - 3;
   const dlRel = firstOver == null ? endRel : firstOver;
   return { key, c, msgT, age, dlAbs: msgT + dlRel, left: msgT + dlRel - T, overNow: dlRel <= age };
+}
+
+const isRtn = (v: unknown): v is Rtn => Array.isArray(v) && v.length === 3 && v.every((x) => typeof x === 'number' && Number.isFinite(x));
+
+/** Relative position for message i, from Cdm[3] or the event's rtn array; null while replay.json does not carry it. */
+export function rtnAt(e: ReplayEvent, i: number): Rtn | null {
+  const fromMsg = e.m[i]?.[3];
+  if (isRtn(fromMsg)) return fromMsg;
+  const fromEvent = e.rtn?.[i];
+  return isRtn(fromEvent) ? fromEvent : null;
 }
 
 /** Index of the 6 h cost-of-waiting window that contains the current time. */

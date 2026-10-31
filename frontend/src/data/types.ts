@@ -24,8 +24,15 @@ export interface Fleet {
   pcEvents: unknown[];
 }
 
-/** One CDM: [arrival hours from replay start, log10 Pc (floor -30), miss distance m]. */
-export type Cdm = [arrivalH: number, risk: number, missM: number];
+/** Relative position of the chaser in the target's RTN frame at closest approach, m. */
+export type Rtn = [r: number, t: number, n: number];
+
+/**
+ * One CDM: [arrival hours from replay start, log10 Pc (floor -30), miss distance m]. The brief update of 31 Oct asks
+ * for relative position against time_to_tca; replay.json does not carry it yet, so the console reads an optional
+ * fourth element [r, t, n] when ml/ adds it.
+ */
+export type Cdm = [arrivalH: number, risk: number, missM: number, rtn?: Rtn];
 
 export type OptionKey = 'coa1' | 'coa2' | 'coa3';
 
@@ -71,6 +78,8 @@ export interface ReplayEvent {
   tca: number;
   m: Cdm[];
   coa: Record<string, Coa>;
+  /** Alternative to Cdm[3]: one [r, t, n] per message, aligned with m. */
+  rtn?: Rtn[];
 }
 
 export interface Replay {

@@ -88,7 +88,7 @@ export function buildWarnings(ctx: RunCtx, snap: Snapshot, sel: number | null): 
     .sort((a, b) => (a.plan?.dlAbs ?? 0) - (b.plan?.dlAbs ?? 0));
 
   const counts: WarningCount[] = [
-    { key: 'passes', label: 'Passes', v: inWin.length, color: C.ink, tip: 'Reported events whose closest approach falls in the next 24 h. Each uses its latest message at this run.' },
+    { key: 'passes', label: 'Passes', v: inWin.length, color: C.ink, tip: 'Reported events with closest approach within the next 24 h (time_to_tca ≤ 1 day). Each uses its latest message at this run.' },
     { key: 'danger', label: 'Under 1 km', v: danger.length, color: C.risk, tip: 'Latest miss distance under 1 km: the brief’s dangerous distance. The brief calls these Critical whatever the Pc.' },
     { key: 'elevated', label: '1 to 5 km', v: elevated.length, color: C.hidden, tip: 'Latest miss distance from 1 to 5 km. Elevated under the brief’s distance rule.' },
     { key: 'pc', label: 'Pc ≥ 1e-4', v: pcHigh.length, color: C.risk, tip: 'Latest Pc at or above 1e-4, the action threshold. These need a burn decision or a hand-over.' },
@@ -97,7 +97,7 @@ export function buildWarnings(ctx: RunCtx, snap: Snapshot, sel: number | null): 
       label: 'Deadlines',
       v: deadlines.length,
       color: C.action,
-      tip: 'Open Decide events whose ' + budget + ' mm/s budget deadline falls in the next 24 h, whatever their closest-approach time.',
+      tip: 'Open Decide events whose ' + budget + ' mm/s budget deadline falls in the next 24 h, whatever their time_to_tca.',
     },
   ];
 

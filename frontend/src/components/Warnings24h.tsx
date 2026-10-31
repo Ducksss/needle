@@ -9,9 +9,14 @@ const missColor = (m: number) => (m < 1000 ? 'var(--risk)' : m <= 5000 ? 'var(--
 export function Warnings24h({ w, onPick }: { w: WarningsView; onPick: (id: number) => void }) {
   return (
     <section aria-label="Next 24 h warnings" className="card side-card w24">
-      <div className="card-head">
+      <div className="w24-head">
         <h2>Next 24 h</h2>
-        <span className="meta mono">{w.window}</span>
+        <span className="meta">
+          closest approach within the next 24 h <span className="nowrap">(time_to_tca ≤ 1 day)</span>
+        </span>
+        <span className="meta">
+          <span className="mono nowrap">{w.window}</span> · <span className="nowrap">simulated calendar</span>
+        </span>
       </div>
       <dl className="w24-counts">
         {w.counts.map((c, i) => (
@@ -30,7 +35,7 @@ export function Warnings24h({ w, onPick }: { w: WarningsView; onPick: (id: numbe
           </li>
         ))}
       </ul>
-      <div className="w24-list" role="list" aria-label="Closest approaches in the next 24 h, soonest first">
+      <div className="w24-list" role="list" aria-label="Closest approaches within the next 24 h, soonest first">
         {w.rows.map((r) => (
           <div role="listitem" key={r.id}>
             <button type="button" className="w24-row" aria-pressed={r.selected} onClick={() => onPick(r.id)}>

@@ -76,10 +76,9 @@ describe('buildView', () => {
 
 describe('replayFacts', () => {
   it('reproduces the numbers quoted in the data notes', () => {
-    const f = replayFacts(data.replay, null);
+    const f = replayFacts(data.replay);
     expect(f.coaMessages).toBe(119);
     expect(f.pcModelWithin01).toBe(106);
     expect(f.medianWaitRatio24h?.toFixed(2)).toBe('1.25');
-    expect(f.classifier).toBeNull();
   });
 });

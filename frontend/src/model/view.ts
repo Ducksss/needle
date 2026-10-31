@@ -44,7 +44,7 @@ const factsCache = new WeakMap<ConsoleData, ReplayFacts>();
 function factsOf(data: ConsoleData): ReplayFacts {
   let f = factsCache.get(data);
   if (!f) {
-    f = replayFacts(data.replay, data.metrics);
+    f = replayFacts(data.replay);
     factsCache.set(data, f);
   }
   return f;

@@ -49,7 +49,7 @@ export function ApprovalModal({ m, clock, onClose, onApprove }: ApprovalModalPro
       <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="coa-title" tabIndex={-1} className="dialog" onKeyDown={onKeyDown}>
         <div className="dialog-head">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span className="dialog-kicker">Approve manoeuvre · {clock}</span>
+            <span className="dialog-kicker">Approve manoeuvre · {clock} (simulated calendar)</span>
             <h2 id="coa-title">
               Event #{m.id} · {m.sat} vs {m.obj} · {m.optName}
             </h2>

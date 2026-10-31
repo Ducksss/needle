@@ -49,6 +49,7 @@ export function Timeline({ dock, flash, legend, clock, run, runs, playing, onPla
         <span className="clock" aria-live="polite">
           {clock}
         </span>
+        <span className="meta">simulated calendar</span>
         <div className="legend">
           {legend.map((l) => (
             <Hover key={l.key} className="help" title={l.name} lines={[l.tip]} side={{ edge: 'right', px: 0 }}>

@@ -2,7 +2,7 @@
 
 import type { CoaOption, Mission, OptionKey, ReplayEvent } from '../data/types';
 import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, sci } from './format';
-import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, TIER_TIP, bucketOf, isKnown, planOf, stateAt, tierOf, waitDv, windowIndex } from './replay';
+import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, TIER_TIP, bucketOf, isKnown, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
 import { type Chip, type RunCtx, OPTION_NAMES, approvedAt, chipFor, isDeferredNow } from './run';
 import { BUCKET_COLOR, C, TONE, type Tone } from './theme';
 
@@ -24,6 +24,14 @@ export interface EventHeader {
   status: string;
 }
 
+export interface RtnView {
+  r: string;
+  t: string;
+  n: string;
+  /** Half-height of the symmetric axis, as a label: "2 km". */
+  maxTxt: string;
+}
+
 export interface HistoryView {
   pcPts: string;
   pcDots: string;
@@ -36,6 +44,8 @@ export interface HistoryView {
   y5L: string;
   nowX: string;
   trend: string;
+  /** Relative position against time to TCA; null until replay.json carries r, t, n. */
+  rtn: RtnView | null;
 }
 
 export interface Fact {
@@ -212,6 +222,7 @@ export function buildHistory(e: ReplayEvent, s: KnownState, T: number): HistoryV
     trend = (d > 0.3 ? 'Pc rising' : d < -0.3 ? 'Pc falling' : 'Pc steady') + ' · miss ' + (lastTwo[1][2] < lastTwo[0][2] ? 'shrinking' : 'growing');
   }
   return {
+    rtn: buildRtn(e, s, xp),
     pcPts: pcP.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '),
     pcDots: pcP.filter((p) => p[2] < PC_ACTION).map((p) => dotPath(p[0], p[1], 2.2)).join(''),
     pcHot: pcP.filter((p) => p[2] >= PC_ACTION).map((p) => dotPath(p[0], p[1], 3)).join(''),
@@ -225,6 +236,24 @@ export function buildHistory(e: ReplayEvent, s: KnownState, T: number): HistoryV
     nowX: xp(Math.max(0, e.tca - T)).toFixed(1),
     trend,
   };
+}
+
+/** Axis half-heights for the relative-position chart, m. */
+const RTN_STEPS = [100, 250, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+
+/** r, t and n polylines on a symmetric axis around zero, in the 320 × 84 view box shared with the miss chart. */
+export function buildRtn(e: ReplayEvent, s: KnownState, xp: (hoursBefore: number) => number): RtnView | null {
+  const pts: { x: number; v: [number, number, number] }[] = [];
+  for (let i = 0; i <= s.k; i++) {
+    const v = rtnAt(e, i);
+    if (v) pts.push({ x: xp(e.tca - e.m[i][0]), v });
+  }
+  if (!pts.length) return null;
+  const peak = Math.max(...pts.flatMap((p) => p.v.map(Math.abs)));
+  const top = RTN_STEPS.find((v) => v >= peak) ?? RTN_STEPS[RTN_STEPS.length - 1];
+  const y = (v: number) => 38 - (clamp(v, -top, top) / top) * 32;
+  const line = (j: 0 | 1 | 2) => pts.map((p) => p.x.toFixed(1) + ',' + y(p.v[j]).toFixed(1)).join(' ');
+  return { r: line(0), t: line(1), n: line(2), maxTxt: top >= 1000 ? top / 1000 + ' km' : top + ' m' };
 }
 
 function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | null, mission: Mission | undefined): EventHeader {

@@ -49,6 +49,51 @@ export function MessageHistory({ h }: { h: HistoryView }) {
         <polyline points={h.missPts} fill="none" stroke="#0F172A" strokeWidth="1.6" strokeLinejoin="round" />
         <path d={h.missDots} fill="#0F172A" />
       </svg>
+      <div className="rtn-head">
+        <span className="caps">Relative position (r, t, n)</span>
+        <span className="rtn-key" aria-hidden="true">
+          <span>
+            <i className="rtn-r" />r
+          </span>
+          <span>
+            <i className="rtn-t" />t
+          </span>
+          <span>
+            <i className="rtn-n" />n
+          </span>
+        </span>
+      </div>
+      <svg viewBox="0 0 320 84" className="chart" role="img" aria-label="Relative position r, t and n in metres against time to closest approach for each message received so far">
+        <line x1="40" x2="316" y1="38" y2="38" stroke="#CBD5E1" />
+        <line x1="40" x2="316" y1="70" y2="70" stroke="#E3E8EE" />
+        <text x="36" y="41" textAnchor="end" fontSize="9" fill="#94A3B8" fontFamily={MONO}>
+          0
+        </text>
+        <text x="40" y="82" fontSize="9" fill="#94A3B8" fontFamily={MONO}>
+          7 d before
+        </text>
+        <text x="316" y="82" textAnchor="end" fontSize="9" fill="#94A3B8" fontFamily={MONO}>
+          TCA
+        </text>
+        {h.rtn ? (
+          <>
+            <text x="36" y="9" textAnchor="end" fontSize="9" fill="#94A3B8" fontFamily={MONO}>
+              +{h.rtn.maxTxt}
+            </text>
+            <text x="36" y="73" textAnchor="end" fontSize="9" fill="#94A3B8" fontFamily={MONO}>
+              −{h.rtn.maxTxt}
+            </text>
+            <line x1={h.nowX} x2={h.nowX} y1="4" y2="72" stroke="#334155" strokeDasharray="2 3" />
+            <polyline points={h.rtn.r} fill="none" stroke="#0F172A" strokeWidth="1.6" strokeLinejoin="round" />
+            <polyline points={h.rtn.t} fill="none" stroke="#475569" strokeWidth="1.6" strokeDasharray="5 3" strokeLinejoin="round" />
+            <polyline points={h.rtn.n} fill="none" stroke="#64748B" strokeWidth="1.6" strokeDasharray="1.5 2.5" strokeLinecap="round" />
+          </>
+        ) : (
+          <text x="178" y="30" textAnchor="middle" fontSize="10" fill="#94A3B8" fontFamily={MONO}>
+            relative position not in replay data
+          </text>
+        )}
+      </svg>
     </figure>
   );
 }

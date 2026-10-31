@@ -1,6 +1,6 @@
 // Numbers quoted in the data notes and captions, computed from replay.json so they always match the data on screen.
 
-import type { Metrics, Replay } from '../data/types';
+import type { Replay } from '../data/types';
 
 export interface ReplayFacts {
   events: number;
@@ -12,8 +12,6 @@ export interface ReplayFacts {
   pcModelWithin01: number;
   /** Median of (lowest Δv one day later) / (lowest Δv now), across plans where both exist. */
   medianWaitRatio24h: number | null;
-  /** Scored tier model from metrics.json, when present. */
-  classifier: { accuracy: number; criticalRecall: number } | null;
 }
 
 export function median(xs: number[]): number | null {
@@ -23,7 +21,7 @@ export function median(xs: number[]): number | null {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-export function replayFacts(replay: Replay, metrics: Metrics | null): ReplayFacts {
+export function replayFacts(replay: Replay): ReplayFacts {
   const coas = replay.events.flatMap((e) => Object.values(e.coa));
   const ratios: number[] = [];
   for (const c of coas) {
@@ -31,13 +29,11 @@ export function replayFacts(replay: Replay, metrics: Metrics | null): ReplayFact
     const later = c.wait[4]?.[1];
     if (now != null && now > 0 && later != null) ratios.push(later / now);
   }
-  const cls = metrics?.test?.methods?.find((m) => m.name === 'Needle classifier + miss');
   return {
     events: replay.events.length,
     escalated: replay.events.filter((e) => e.m.some((m) => m[1] >= -4)).length,
     coaMessages: coas.length,
     pcModelWithin01: coas.filter((c) => c.pcModelOk).length,
     medianWaitRatio24h: median(ratios),
-    classifier: cls ? { accuracy: cls.accuracy, criticalRecall: cls.criticalRecall } : null,
   };
 }

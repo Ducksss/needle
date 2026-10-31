@@ -356,6 +356,6 @@ export function buildLegend(budget: number): LegendItem[] {
     { key: 'burn', label: 'proposed burn', name: 'Proposed burn', tip: 'The planner’s lowest-Δv option that brings Pc below 1e-4 and the miss above 1 km. It waits for approval.' },
     { key: 'deadline', label: 'decision deadline', name: 'Decision deadline', tip: 'After this, the cheapest burn needs more than the ' + budget + ' mm/s Δv budget.' },
     { key: 'end', label: 'passed unmitigated', name: 'Red end dot', tip: 'Closest approach passed with Pc still at or above 1e-4 and no approved burn. Grey: passed below 1e-4. Teal: burn approved.' },
-    { key: 'band', label: 'next 24 h', name: 'Next 24 h', tip: 'The window the Next 24 h panel counts: from this run to 24 h later.' },
+    { key: 'band', label: 'next 24 h', name: 'Next 24 h', tip: 'The window the Next 24 h panel counts: closest approach within the next 24 h (time_to_tca ≤ 1 day) of this run.' },
   ];
 }

@@ -166,8 +166,6 @@ export function App() {
           relative state, both covariances and object sizes; it reproduces ESA’s Pc within 0.1 orders of magnitude for {notes.pcModelWithin01} of {notes.coaMessages} escalation messages. Burn
           response: Clohessy-Wiltshire, checked against two-body propagation. Not modelled: drag, J2, burn execution error, re-screening against the full catalogue. Spacecraft: 1,000 kg, 1 N, Isp
           220 s assumed. Δv budget is a tweak (now {view.budget} mm/s).
-          {notes.classifier &&
-            ` The scored tier model (brief columns only) is separate from this physics view: ${(notes.classifier.accuracy * 100).toFixed(1)}% row accuracy and ${(notes.classifier.criticalRecall * 100).toFixed(1)}% Critical recall on test_data.`}
         </p>
       </div>
       {s.modal && planner && (
