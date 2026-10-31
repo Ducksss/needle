@@ -49,9 +49,11 @@ Real ESA training-set CDM histories placed on a simulated 21-day calendar. Messa
         "m2": [r1, r2],                            // encounter-plane miss vector, m
         "ell": { "a": 457.0, "b": 39.0, "deg": 12.3 },  // combined 1-sigma ellipse, m and deg
         "hbrEff": 7.2, "pcModelOk": true,          // effective hard-body radius; model within 0.1 orders of ESA Pc
+        "robustMissM": 1330,                       // nominal post-burn miss that keeps the forecast 10th percentile >= 1 km
         "wait": [[hoursAfterCdm, dvMmS | null]],   // lowest Δv if the burn happens anywhere in each 6 h window; null = over 80 mm/s
         "opts": [{
-          "key": "coa1",                           // coa1 Recommended (min Δv now), coa2 More margin (Pc < 1e-6, miss > 2 km), coa3 Wait 24 h
+          "key": "coa1",                           // coa1 Minimum Δv now (miss > 1 km), coa2 More margin (Pc < 1e-6, miss > 2 km), coa3 Wait 24 h,
+                                                   // coa4 Robust, the recommended option (miss > robustMissM); present on most burn-option CDMs
           "feasible": true, "dv": 1.0,             // mm/s
           "alpha": 180, "beta": 0,                 // deg: alpha in-plane from velocity toward radial-out; beta out of plane
           "leadH": 77.0, "pcAfter": 1.3e-5, "missAfter": 1140,
@@ -66,6 +68,31 @@ Real ESA training-set CDM histories placed on a simulated 21-day calendar. Messa
 ```
 
 Assumed spacecraft: 1,000 kg, 1 N thruster, Isp 220 s.
+
+### `forecast.json`
+
+How far an event's miss distance can still move before closest approach, from train events outside the replay. Written by `needle-ml build`.
+
+```jsonc
+{
+  "leadEdgesDays": [0, 1, 2, 3, 5, null],      // lead-time bins, days before closest approach
+  "missEdgesM": [0, 1000, 2000, 5000, null],    // current-miss bins, metres
+  "quantiles": [0.1, 0.5, 0.9],
+  "cells": [[{ "n": 495, "ratioQ10": 0.677, "ratioQ50": 1.003, "ratioQ90": 1.792,
+               "pUnder1km": 0.154, "pCritical": 0.154, "pooled": false }]],   // cells[leadBin][missBin]
+  "robustRatioQ10": [0.976, 0.901, 0.751, 0.636, 0.529],                     // per lead bin, events now 1 to 5 km out
+  "validation": { "heldOutEvents": 2529, "coverage10to90": 0.799, "coverageByLeadBin": { "0": 0.801 } },
+  "excludedReplayEvents": 280
+}
+```
+
+To forecast an event at replay time `T`: take its latest message received by `T`. Its lead is `(tca - arrivalH) / 24` days. Pick the cell by lead bin and miss bin.
+
+- **Predicted final miss:** `miss × ratioQ50`.
+- **Lower and upper limits:** `miss × ratioQ10` and `miss × ratioQ90`. About 8 in 10 held-out outcomes fall inside them.
+- **Probabilities:** `pUnder1km` and `pCritical`.
+
+Pc has no band, because it swings by orders of magnitude.
 
 ### `test_event_predictions.csv` (the task's predictions)
 

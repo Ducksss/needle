@@ -1,0 +1,234 @@
+{
+  "leadEdgesDays": [
+    0.0,
+    1.0,
+    2.0,
+    3.0,
+    5.0,
+    null
+  ],
+  "missEdgesM": [
+    0.0,
+    1000.0,
+    2000.0,
+    5000.0,
+    null
+  ],
+  "quantiles": [
+    0.1,
+    0.5,
+    0.9
+  ],
+  "cells": [
+    [
+      {
+        "n": 529,
+        "ratioQ10": 0.944,
+        "ratioQ50": 1.0,
+        "ratioQ90": 1.114,
+        "pUnder1km": 0.968,
+        "pCritical": 0.968,
+        "pooled": false
+      },
+      {
+        "n": 479,
+        "ratioQ10": 0.973,
+        "ratioQ50": 1.0,
+        "ratioQ90": 1.042,
+        "pUnder1km": 0.025,
+        "pCritical": 0.025,
+        "pooled": false
+      },
+      {
+        "n": 1127,
+        "ratioQ10": 0.977,
+        "ratioQ50": 1.0,
+        "ratioQ90": 1.022,
+        "pUnder1km": 0.003,
+        "pCritical": 0.003,
+        "pooled": false
+      },
+      {
+        "n": 5975,
+        "ratioQ10": 0.991,
+        "ratioQ50": 1.0,
+        "ratioQ90": 1.009,
+        "pUnder1km": 0.0,
+        "pCritical": 0.0,
+        "pooled": false
+      }
+    ],
+    [
+      {
+        "n": 560,
+        "ratioQ10": 0.837,
+        "ratioQ50": 1.008,
+        "ratioQ90": 1.736,
+        "pUnder1km": 0.889,
+        "pCritical": 0.889,
+        "pooled": false
+      },
+      {
+        "n": 499,
+        "ratioQ10": 0.887,
+        "ratioQ50": 1.001,
+        "ratioQ90": 1.237,
+        "pUnder1km": 0.078,
+        "pCritical": 0.078,
+        "pooled": false
+      },
+      {
+        "n": 1180,
+        "ratioQ10": 0.91,
+        "ratioQ50": 1.0,
+        "ratioQ90": 1.155,
+        "pUnder1km": 0.009,
+        "pCritical": 0.009,
+        "pooled": false
+      },
+      {
+        "n": 6357,
+        "ratioQ10": 0.957,
+        "ratioQ50": 1.0,
+        "ratioQ90": 1.04,
+        "pUnder1km": 0.001,
+        "pCritical": 0.001,
+        "pooled": false
+      }
+    ],
+    [
+      {
+        "n": 557,
+        "ratioQ10": 0.722,
+        "ratioQ50": 1.061,
+        "ratioQ90": 3.19,
+        "pUnder1km": 0.801,
+        "pCritical": 0.801,
+        "pooled": false
+      },
+      {
+        "n": 495,
+        "ratioQ10": 0.677,
+        "ratioQ50": 1.003,
+        "ratioQ90": 1.792,
+        "pUnder1km": 0.154,
+        "pCritical": 0.154,
+        "pooled": false
+      },
+      {
+        "n": 1114,
+        "ratioQ10": 0.789,
+        "ratioQ50": 1.004,
+        "ratioQ90": 1.371,
+        "pUnder1km": 0.016,
+        "pCritical": 0.016,
+        "pooled": false
+      },
+      {
+        "n": 6275,
+        "ratioQ10": 0.87,
+        "ratioQ50": 1.0,
+        "ratioQ90": 1.107,
+        "pUnder1km": 0.002,
+        "pCritical": 0.002,
+        "pooled": false
+      }
+    ],
+    [
+      {
+        "n": 625,
+        "ratioQ10": 0.692,
+        "ratioQ50": 1.133,
+        "ratioQ90": 6.228,
+        "pUnder1km": 0.72,
+        "pCritical": 0.72,
+        "pooled": false
+      },
+      {
+        "n": 526,
+        "ratioQ10": 0.625,
+        "ratioQ50": 1.016,
+        "ratioQ90": 3.185,
+        "pUnder1km": 0.171,
+        "pCritical": 0.171,
+        "pooled": false
+      },
+      {
+        "n": 1166,
+        "ratioQ10": 0.642,
+        "ratioQ50": 1.004,
+        "ratioQ90": 1.935,
+        "pUnder1km": 0.041,
+        "pCritical": 0.042,
+        "pooled": false
+      },
+      {
+        "n": 6880,
+        "ratioQ10": 0.768,
+        "ratioQ50": 1.0,
+        "ratioQ90": 1.238,
+        "pUnder1km": 0.003,
+        "pCritical": 0.003,
+        "pooled": false
+      }
+    ],
+    [
+      {
+        "n": 645,
+        "ratioQ10": 0.72,
+        "ratioQ50": 1.333,
+        "ratioQ90": 9.608,
+        "pUnder1km": 0.603,
+        "pCritical": 0.603,
+        "pooled": false
+      },
+      {
+        "n": 533,
+        "ratioQ10": 0.529,
+        "ratioQ50": 1.069,
+        "ratioQ90": 6.571,
+        "pUnder1km": 0.216,
+        "pCritical": 0.216,
+        "pooled": false
+      },
+      {
+        "n": 1078,
+        "ratioQ10": 0.541,
+        "ratioQ50": 1.052,
+        "ratioQ90": 3.793,
+        "pUnder1km": 0.049,
+        "pCritical": 0.05,
+        "pooled": false
+      },
+      {
+        "n": 7008,
+        "ratioQ10": 0.598,
+        "ratioQ50": 1.002,
+        "ratioQ90": 1.478,
+        "pUnder1km": 0.006,
+        "pCritical": 0.006,
+        "pooled": false
+      }
+    ]
+  ],
+  "robustRatioQ10": [
+    0.976,
+    0.901,
+    0.751,
+    0.636,
+    0.529
+  ],
+  "validation": {
+    "heldOutEvents": 2529,
+    "coverage10to90": 0.799,
+    "coverageByLeadBin": {
+      "0": 0.801,
+      "1": 0.802,
+      "2": 0.801,
+      "3": 0.788,
+      "4": 0.805
+    }
+  },
+  "excludedReplayEvents": 280,
+  "note": "final miss = current miss x ratio; one sample per event per lead bin; replay events excluded"
+}
