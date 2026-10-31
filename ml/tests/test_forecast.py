@@ -43,6 +43,14 @@ def test_pcrit_table_pools_sparse_cells_and_never_writes_nan():
     assert tab[2][2][1] == {"p": None, "n": 0, "pooledOver": "Pc band"}
 
 
+def test_pc_forecast_bins_and_table():
+    assert list(forecast._pc_fc_bin([-30, -12, -8, -5, -3])) == [0, 1, 2, 3, 4]
+    tab = forecast.pc_table(forecast.samples(toy_train()))
+    assert len(tab) == 5 and all(len(row) == len(forecast.LEAD_EDGES_D) - 1 for row in tab)
+    c = tab[2][2]  # Pc 1e-10 to 1e-6 (toy risk -7), 2 to 3 days out
+    assert c["n"] == 60 and c["ceilingDelta"] == 0.0 and c["pFloor"] == 0.0 and c["pAtLeast1e4"] == 0.0
+
+
 def test_robust_miss_grows_with_the_pessimistic_shrink():
     fc = {"cells": [[{}] * 4] * 5, "robustRatioQ10": [0.98, 0.9, 0.75, 0.64, 0.53]}
     near, mid, far = (forecast.robust_miss_m(fc, d) for d in (0.5, 2.5, 6.0))
@@ -60,6 +68,10 @@ def test_forecast_artifact():
         for row in band:
             for c in row:
                 assert c["p"] is None or 0 <= c["p"] <= 1
+    pv = fc["validation"]["pcForecast"]
+    assert 0.85 <= pv["ceilingHeld"] <= 0.95
+    assert abs(pv["pFloor"]["meanPredicted"] - pv["pFloor"]["observed"]) < 0.05
+    assert len(fc["pcForecast"]["cells"]) == 5
     v = fc["validation"]["pCritical"]
     assert v["brier"] < v["brierBaseRate"]
     for row in fc["cells"]:

@@ -44,10 +44,11 @@ The colours match the console's tokens. Each one has one meaning in the product.
 | `needle-mark.svg` | Mark on light backgrounds |
 | `needle-mark-dark.svg` | Mark on dark backgrounds |
 | `needle-mark-tile.svg` | App icon and favicon |
-| `needle-lockup.png`, `needle-lockup-dark.png` | Mark, wordmark and tagline for light and dark backgrounds |
-| `needle-cover.png` | 1280 × 640 cover: README hero and GitHub social preview |
+| `needle-lockup.png`, `needle-lockup-dark.png` | Mark, wordmark and tagline for light and dark backgrounds, rendered at 2× |
+| `needle-cover@2x.png` | 2560 × 1280 cover (876 KB): README hero, slides, GitHub social preview |
+| `needle-cover.png` | 1280 × 640 cover: for uploads that need the standard size |
 
-To set the GitHub social preview, open the repository's **Settings → General → Social preview** and upload `needle-cover.png`. GitHub has no API for this.
+To set the GitHub social preview, open the repository's **Settings → General → Social preview** and upload `needle-cover@2x.png` (under GitHub's 1 MB limit). GitHub has no API for this.
 
 Every number on the cover comes from the verified results in the root README.
 
@@ -57,4 +58,4 @@ Every number on the cover comes from the verified results in the root README.
 python3 docs/brand/src/build.py
 ```
 
-The script writes the SVGs, then renders the PNGs with headless Google Chrome. The cover's dots are the 2,167 test events from `artifacts/fleet.json`.
+The script writes the SVGs, then renders the PNGs with headless Google Chrome at 2× device pixels (the 1280 × 640 cover at 1×). The cover's dots are the 2,167 test events from `artifacts/fleet.json`.
