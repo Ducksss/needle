@@ -9,7 +9,7 @@ A held-out 20% of events checks that the 10th to 90th band covers about 80% of o
 import numpy as np
 import pandas as pd
 
-from .tiers import MISS_CRITICAL_M, tier_code
+from .tiers import MISS_CRITICAL_M, pc_band, tier_code
 
 LEAD_EDGES_D = (0.0, 1.0, 2.0, 3.0, 5.0, np.inf)
 MISS_EDGES_M = (0.0, 1000.0, 2000.0, 5000.0, np.inf)
@@ -31,6 +31,7 @@ def samples(tr, exclude=()):
     df["ratio"] = df.miss_distance_final / df.miss_distance.clip(lower=1.0)
     df["final_under_1km"] = df.miss_distance_final < MISS_CRITICAL_M
     df["final_critical"] = tier_code(df.risk_final.values, df.miss_distance_final.values) == 2
+    df["pc_bin"] = pc_band(df.risk.values)
     return df
 
 
@@ -38,7 +39,7 @@ def _cell(s):
     q = s.ratio.quantile(QUANTILES).values
     return {"n": int(len(s)), "ratioQ10": round(float(q[0]), 3), "ratioQ50": round(float(q[1]), 3),
             "ratioQ90": round(float(q[2]), 3), "pUnder1km": round(float(s.final_under_1km.mean()), 3),
-            "pCritical": round(float(s.final_critical.mean()), 3)}
+            "pCritical": round(float(s.final_critical.mean()), 3)}  # all Pc bands; prefer pCriticalByPc
 
 
 def table(s):
@@ -73,6 +74,48 @@ def coverage(cells, s):
     return round(float(inside.mean()), 3)
 
 
+PC_MIN_CELL = 20
+PC_POOLING = ("lead and miss", "miss", "lead", "Pc band")
+
+
+def pcrit_table(s):
+    """P(final Critical) by current Pc band, lead bin and miss bin: pcrit[pc][lead][miss].
+
+    Pc changes the answer a lot (about 6% below 1e-6, up to 75% at 1e-4 and above), but few events sit
+    at Pc >= 1e-4, so a sparse cell pools over lead time, then over miss, then over the whole Pc band.
+    """
+    out = []
+    for pb in range(3):
+        sp = s[s.pc_bin == pb]
+        rows = []
+        for lb in range(len(LEAD_EDGES_D) - 1):
+            row = []
+            for mb in range(len(MISS_EDGES_M) - 1):
+                tries = (sp[(sp.lead_bin == lb) & (sp.miss_bin == mb)], sp[sp.miss_bin == mb], sp[sp.lead_bin == lb], sp)
+                for level, c in zip(PC_POOLING, tries):
+                    if len(c) >= PC_MIN_CELL or level == "Pc band":
+                        p = round(float(c.final_critical.mean()), 3) if len(c) else None
+                        row.append({"p": p, "n": int(len(c)), "pooledOver": level})
+                        break
+            rows.append(row)
+        out.append(rows)
+    return out
+
+
+def pcrit_check(table_, test):
+    """Held-out check of P(final Critical): Brier score against a base-rate guess, and calibration by Pc band."""
+    pred = np.array([table_[pb][lb][mb]["p"] for pb, lb, mb in zip(test.pc_bin, test.lead_bin, test.miss_bin)])
+    obs = test.final_critical.values.astype(float)
+    base = np.full_like(pred, obs.mean())
+    by_pc = []
+    for pb in range(3):
+        m = test.pc_bin.values == pb
+        by_pc.append({"pcBand": pb, "n": int(m.sum()), "meanPredicted": round(float(pred[m].mean()), 3) if m.any() else None,
+                      "observed": round(float(obs[m].mean()), 3) if m.any() else None})
+    return {"brier": round(float(((pred - obs) ** 2).mean()), 4), "brierBaseRate": round(float(((base - obs) ** 2).mean()), 4),
+            "byPcBand": by_pc}
+
+
 def build(tr, exclude=(), log=print):
     """forecast.json: the full table, plus an event-level 80/20 check of the band's coverage."""
     s = samples(tr, exclude)
@@ -81,17 +124,21 @@ def build(tr, exclude=(), log=print):
     held = set(rng.choice(events, size=len(events) // 5, replace=False))
     fit, test = s[~s.event_id.isin(held)], s[s.event_id.isin(held)]
     cov_held = coverage(table(fit), test)
+    pcrit_held = pcrit_check(pcrit_table(fit), test)
     by_lead = {}
     t = table(fit)
     for lb in range(len(LEAD_EDGES_D) - 1):
         part = test[test.lead_bin == lb]
         by_lead[str(lb)] = coverage(t, part) if len(part) else None
     cells = table(s)
-    log(f"forecast: {s.event_id.nunique():,} events, {len(s):,} samples; held-out 10-90 band coverage {cov_held}")
+    log(f"forecast: {s.event_id.nunique():,} events, {len(s):,} samples; held-out 10-90 band coverage {cov_held}; "
+        f"P(final Critical) Brier {pcrit_held['brier']} vs base rate {pcrit_held['brierBaseRate']}")
     return {"leadEdgesDays": [e if np.isfinite(e) else None for e in LEAD_EDGES_D],
             "missEdgesM": [e if np.isfinite(e) else None for e in MISS_EDGES_M],
             "quantiles": list(QUANTILES), "cells": cells, "robustRatioQ10": robust_ratio(s),
-            "validation": {"heldOutEvents": len(held), "coverage10to90": cov_held, "coverageByLeadBin": by_lead},
+            "pCriticalByPc": pcrit_table(s), "pcEdgesLog10": [-6, -4],
+            "validation": {"heldOutEvents": len(held), "coverage10to90": cov_held, "coverageByLeadBin": by_lead,
+                           "pCritical": pcrit_held},
             "excludedReplayEvents": len(set(exclude)),
             "note": "final miss = current miss x ratio; one sample per event per lead bin; replay events excluded"}
 

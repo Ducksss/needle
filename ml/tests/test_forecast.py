@@ -35,6 +35,14 @@ def test_table_shape_and_pooling():
     assert c["n"] == 60 and not c["pooled"] and c["ratioQ10"] == c["ratioQ90"] == 0.9
 
 
+def test_pcrit_table_pools_sparse_cells_and_never_writes_nan():
+    tab = forecast.pcrit_table(forecast.samples(toy_train()))
+    assert len(tab) == 3 and len(tab[0]) == len(forecast.LEAD_EDGES_D) - 1
+    c = tab[0][2][1]  # Pc below 1e-6, 2 to 3 days out, 1 to 2 km
+    assert c == {"p": 0.0, "n": 60, "pooledOver": "lead and miss"}
+    assert tab[2][2][1] == {"p": None, "n": 0, "pooledOver": "Pc band"}
+
+
 def test_robust_miss_grows_with_the_pessimistic_shrink():
     fc = {"cells": [[{}] * 4] * 5, "robustRatioQ10": [0.98, 0.9, 0.75, 0.64, 0.53]}
     near, mid, far = (forecast.robust_miss_m(fc, d) for d in (0.5, 2.5, 6.0))
@@ -47,7 +55,13 @@ def test_forecast_artifact():
     if not path.exists():
         pytest.skip("forecast.json not built yet")
     fc = json.loads(path.read_text())
-    assert {"leadEdgesDays", "missEdgesM", "quantiles", "cells", "robustRatioQ10", "validation"} <= set(fc)
+    assert {"leadEdgesDays", "missEdgesM", "quantiles", "cells", "robustRatioQ10", "pCriticalByPc", "validation"} <= set(fc)
+    for band in fc["pCriticalByPc"]:
+        for row in band:
+            for c in row:
+                assert c["p"] is None or 0 <= c["p"] <= 1
+    v = fc["validation"]["pCritical"]
+    assert v["brier"] < v["brierBaseRate"]
     for row in fc["cells"]:
         for c in row:
             assert c["ratioQ10"] <= c["ratioQ50"] <= c["ratioQ90"]
