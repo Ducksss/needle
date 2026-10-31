@@ -116,6 +116,69 @@ def pcrit_check(table_, test):
             "byPcBand": by_pc}
 
 
+PC_FLOOR = -30.0
+PC_FC_EDGES = (-10.0, -6.0, -4.0)  # current log10 Pc bins above the floor: <1e-10, 1e-10..1e-6, 1e-6..1e-4, >=1e-4
+PC_FC_MIN = 20
+
+
+def _pc_fc_bin(risk):
+    """0 = at the -30 floor (too small to compute), then 1..4 by PC_FC_EDGES."""
+    risk = np.asarray(risk, dtype=float)
+    return np.where(risk <= PC_FLOOR, 0, 1 + np.digitize(risk, PC_FC_EDGES))
+
+
+def _pc_cell(c):
+    above = c[c.risk > PC_FLOOR]
+    delta = (above.risk_final - above.risk) if len(above) else None
+    return {"n": int(len(c)),
+            "ceilingDelta": round(float(delta.quantile(0.9)), 2) if delta is not None and len(delta) else None,
+            "pFloor": round(float((c.risk_final <= PC_FLOOR).mean()), 3),
+            "pBelow1e6": round(float((c.risk_final < -6).mean()), 3),
+            "pAtLeast1e4": round(float((c.risk_final >= -4).mean()), 3)}
+
+
+def pc_table(s):
+    """How the final Pc relates to today's, by current-Pc bin and lead bin: cells[pcBin][leadBin].
+
+    Pc is bimodal before closest approach: it mostly stays at or below today's value, or collapses to the
+    -30 floor (too small to compute). So the table stores a ceiling (the 90th percentile of final minus
+    current log10 Pc) and the chances of ending at the floor, below 1e-6 and at or above 1e-4, not a band.
+    A cell with fewer than 20 samples pools over lead time.
+    """
+    s = s.assign(pc_fc=_pc_fc_bin(s.risk.values))
+    out = []
+    for pb in range(len(PC_FC_EDGES) + 2):
+        sp = s[s.pc_fc == pb]
+        row = []
+        for lb in range(len(LEAD_EDGES_D) - 1):
+            c = sp[sp.lead_bin == lb]
+            cell = _pc_cell(c if len(c) >= PC_FC_MIN else sp)
+            cell["pooledOverLead"] = bool(len(c) < PC_FC_MIN)
+            row.append(cell)
+        out.append(row)
+    return out
+
+
+def pc_check(table_, test):
+    """Held-out checks: how often the final Pc stays under the ceiling, and calibration of P(final >= 1e-4) and P(floor)."""
+    t = test.assign(pc_fc=_pc_fc_bin(test.risk.values))
+    under, n_ceiling = 0, 0
+    p4, pf = [], []
+    for pb, lb, r, rf in zip(t.pc_fc, t.lead_bin, t.risk, t.risk_final):
+        cell = table_[pb][lb]
+        if r > PC_FLOOR and cell["ceilingDelta"] is not None:
+            n_ceiling += 1
+            under += rf <= r + cell["ceilingDelta"] + 1e-9
+        p4.append(cell["pAtLeast1e4"]); pf.append(cell["pFloor"])
+    p4, pf = np.array(p4), np.array(pf)
+    y4, yf = (t.risk_final.values >= -4).astype(float), (t.risk_final.values <= PC_FLOOR).astype(float)
+    return {"ceilingHeld": round(under / n_ceiling, 3), "ceilingSamples": n_ceiling,
+            "pAtLeast1e4": {"meanPredicted": round(float(p4.mean()), 4), "observed": round(float(y4.mean()), 4),
+                            "brier": round(float(((p4 - y4) ** 2).mean()), 4),
+                            "brierBaseRate": round(float(((y4.mean() - y4) ** 2).mean()), 4)},
+            "pFloor": {"meanPredicted": round(float(pf.mean()), 3), "observed": round(float(yf.mean()), 3)}}
+
+
 def build(tr, exclude=(), log=print):
     """forecast.json: the full table, plus an event-level 80/20 check of the band's coverage."""
     s = samples(tr, exclude)
@@ -125,6 +188,7 @@ def build(tr, exclude=(), log=print):
     fit, test = s[~s.event_id.isin(held)], s[s.event_id.isin(held)]
     cov_held = coverage(table(fit), test)
     pcrit_held = pcrit_check(pcrit_table(fit), test)
+    pcfc_held = pc_check(pc_table(fit), test)
     by_lead = {}
     t = table(fit)
     for lb in range(len(LEAD_EDGES_D) - 1):
@@ -137,8 +201,9 @@ def build(tr, exclude=(), log=print):
             "missEdgesM": [e if np.isfinite(e) else None for e in MISS_EDGES_M],
             "quantiles": list(QUANTILES), "cells": cells, "robustRatioQ10": robust_ratio(s),
             "pCriticalByPc": pcrit_table(s), "pcEdgesLog10": [-6, -4],
+            "pcForecast": {"pcBinEdgesLog10": list(PC_FC_EDGES), "floorLog10": PC_FLOOR, "cells": pc_table(s)},
             "validation": {"heldOutEvents": len(held), "coverage10to90": cov_held, "coverageByLeadBin": by_lead,
-                           "pCritical": pcrit_held},
+                           "pCritical": pcrit_held, "pcForecast": pcfc_held},
             "excludedReplayEvents": len(set(exclude)),
             "note": "final miss = current miss x ratio; one sample per event per lead bin; replay events excluded"}
 
