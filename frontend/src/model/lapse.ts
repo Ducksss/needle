@@ -63,7 +63,8 @@ export function lapseBetween(ctx: RunCtx, fromRun: number): Lapse {
     for (const e of replay.events) {
       const first = e.m[0][0];
       if (first > T0 && first <= T1 && e.tca > T1) arrived.push({ id: e.id, unmitigated: false });
-      if (e.tca > T0 && e.tca <= T1 && first <= T0) {
+      // Includes events first reported inside the window too, so one that escalated and passed unseen still flashes.
+      if (e.tca > T0 && e.tca <= T1) {
         const s = stateAt(e, T1, runH);
         const unmitigated = isKnown(s) && s.last[1] >= PC_ACTION && approvedAt(ctx, e.id) == null;
         passed.push({ id: e.id, unmitigated });

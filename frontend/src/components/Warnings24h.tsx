@@ -20,7 +20,7 @@ export function Warnings24h({ w, onPick }: { w: WarningsView; onPick: (id: numbe
       </div>
       <dl className="w24-counts">
         {w.counts.map((c, i) => (
-          <Count key={c.key} c={c} right={i % 3 === 2} />
+          <Count key={c.key} c={c} col={i % 3} />
         ))}
       </dl>
       <ul className="w24-insights" aria-label="Insights">
@@ -74,7 +74,7 @@ export function Warnings24h({ w, onPick }: { w: WarningsView; onPick: (id: numbe
   );
 }
 
-function Count({ c, right }: { c: WarningCount; right: boolean }) {
+function Count({ c, col }: { c: WarningCount; col: number }) {
   const id = useId();
   return (
     <div className="tw w24-count" tabIndex={0} aria-describedby={id}>
@@ -82,7 +82,7 @@ function Count({ c, right }: { c: WarningCount; right: boolean }) {
         <span>{c.label}</span>
       </dt>
       <dd style={{ color: c.v ? c.color : 'var(--muted)' }}>{c.v}</dd>
-      <TipCard id={id} title={c.label} lines={[c.tip]} side={{ edge: right ? 'right' : 'left', px: 0 }} />
+      <TipCard id={id} title={c.label} lines={[c.tip]} side={{ edge: col === 2 ? 'right' : col === 1 ? 'center' : 'left', px: 0 }} />
     </div>
   );
 }

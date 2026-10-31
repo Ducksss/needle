@@ -81,6 +81,13 @@ export function GlobeCanvas({ scene, label }: { scene: GlobeScene; label: string
     s.reduced = mq.matches;
     const onMotion = () => {
       s.reduced = mq.matches;
+      // Turning reduced motion on mid-transition snaps to the end state, as a scene change does under reduced motion.
+      if (s.reduced) {
+        const now = performance.now();
+        s.spin = { from: s.spin.to, to: s.spin.to, t0: now };
+        s.phase = { from: s.phase.to, to: s.phase.to, t0: now };
+        s.effects = null;
+      }
       s.dirty = true;
     };
     mq.addEventListener('change', onMotion);

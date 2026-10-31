@@ -17,7 +17,9 @@ export function noBreak(text: ReactNode): ReactNode {
   );
 }
 
-export const sideStyle = (side: TipSide = { edge: 'left', px: 0 }): CSSProperties => (side.edge === 'left' ? { left: side.px } : { right: side.px });
+// Centring uses the translate property, so fitCard's transform can still nudge the card inside the viewport.
+export const sideStyle = (side: TipSide = { edge: 'left', px: 0 }): CSSProperties =>
+  side.edge === 'center' ? { left: '50%', translate: '-50% 0' } : side.edge === 'left' ? { left: side.px } : { right: side.px };
 
 interface TipCardProps {
   id?: string;

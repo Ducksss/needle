@@ -22,7 +22,8 @@ export async function loadConsoleData(urls = dataUrls()): Promise<ConsoleData> {
     getJson<Replay>(urls.replay),
     getJson<Metrics>(urls.metrics).catch(() => null),
     getJson<Forecast>(urls.forecast)
-      .then((f) => (Array.isArray(f?.cells) ? f : null))
+      // Only a forecast with every field the cards read; otherwise the console shows no forecast rather than failing.
+      .then((f) => (Array.isArray(f?.cells) && Array.isArray(f?.leadEdgesDays) && Array.isArray(f?.missEdgesM) && f?.validation ? f : null))
       .catch(() => null),
   ]);
   // Fail into the error state, not a blank page, when a file parses but is not the contract shape.

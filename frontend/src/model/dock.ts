@@ -10,7 +10,8 @@ import { C } from './theme';
 
 /** Where a hover card anchors: its left or right edge, offset in px from the trigger's edge. */
 export interface TipSide {
-  edge: 'left' | 'right';
+  /** 'center' centres the card on its host, for hosts in the middle of a row. */
+  edge: 'left' | 'right' | 'center';
   px: number;
 }
 
@@ -454,7 +455,7 @@ export function buildLegend(budget: number): LegendItem[] {
     { key: 'bar', label: 'known', name: 'Event bar', tip: 'From the event’s first message to now. Each event is its own stream of messages, about one every 8 h. Faded: closest approach has passed.' },
     { key: 'pc', label: 'Pc ≥ 1e-4', name: 'Orange stretch', tip: 'Time when the latest message had Pc at or above 1e-4, the action threshold. In the open-events strip, the orange line is the count to decide at each run, on its own scale.' },
     { key: 'ahead', label: 'to closest approach', name: 'Dashed outline', tip: 'Time left until closest approach. Those messages have not arrived yet.' },
-    { key: 'burn', label: 'proposed burn', name: 'Proposed burn', tip: 'The planner’s recommended option (robust when it has one), drawn at its burn time with its Δv. It aims for Pc below 1e-4 and a miss above 1 km; check the gate before approving. It waits for approval.' },
+    { key: 'burn', label: 'proposed burn', name: 'Proposed burn', tip: 'For the selected event, the option picked in the workspace; for the others, the planner’s recommended option (robust when it has one, which can cost more Δv than the minimum). Drawn at its burn time with its Δv. It aims for Pc below 1e-4 and a miss above 1 km; check the gate before approving. It waits for approval.' },
     { key: 'deadline', label: 'decision deadline', name: 'Decision deadline', tip: 'After this, the cheapest burn needs more than the ' + budget + ' mm/s Δv budget.' },
     { key: 'end', label: 'passed unmitigated', name: 'Red end dot', tip: 'Closest approach passed with Pc still at or above 1e-4 and no approved burn. Grey: passed below 1e-4. Teal: burn approved.' },
     { key: 'forecast', label: 'forecast (chance it ends Critical)', name: 'Forecast', tip: 'Ring at each open event’s closest approach, filled to its chance of ending Critical (from the latest message seen at this run). In the strip, the dotted line after the playhead is the expected number of passes ending Critical per 8 h.' },

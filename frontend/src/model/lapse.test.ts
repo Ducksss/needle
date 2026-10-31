@@ -30,6 +30,7 @@ describe('time-lapse', () => {
       ev(2, 20, [[2, -3.5, 400]]),
       ev(3, 22, [[3, -7, 9000]]),
       ev(4, 30, [[12, -7, 9000]]),
+      ev(5, 22, [[12, -3.5, 400]]),
     ]);
     const l = lapseBetween(runCtx(rp, 3, 10, NO_DECISIONS), 1);
     expect(l.dH).toBe(16);
@@ -38,6 +39,7 @@ describe('time-lapse', () => {
     expect(l.passed).toEqual([
       { id: 2, unmitigated: true },
       { id: 3, unmitigated: false },
+      { id: 5, unmitigated: true },
     ]);
     const approved = lapseBetween(runCtx(rp, 3, 10, { ...NO_DECISIONS, approved: { 2: 2 } }), 1);
     expect(approved.passed[0]).toEqual({ id: 2, unmitigated: false });
