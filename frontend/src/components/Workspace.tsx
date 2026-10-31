@@ -204,7 +204,7 @@ function ForecastPanel({ f }: { f: ForecastCardView }) {
         <span className="meta">{c.lead}</span>
       </div>
       <div className="fc-body">
-        <div className="fc-range" role="img" aria-label={`Miss distance: ${c.now.label}, ${c.pred.label}, 8 in 10 band ${c.band.label}, on a log scale with the 1 km line.`}>
+        <div className="fc-range" role="img" aria-label={`Miss distance: ${c.now.label}, ${c.pred.label}. ${c.band.label}. Log scale with the 1 km line.`}>
           <div className="fc-bar">
             <span className="fc-track" />
             <span className="fc-band" style={{ left: c.band.left, width: c.band.width }} />
@@ -227,13 +227,15 @@ function ForecastPanel({ f }: { f: ForecastCardView }) {
             ))}
           </div>
           <span className="fc-band-key">
-            <i /> band: {c.band.label}
+            <i /> {c.band.label}
           </span>
         </div>
         <dl className="fc-numbers">
           <div>
             <dt>
-              Chance it ends under 1 km
+              <Hover className="help" title="Chance it gets closer than 1 km" lines={c.pUnder1kmTip}>
+                <span className="dotted">Chance it gets closer than 1 km</span>
+              </Hover>
               <small>{c.pUnder1kmBasis}</small>
             </dt>
             <dd className="mono" style={{ color: c.pUnder1kmColor }}>
@@ -242,7 +244,9 @@ function ForecastPanel({ f }: { f: ForecastCardView }) {
           </div>
           <div>
             <dt>
-              Chance it ends Critical
+              <Hover className="help" title="Chance it ends up needing a burn" lines={c.pCriticalTip} side={{ edge: 'right', px: 0 }}>
+                <span className="dotted">Chance it ends up needing a burn</span>
+              </Hover>
               <small>{c.pCriticalBasis}</small>
             </dt>
             <dd className={'mono' + (c.pCriticalMissing ? ' fc-missing' : '')} style={{ color: c.pCriticalColor }}>

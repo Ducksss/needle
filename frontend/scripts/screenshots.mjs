@@ -226,11 +226,11 @@ page = await open(1440, 1000, 2);
 const hist = ['figure.ws-cell:has(> .fan-wrap)'];
 const pcChart = async () => {
   const b = await pageBox(page, hist);
-  return { ...b, height: Math.min(b.height, 260) };
+  return { ...b, height: Math.min(b.height, 340) };
 };
 await page.mouse.move(5, 5);
 await shot(page, '21-pc-forecast-6341.png', { fullPage: true, clip: await pcChart() });
-await hoverShot(page, '.pc-ceil-tag', '21b-pc-forecast-ceiling-hover.png');
+await hoverShot(page, '.pc-keys .tw >> nth=0', '21b-pc-forecast-ceiling-hover.png');
 await page.getByRole('button', { name: /^Watch/ }).click();
 await page.locator('.qrow', { hasText: '#7546' }).click();
 await page.waitForTimeout(300);

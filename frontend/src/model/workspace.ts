@@ -3,7 +3,7 @@
 import type { CoaOption, Forecast, Mission, OptionKey, ReplayEvent } from '../data/types';
 import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, sci } from './format';
 import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, PLAN_CUTOFF_H, TIER_TIP, bucketOf, burnAt, burnPassed, isKnown, planAt, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
-import { type ForecastCard, type MissForecast, type PcOutlook, forecastAt, forecastCard, forecastLine, pcForecastAt, pcOutlookText, rangeTxt } from './forecast';
+import { type ForecastCard, type MissForecast, type PcOutlook, type PcOutlookKey, PC_NOTE, forecastAt, forecastCard, forecastLine, pcForecastAt, pcOutlookText, rangeTxt } from './forecast';
 import { type Chip, type RunCtx, OPTION_NAMES, approvedAt, chipFor, isDeferredNow, orderedFeasible } from './run';
 import { TONE, type Tone, missColor, pcColor } from './theme';
 
@@ -68,16 +68,15 @@ export interface HistoryView {
   pcNote: { text: string; tip: string[] | null };
 }
 
-/** Pc outlook drawn in the 320 × 96 view box of the Pc chart. */
+/** Pc outlook drawn in the 320 × 96 view box of the Pc chart, with its plain-language key under the chart. */
 export interface PcFanView {
   /** Dashed ink line from the now point to closest approach at today's Pc plus ceilingDelta; null at the floor. */
-  ceiling: { d: string; x: number; y: number; alignEnd: boolean; below: boolean; tip: string[] } | null;
+  ceiling: string | null;
   /** Soft grey wedge from the now point down to the chart floor at closest approach; at the floor, a band along it. */
   fade: string;
-  /** "53% fall to ~0"; at the floor two lines, "95% stay too small" and "to compute", so it fits right of now. */
-  floorLabel: string[];
   /** Ring at closest approach on the 1e-4 line, filled to the chance of ending at or above 1e-4. */
-  ring: { cx: number; cy: number; r: number; wedge: string; label: string | null };
+  ring: { cx: number; cy: number; r: number; wedge: string };
+  keys: PcOutlookKey[];
 }
 
 export interface Fact {
@@ -256,8 +255,8 @@ const QUEUE_NAME: Record<Bucket, string> = {
 
 export const TIER_TONE: Record<Tier, Tone> = { CRITICAL: TONE.decide, ELEVATED: TONE.watch, SAFE: TONE.passed };
 
+export { PC_NOTE };
 export const PC_NOTE_OLD = 'Pc is not forecast: it swings by orders of magnitude.';
-export const PC_NOTE = 'Pc rarely rises; it often collapses as tracking improves.';
 
 /** Pie wedge from 12 o'clock, clockwise, for a share p of a circle. */
 function wedgePath(cx: number, cy: number, r: number, p: number): string {
@@ -271,30 +270,20 @@ function wedgePath(cx: number, cy: number, r: number, p: number): string {
 
 /** The Pc outlook from the now point to closest approach (x = 316), on the Pc chart's axis. */
 export function buildPcFan(po: PcOutlook, nowX: number, yPc: (r: number) => number): PcFanView {
-  const t = pcOutlookText(po);
   const y0 = yPc(po.risk);
   const FLOOR_Y = 86;
-  let ceiling: PcFanView['ceiling'] = null;
-  let fade = '';
+  const x0 = nowX.toFixed(1);
+  let ceiling: string | null = null;
+  let fade: string;
   if (po.pcBin !== 0 && po.cell.ceilingDelta != null) {
-    const yC = yPc(po.risk + po.cell.ceilingDelta);
-    // The label sits above the start of the line, or below it when that would leave the chart.
-    const below = Math.min(y0, yC) < 12;
-    ceiling = {
-      d: 'M' + nowX.toFixed(1) + ',' + y0.toFixed(1) + 'L316,' + yC.toFixed(1),
-      x: nowX > 272 ? 316 : nowX + 4,
-      y: below ? Math.max(y0, yC) + 3 : Math.min(y0, yC) - 3,
-      alignEnd: nowX > 272,
-      below,
-      tip: t.ceilingTip,
-    };
-    fade = 'M' + nowX.toFixed(1) + ',' + y0.toFixed(1) + 'L316,' + yC.toFixed(1) + 'L316,' + FLOOR_Y + 'Z';
+    const yC = yPc(po.risk + po.cell.ceilingDelta).toFixed(1);
+    ceiling = 'M' + x0 + ',' + y0.toFixed(1) + 'L316,' + yC;
+    fade = 'M' + x0 + ',' + y0.toFixed(1) + 'L316,' + yC + 'L316,' + FLOOR_Y + 'Z';
   } else {
-    fade = 'M' + nowX.toFixed(1) + ',' + (FLOOR_Y - 3) + 'L316,' + (FLOOR_Y - 3) + 'L316,' + FLOOR_Y + 'L' + nowX.toFixed(1) + ',' + FLOOR_Y + 'Z';
+    fade = 'M' + x0 + ',' + (FLOOR_Y - 3) + 'L316,' + (FLOOR_Y - 3) + 'L316,' + FLOOR_Y + 'L' + x0 + ',' + FLOOR_Y + 'Z';
   }
-  const floorLabel = po.pcBin === 0 ? [t.floor.replace(' to compute', ''), 'to compute'] : [t.floor];
   const cy = yPc(PC_ACTION);
-  return { ceiling, fade, floorLabel, ring: { cx: 315, cy, r: 3.5, wedge: wedgePath(315, cy, 3.5, po.cell.pAtLeast1e4), label: t.atLeast1e4 } };
+  return { ceiling, fade, ring: { cx: 315, cy, r: 3.5, wedge: wedgePath(315, cy, 3.5, po.cell.pAtLeast1e4) }, keys: pcOutlookText(po).keys };
 }
 
 export function buildHistory(e: ReplayEvent, s: KnownState, T: number, fc: MissForecast | null = null, po: PcOutlook | null = null, pcForecastOn = false): HistoryView {

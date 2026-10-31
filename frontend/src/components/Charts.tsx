@@ -23,9 +23,6 @@ function NowTag({ x, width, tip = NOW_TIP }: { x: string; width: number; tip?: s
   );
 }
 
-/** Halo so outlook labels stay readable over the now line and the threshold lines. */
-const HALO = { stroke: '#ffffff', strokeWidth: 3, paintOrder: 'stroke' as const, strokeLinejoin: 'round' as const };
-
 export function MessageHistory({ h }: { h: HistoryView }) {
   const fanTip = useId();
   const fadeId = useId();
@@ -39,22 +36,11 @@ export function MessageHistory({ h }: { h: HistoryView }) {
       <span className="caps">Collision probability</span>
       <div className="chart-wrap">
       <NowTag x={h.nowX} width={320} />
-      {pf?.ceiling && (
-        <Hover
-          className={'pc-ceil-tag' + (pf.ceiling.alignEnd ? ' end' : '') + (pf.ceiling.below ? ' below' : '')}
-          style={{ left: (pf.ceiling.x / 320) * 100 + '%', top: 'calc(12px + (100% - 12px) * ' + (pf.ceiling.y / 96).toFixed(3) + ')' }}
-          title="Ceiling"
-          lines={pf.ceiling.tip}
-          side={{ edge: pf.ceiling.alignEnd ? 'right' : 'left', px: 0 }}
-        >
-          ceiling
-        </Hover>
-      )}
       <svg
         viewBox="0 0 320 96"
         className="chart"
         role="img"
-        aria-label={'Collision probability for each message received so far' + (pf ? ', with the outlook to closest approach: ' + [pf.ceiling ? 'a ceiling' : null, pf.floorLabel.join(' '), pf.ring.label].filter(Boolean).join(', ') : '')}
+        aria-label={'Collision probability for each message received so far' + (pf ? ', with the outlook to closest approach: ' + pf.keys.map((k) => k.label).join('; ') : '')}
       >
         {pf?.fade && (
           <>
@@ -85,25 +71,25 @@ export function MessageHistory({ h }: { h: HistoryView }) {
         <path d={h.pcHot} fill="#C2410C" />
         {pf && (
           <>
-            {pf.ceiling && <path d={pf.ceiling.d} fill="none" stroke="#0F172A" strokeWidth="1.2" strokeDasharray="4 3" />}
-            <text x="312" y={82 - (pf.floorLabel.length - 1) * 10} textAnchor="end" fontSize="9" fill="#64748B" fontFamily={MONO} {...HALO}>
-              {pf.floorLabel.map((l, i) => (
-                <tspan key={i} x="312" dy={i ? 10 : 0}>
-                  {l}
-                </tspan>
-              ))}
-            </text>
+            {pf.ceiling && <path d={pf.ceiling} fill="none" stroke="#0F172A" strokeWidth="1.2" strokeDasharray="4 3" />}
             <circle cx={pf.ring.cx} cy={pf.ring.cy} r={pf.ring.r} fill="rgba(194, 65, 12, 0.14)" stroke="#C2410C" strokeWidth="1" />
             {pf.ring.wedge && <path d={pf.ring.wedge} fill="#C2410C" />}
-            {pf.ring.label && (
-              <text x="309" y="29" textAnchor="end" fontSize="9" fill="#C2410C" fontFamily={MONO} {...HALO}>
-                {pf.ring.label}
-              </text>
-            )}
           </>
         )}
       </svg>
       </div>
+      {pf && (
+        <ul className="pc-keys">
+          {pf.keys.map((k) => (
+            <li key={k.kind}>
+              <i className={'pc-key pc-key-' + k.kind} aria-hidden="true" />
+              <Hover className="help" title={k.title} lines={k.tip} side={{ edge: 'left', px: 0 }}>
+                <span className="dotted">{k.label}</span>
+              </Hover>
+            </li>
+          ))}
+        </ul>
+      )}
       {h.pcNote.tip ? (
         <Hover className="chart-note help" title="Pc outlook" lines={h.pcNote.tip}>
           <span className="dotted">{h.pcNote.text}</span>

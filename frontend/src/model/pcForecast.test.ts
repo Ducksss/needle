@@ -22,37 +22,45 @@ describe('Pc outlook', () => {
     expect([-30, -29.98, -10.01, -10, -6.01, -6, -4.01, -4, -2].map((r) => pcBinOf(pf, r))).toEqual([0, 1, 1, 2, 2, 3, 3, 4, 4]);
   });
 
-  it('reads #6341 at run 5 from its latest message: ceiling below today, 53% fall to ~0, 11% end at or above 1e-4', () => {
+  it('reads #6341 at run 5 in plain words: worst likely 1 in 10,000, 53% drop to almost zero, 11% still high', () => {
     const e = data.replay.events.find((x) => x.id === 6341)!;
     const ctx = runCtx(data.replay, 4, 10, NO_DECISIONS);
     const po = pcForecastAt(f, e, known(e, ctx.T))!;
     expect([po.pcBin, po.leadTxt, po.cell.n, po.cell.ceilingDelta]).toEqual([4, '3 to 5 days', 38, -0.43]);
     const t = pcOutlookText(po);
-    expect([t.floor, t.atLeast1e4]).toEqual(['53% fall to ~0', '11% end ≥ 1e-4']);
-    expect(t.ceilingTip[0]).toBe('9 in 10 similar events ended at or below this (held on 89.9% of held-out events).');
-    expect(t.noteTip[0]).toBe('From 38 past events with Pc at or above 1e-4, 3 to 5 days before closest approach.');
+    expect(t.keys.map((k) => k.label)).toEqual(['worst likely: 1 in 10,000', '53% chance the risk drops to almost zero', '11% chance it’s still high at closest approach']);
+    expect(t.keys[0].tip[0]).toBe('9 out of 10 similar past events ended at or below this risk.');
+    expect(t.keys[0].tip[1]).toBe('Technical: Pc ceiling 9.7e-5, today’s Pc 2.6e-4 lowered by 0.43 orders of magnitude (ceilingDelta); held on 89.9% of held-out events.');
+    expect(t.keys[1].tip[0]).toBe('As tracking improves, the collision risk often turns out to be negligible.');
+    expect(t.noteTip[0]).toBe('Technical: from 38 past events with Pc at or above 1e-4, 3 to 5 days before closest approach.');
 
     const ws = buildWorkspace(ctx, e, DEFAULT_OPTION, { medianWaitRatio24h: null }, undefined, f);
     if (ws.kind !== 'event') throw new Error('no event');
     const fan = ws.hist.pcFc!;
     expect(fan.ceiling).not.toBeNull();
-    expect(fan.floorLabel).toEqual(['53% fall to ~0']);
-    expect(fan.ring.label).toBe('11% end ≥ 1e-4');
+    expect(fan.keys.map((k) => k.kind)).toEqual(['ceiling', 'fade', 'ring']);
+    expect(ws.hist.pcNote.text).toBe('Collision risk rarely goes up from here. It usually stays the same or drops as better tracking arrives.');
     expect(ws.hist.pcNote.text).toBe(PC_NOTE);
   });
 
-  it('draws no ceiling at the floor and says how many stay too small to compute', () => {
+  it('draws no ceiling at the floor and says the risk is already negligible', () => {
     const e = ev(1, 100, [[10, -30, 3000]]);
     const po = pcForecastAt(f, e, known(e, 20))!;
     expect(po.pcBin).toBe(0);
     const t = pcOutlookText(po);
-    expect(t.atLeast1e4).toBeNull();
-    expect(t.floor).toMatch(/^\d+% stay too small to compute$/);
+    expect(t.keys.map((k) => k.kind)).toEqual(['floor']);
+    expect(t.keys[0].label).toMatch(/^Risk is already negligible; \d+% stay that way\.$/);
     const ctx = runCtx({ runs: 64, runH: 8, windowH: 504, note: 'test', events: [e] }, 3, 10, NO_DECISIONS);
     const ws = buildWorkspace(ctx, e, DEFAULT_OPTION, { medianWaitRatio24h: null }, undefined, f);
     if (ws.kind !== 'event') throw new Error('no event');
     expect(ws.hist.pcFc?.ceiling).toBeNull();
-    expect(ws.hist.pcFc?.floorLabel).toEqual([t.floor.replace(' to compute', ''), 'to compute']);
+    expect(ws.hist.pcFc?.keys).toEqual(t.keys);
+  });
+
+  it('leaves out the still-high line under 1%', () => {
+    const e = ev(1, 100, [[10, -8, 3000]]);
+    const t = pcOutlookText(pcForecastAt(f, e, known(e, 20))!);
+    expect(t.keys.some((k) => k.kind === 'ring')).toBe(false);
   });
 
   it('uses only the latest message seen by T', () => {

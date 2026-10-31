@@ -69,9 +69,12 @@ describe('forecast lookup', () => {
     expect(pos(c.now.left)).toBeGreaterThan(pos(c.oneKm));
     expect(c.risk).not.toBeNull();
     expect([c.pUnder1km, c.pCritical]).toEqual(['15%', '70%']);
-    expect(c.pUnder1kmBasis).toBe('100 similar events');
-    expect(c.pCriticalBasis).toBe('50 similar events at Pc ≥ 1e-4');
-    expect(c.footnote).toMatch(/The band held 8 times in 10 on 2,529 held-out events\./);
+    expect(c.pUnder1kmBasis).toBe('100 similar past events');
+    expect(c.pCriticalBasis).toBe('50 similar past events at this risk level');
+    expect(c.pCriticalTip[1]).toMatch(/\(Pc ≥ 1e-4\)\.$/);
+    expect(c.pred.label).toBe('likely final distance 1.50 km');
+    expect(c.band.label).toBe('8 out of 10 similar events ended between 900 m and 2.70 km');
+    expect(c.footnote).toMatch(/The range held 8 times out of 10 on 2,529 events held back for testing\./);
   });
 
   it('formats ranges and shares', () => {
@@ -102,7 +105,7 @@ describe('forecast in the console', () => {
     expect(v.ws.header.pc).toBe('4.5e-4');
     expect(v.ws.forecast.card.lead).toBe('Predicted from today’s message, 5d 22h before closest approach');
     expect(v.ws.forecast.card.pCritical).toBe('20%');
-    expect(v.ws.forecast.card.pCriticalBasis).toBe('20 similar events at Pc ≥ 1e-4');
+    expect(v.ws.forecast.card.pCriticalBasis).toBe('20 similar past events at this risk level');
   });
 
   it('shows no fan or line for a passed event', () => {

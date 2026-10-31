@@ -2,7 +2,7 @@
 // for the final miss distance, and a Pc outlook (a ceiling and outcome chances, since Pc has no useful band).
 
 import type { Forecast, ForecastCell, PcForecastCell, ReplayEvent } from '../data/types';
-import { dh } from './format';
+import { dh, pcOdds, pcTxt } from './format';
 import { C } from './theme';
 import { PC_ACTION, PC_WATCH, type KnownState } from './replay';
 
@@ -153,10 +153,20 @@ export interface ForecastCard {
   pCriticalMissing: boolean;
   pUnder1kmColor: string;
   pCriticalColor: string;
+  /** Hover cards: the technical meaning behind each plain label. */
+  pUnder1kmTip: string[];
+  pCriticalTip: string[];
   footnote: string;
 }
 
 const PC_BAND_TXT = ['Pc below 1e-6', 'Pc 1e-6 to 1e-4', 'Pc ≥ 1e-4'];
+
+/** "between 231 m and 2.08 km", one unit when both ends share it: "between 1.80 and 12.62 km". */
+function betweenTxt(lo: number, hi: number): string {
+  if (hi < 1000) return 'between ' + Math.round(lo) + ' and ' + Math.round(hi) + ' m';
+  if (lo >= 1000) return 'between ' + (lo / 1000).toFixed(2) + ' and ' + (hi / 1000).toFixed(2) + ' km';
+  return 'between ' + kmTxt(lo) + ' and ' + kmTxt(hi);
+}
 
 /** A forecast chance in risk orange from 50%, amber from 20%, otherwise ink. */
 export const chanceColor = (p: number | null) => (p == null ? C.muted : p >= 0.5 ? C.risk : p >= 0.2 ? C.hidden : C.ink);
@@ -173,20 +183,25 @@ export function forecastCard(fc: MissForecast, toTcaH = fc.leadDays * 24): Forec
     lead: 'Predicted from today’s message, ' + dh(toTcaH) + ' before closest approach',
     ticks: ax.ticks.map((t) => ({ left: pct(t.pos), label: t.label })),
     now: { left: pct(ax.at(fc.missM)), label: 'now ' + kmTxt(fc.missM) },
-    pred: { left: pct(ax.at(fc.q50M)), label: 'predicted final ' + kmTxt(fc.q50M) },
-    band: { left: pct(a), width: pct(Math.max(0.004, b - a)), label: inTen(fc.coverage) + ': ' + rangeTxt(fc.q10M, fc.q90M) },
+    pred: { left: pct(ax.at(fc.q50M)), label: 'likely final distance ' + kmTxt(fc.q50M) },
+    band: { left: pct(a), width: pct(Math.max(0.004, b - a)), label: inTen(fc.coverage).replace(' in ', ' out of ') + ' similar events ended ' + betweenTxt(fc.q10M, fc.q90M) },
     risk: fc.q10M < 1000 ? { left: pct(a), width: pct(Math.max(0.004, Math.min(b, k) - a)) } : null,
     oneKm: pct(k),
     pUnder1km: pctTxt(fc.cell.pUnder1km),
-    pUnder1kmBasis: fc.cell.n.toLocaleString('en-US') + ' similar events',
+    pUnder1kmBasis: fc.cell.n.toLocaleString('en-US') + ' similar past events',
     pCritical: pCriticalTxt(fc),
-    pCriticalBasis: fc.pCriticalN != null ? fc.pCriticalN.toLocaleString('en-US') + ' similar events at ' + PC_BAND_TXT[fc.pcBand] : 'too few past events at ' + PC_BAND_TXT[fc.pcBand],
+    pCriticalBasis: fc.pCriticalN != null ? fc.pCriticalN.toLocaleString('en-US') + ' similar past events at this risk level' : 'too few past events at this risk level',
     pCriticalMissing: fc.pCritical == null,
     pUnder1kmColor: chanceColor(fc.cell.pUnder1km),
     pCriticalColor: chanceColor(fc.pCritical),
+    pUnder1kmTip: ['Technical: share of past events at the same lead time and miss distance whose final miss was under 1 km, the brief’s dangerous distance.'],
+    pCriticalTip: [
+      'Technical: chance the event ends Critical, the brief’s top tier (final Pc at least 1e-4 or miss under 1 km), when a burn is considered.',
+      'From past events at the same lead time and distance that also shared today’s Pc band (' + PC_BAND_TXT[fc.pcBand] + ').',
+    ],
     footnote:
-      'Band and chance under 1 km: past events at the same lead time and distance. Chance it ends Critical: past events that also shared the Pc band. The band held ' +
-      inTen(fc.coverage).replace(' in ', ' times in ') + ' on ' + fc.heldOut.toLocaleString('en-US') + ' held-out events. The brief scores predictions made 2+ days out; Needle updates this at every message.',
+      'Based on how similar past events moved from the same point. The range held ' +
+      inTen(fc.coverage).replace(' in ', ' times out of ') + ' on ' + fc.heldOut.toLocaleString('en-US') + ' events held back for testing. The brief scores predictions made 2 or more days out; Needle updates this at every message.',
   };
 }
 
@@ -227,27 +242,69 @@ export function pcForecastAt(f: Forecast | null | undefined, e: ReplayEvent, s: 
   return { leadDays, pcBin, cell, risk, leadTxt, ceilingHeld: f.validation.pcForecast?.ceilingHeld ?? null };
 }
 
+export interface PcOutlookKey {
+  /** Swatch: the dashed ceiling, the grey fade, the floor band or the ring. */
+  kind: 'ceiling' | 'fade' | 'floor' | 'ring';
+  /** Plain words for a judge at a glance; the technical terms are in the card. */
+  label: string;
+  title: string;
+  tip: string[];
+}
+
 export interface PcOutlookText {
-  /** "53% fall to ~0", or at the floor "99% stay too small to compute". */
-  floor: string;
-  /** "11% end ≥ 1e-4"; null under 1%. */
-  atLeast1e4: string | null;
-  ceilingTip: string[];
-  /** Hover card of the chart note: the sample behind the numbers. */
+  /** In drawing order: ceiling, fall to almost zero (or already negligible), still high at closest approach. */
+  keys: PcOutlookKey[];
+  note: string;
+  /** Hover card of the note: the sample behind the numbers. */
   noteTip: string[];
 }
 
+export const PC_NOTE = 'Collision risk rarely goes up from here. It usually stays the same or drops as better tracking arrives.';
+
+/** Plain labels for the Pc outlook, with probabilities as odds. */
 export function pcOutlookText(po: PcOutlook): PcOutlookText {
   const c = po.cell;
+  const n = c.n.toLocaleString('en-US');
+  const keys: PcOutlookKey[] = [];
+  if (po.pcBin !== 0 && c.ceilingDelta != null) {
+    const top = po.risk + c.ceilingDelta;
+    keys.push({
+      kind: 'ceiling',
+      label: 'worst likely: ' + (pcOdds(top) ?? 'negligible'),
+      title: 'Worst likely',
+      tip: [
+        '9 out of 10 similar past events ended at or below this risk.',
+        'Technical: Pc ceiling ' + pcTxt(top) + ', today’s Pc ' + pcTxt(po.risk) + (c.ceilingDelta < 0 ? ' lowered' : ' raised') + ' by ' + Math.abs(c.ceilingDelta).toFixed(2) + ' orders of magnitude (ceilingDelta)' +
+          (po.ceilingHeld != null ? '; held on ' + (po.ceilingHeld * 100).toFixed(1) + '% of held-out events.' : '.'),
+      ],
+    });
+    keys.push({
+      kind: 'fade',
+      label: pctTxt(c.pFloor) + ' chance the risk drops to almost zero',
+      title: 'Drops to almost zero',
+      tip: ['As tracking improves, the collision risk often turns out to be negligible.', 'Technical: share of ' + n + ' similar past events whose final Pc was too small to compute (the 1e-30 floor).'],
+    });
+  } else {
+    keys.push({
+      kind: 'floor',
+      label: 'Risk is already negligible; ' + pctTxt(c.pFloor) + ' stay that way.',
+      title: 'Already negligible',
+      tip: ['Technical: today’s Pc is at the 1e-30 floor, too small to compute. ' + pctTxt(c.pFloor) + ' of ' + n + ' similar past events ended there.'],
+    });
+  }
+  if (c.pAtLeast1e4 >= 0.01) {
+    keys.push({
+      kind: 'ring',
+      label: pctTxt(c.pAtLeast1e4) + ' chance it’s still high at closest approach',
+      title: 'Still high at closest approach',
+      tip: ['Technical: chance the final Pc is at or above 1e-4, the action threshold. The ring sits on the 1e-4 line at closest approach, filled to that chance.'],
+    });
+  }
   return {
-    floor: pctTxt(c.pFloor) + (po.pcBin === 0 ? ' stay too small to compute' : ' fall to ~0'),
-    atLeast1e4: c.pAtLeast1e4 < 0.01 ? null : Math.round(c.pAtLeast1e4 * 100) + '% end ≥ 1e-4',
-    ceilingTip: [
-      '9 in 10 similar events ended at or below this' + (po.ceilingHeld != null ? ' (held on ' + (po.ceilingHeld * 100).toFixed(1) + '% of held-out events).' : '.'),
-      'Drawn at today’s Pc ' + (c.ceilingDelta != null && c.ceilingDelta < 0 ? 'minus ' : 'plus ') + Math.abs(c.ceilingDelta ?? 0).toFixed(2) + ' orders of magnitude.',
-    ],
+    keys,
+    note: PC_NOTE,
     noteTip: [
-      'From ' + c.n.toLocaleString('en-US') + ' past events with Pc ' + PC_BIN_TXT[po.pcBin] + ', ' + (c.pooledOverLead ? 'pooled over all lead times.' : po.leadTxt + ' before closest approach.'),
+      'Technical: from ' + n + ' past events with Pc ' + PC_BIN_TXT[po.pcBin] + ', ' + (c.pooledOverLead ? 'pooled over all lead times.' : po.leadTxt + ' before closest approach.'),
       pctTxt(c.pFloor) + ' ended too small to compute, ' + pctTxt(c.pBelow1e6) + ' below 1e-6 and ' + pctTxt(c.pAtLeast1e4) + ' at or above 1e-4.',
     ],
   };
