@@ -139,6 +139,18 @@ The console forecasts each open event's final miss distance from its latest mess
   - In the replay, the minimum-Δv burn already meets this target in 86 of 118 escalation messages, because pushing Pc below 1e-4 usually opens the miss well past 1 km.
   - Where it does not, the robust burn costs 0.37 mm/s more on average, and 4.5 mm/s at most.
 
+**Collision probability forecast.** Before closest approach, Pc behaves in one of two ways: it mostly stays at or below today's value, or it collapses to the -30 floor as tracking improves. A band would span about 25 orders of magnitude. So for each current-Pc bin and lead bin, the console shows three things:
+
+- **A ceiling:** the 90th percentile of the final Pc relative to today's.
+- **The chance it falls to about zero.**
+- **The chance it ends at or above 1e-4.**
+
+On held-out events, the final Pc stayed under the ceiling 89.9% of the time (4,355 samples). The predicted chance of falling to the floor averaged 75.5%, against 76.0% observed. For events now at Pc ≥ 1e-4:
+
+- **Ceiling:** 9 in 10 end at least about 0.5 orders of magnitude lower.
+- **Collapse:** 51 to 64% fall to about zero.
+- **Still high:** only about 10% are still at or above 1e-4 at closest approach.
+
 ## 10. Physics model checks (not part of the scores)
 
 The console's Pc and burn planner use the full CDM: relative state, both covariances and object sizes. The UI labels them as the physics model.

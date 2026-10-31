@@ -94,7 +94,16 @@ To forecast an event at replay time `T`: take its latest message received by `T`
 - **Lower and upper limits:** `miss × ratioQ10` and `miss × ratioQ90`. About 8 in 10 held-out outcomes fall inside them.
 - **Probabilities:** `pUnder1km` from the cell. For the chance of ending Critical, use `pCriticalByPc[pcBand][leadBin][missBin].p`, where `pcBand` comes from the latest message's Pc. Pc changes this a lot: about 6% below 1e-6, and up to 75% at 1e-4 and above. `cells[...].pCritical` ignores Pc; don't show it.
 
-Pc has no band, because it swings by orders of magnitude.
+Pc has no band, because it is bimodal: it mostly stays at or below today's value, or collapses to the -30 floor. `pcForecast.cells[pcBin][leadBin]` gives what is useful instead.
+
+- `pcBin`: 0 at the floor; 1 below 1e-10; 2 for 1e-10 to 1e-6; 3 for 1e-6 to 1e-4; 4 at or above 1e-4 (`pcBinEdgesLog10`).
+- `ceilingDelta`: the 90th percentile of final minus current log10 Pc. Draw a "ceiling" at current + ceilingDelta: 9 in 10 similar events ended at or below it. It is null at the floor.
+- `pFloor`: the chance it ends too small to compute (Pc ≈ 0).
+- `pBelow1e6`: the chance it ends below 1e-6.
+- `pAtLeast1e4`: the chance it ends at or above 1e-4.
+- `n` and `pooledOverLead`: the sample count, and whether it pools across lead times.
+
+Held-out checks are in `validation.pcForecast`.
 
 ### `test_event_predictions.csv` (the task's predictions)
 
