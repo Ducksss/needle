@@ -3,7 +3,7 @@
 import type { CoaOption, OptionKey, Replay, ReplayEvent } from '../data/types';
 import { at, clamp, dh, dirShort, mTxt, pcWithOdds, withOdds } from './format';
 import { PC_ACTION, isKnown, planOf, stateAt } from './replay';
-import { type RunCtx, OPTION_NAMES, approvedAt, chipFor } from './run';
+import { type RunCtx, OPTION_NAMES, approvedAt, chipFor, orderedFeasible } from './run';
 import { C } from './theme';
 
 /** Where a hover card anchors: its left or right edge, offset in px from the trigger's edge. */
@@ -318,8 +318,8 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
           lines: [ctx.dec.approvedTxt[e.id] ?? '', 'Simulated upload. Later messages are the real recorded ones, so they do not show the burn.'].filter(Boolean),
         });
       } else if (pl) {
-        // Same choice as the workspace planner: feasible options only.
-        const feasible = pl.c.opts.filter((x) => x.feasible);
+        // Same choice as the workspace planner: feasible options, robust first.
+        const feasible = orderedFeasible(pl.c.opts);
         const o: CoaOption | undefined = (sel === e.id ? feasible.find((x) => x.key === optKey) : undefined) ?? feasible[0];
         if (o) {
           const hB = T + (o.key === 'coa3' ? 24 : 0);

@@ -58,6 +58,17 @@ export function Workspace({ ws, budget, onOpt, onReview, onDefer }: WorkspacePro
             <dd>{h.msgs}</dd>
           </div>
         </dl>
+        {h.forecast && (
+          <p className="ws-forecast">
+            <span className="caps">Forecast at closest approach</span>{' '}
+            <Hover className="help" title="Forecast at closest approach" lines={h.forecast.tip}>
+              <span className="dotted">
+                Predicted final miss <b className="mono">{h.forecast.median}</b> ({h.forecast.cover}: <span className="mono">{h.forecast.range}</span>)
+              </span>
+            </Hover>{' '}
+            · P(ends under 1 km) <b className="mono">{h.forecast.pUnder1km}</b> · P(ends Critical) <b className="mono">{h.forecast.pCritical}</b>
+          </p>
+        )}
       </div>
       <div className="ws-grid">
         <MessageHistory h={ws.hist} />

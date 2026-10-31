@@ -36,7 +36,7 @@ export function Queue({ q, flash, run, onTab, onPick }: QueueProps) {
         {q.rows.map((r) => {
           const lit = flash && r.changed;
           return (
-            <button key={lit ? r.id + ':' + run : r.id} type="button" className={'qrow' + (lit ? ' flash' : '')} aria-pressed={r.on} onClick={() => onPick(r.id)}>
+            <button key={lit ? r.id + ':' + run : r.id} type="button" className={'qrow' + (lit ? ' flash' : '')} aria-pressed={r.on} title={r.title} onClick={() => onPick(r.id)}>
               <span className="qrow-main">
                 <span className="qrow-id">
                   <span className="mono">#{r.id}</span>

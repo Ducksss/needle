@@ -116,6 +116,18 @@ for (const [width, height] of [
   await page.close();
 }
 
+// Forecast: the robust option panel at the default run, and a 1 to 2 km Watch event 2 to 3 days out.
+page = await open(1440, 1000, 2);
+await shot(page, '14-options-robust.png', { fullPage: true, clip: await pageBox(page, ['section[aria-label="Workspace"] [role="radiogroup"]', 'section[aria-label="Workspace"] .actions']) });
+await page.getByRole('button', { name: /^Watch/ }).click();
+await page.locator('.qrow', { hasText: '#' + (process.env.NEEDLE_FORECAST_EVENT ?? '7678') }).click();
+await page.waitForTimeout(100);
+await shot(page, '13-forecast-watch-event.png', { fullPage: true, clip: await pageBox(page, ['section[aria-label="Workspace"]', 'section[aria-label="Queue"]']) });
+await page.locator('.fan-label').hover();
+await page.waitForTimeout(150);
+await shot(page, '13b-forecast-hover.png', { fullPage: true, clip: await pageBox(page, ['.fan-wrap', '.fan-row', '.fan-label > .tt'], 14) });
+await page.close();
+
 // The globe spins and pulses: three frames one second apart, then the reduced-motion view.
 page = await open(1440, 1000, 2);
 const globe = ['section[aria-label="Orbit context"]'];

@@ -2,7 +2,7 @@
 
 import { at, dh, pcWithOdds, sgn } from './format';
 import { waitDv, windowIndex } from './replay';
-import type { NeedRow, Snapshot } from './run';
+import { type NeedRow, type Snapshot, orderedFeasible } from './run';
 import { C } from './theme';
 
 export interface Kpi {
@@ -78,9 +78,13 @@ export function buildNext(snap: Snapshot, budget: number, sel: number | null = n
   }
   const { e, s, plan } = urgent;
   const w0 = waitDv(plan.c, windowIndex(plan.c, plan.age));
+  const rec = orderedFeasible(plan.c.opts)[0];
+  const burn = rec
+    ? 'Recommended burn: ' + rec.dv.toFixed(1) + ' mm/s (' + (rec.key === 'coa4' ? 'robust' : rec.key === 'coa1' ? 'minimum Δv' : 'more margin') + ').'
+    : 'Lowest burn now: ' + (w0 != null ? w0.toFixed(1) + ' mm/s.' : 'above 80 mm/s.');
   const head = '#' + e.id + ' · ' + e.sat + ' vs ' + e.obj.toLowerCase() + ' · Pc ' + pcWithOdds(s.last[1]) + '. ';
   const tail = plan.overNow
     ? 'Already above the ' + budget + ' mm/s budget: decide now or accept a larger burn.'
-    : 'Decide within ' + dh(plan.left) + ' (by ' + at(plan.dlAbs) + ') to stay inside the ' + budget + ' mm/s budget. Lowest burn now: ' + (w0 != null ? w0.toFixed(1) + ' mm/s.' : 'above 80 mm/s.');
+    : 'Decide within ' + dh(plan.left) + ' (by ' + at(plan.dlAbs) + ') to stay inside the ' + budget + ' mm/s budget. ' + burn;
   return { tone: 'decide', label: 'Next decision', text: head + tail, eventId: e.id, showing: sel === e.id };
 }

@@ -1,9 +1,10 @@
 // Workspace for the selected event: header, message history, and either the burn planner or the messages table.
 
-import type { CoaOption, Mission, OptionKey, ReplayEvent } from '../data/types';
+import type { CoaOption, Forecast, Mission, OptionKey, ReplayEvent } from '../data/types';
 import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, sci } from './format';
 import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, TIER_TIP, bucketOf, isKnown, planAt, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
-import { type Chip, type RunCtx, OPTION_NAMES, approvedAt, chipFor, isDeferredNow } from './run';
+import { type ForecastLine, type MissForecast, forecastAt, forecastLine, rangeTxt } from './forecast';
+import { type Chip, type RunCtx, OPTION_NAMES, approvedAt, chipFor, isDeferredNow, orderedFeasible } from './run';
 import { BUCKET_COLOR, C, TONE, type Tone } from './theme';
 
 export interface EventHeader {
@@ -22,6 +23,8 @@ export interface EventHeader {
   tcaTxt: string;
   msgs: string;
   status: string;
+  /** Final-miss forecast for open events, when forecast.json is present. */
+  forecast: ForecastLine | null;
 }
 
 export interface RtnView {
@@ -30,6 +33,16 @@ export interface RtnView {
   n: string;
   /** Half-height of the symmetric axis, as a label: "2 km". */
   maxTxt: string;
+}
+
+/** Forecast fan on the miss chart, from the now line to closest approach. */
+export interface FanView {
+  cone: string;
+  median: string;
+  /** y of the 1 km line: the cone below it is tinted. */
+  clipY: string;
+  label: string;
+  tip: string[];
 }
 
 export interface HistoryView {
@@ -46,6 +59,7 @@ export interface HistoryView {
   trend: string;
   /** Relative position against time to TCA; null until replay.json carries r, t, n. */
   rtn: RtnView | null;
+  fan: FanView | null;
 }
 
 export interface Fact {
@@ -208,12 +222,12 @@ const QUEUE_NAME: Record<Bucket, string> = {
 
 export const TIER_TONE: Record<Tier, Tone> = { CRITICAL: TONE.decide, ELEVATED: TONE.watch, SAFE: TONE.passed };
 
-export function buildHistory(e: ReplayEvent, s: KnownState, T: number): HistoryView {
+export function buildHistory(e: ReplayEvent, s: KnownState, T: number, fc: MissForecast | null = null): HistoryView {
   const vis = e.m.slice(0, s.k + 1);
   const xp = (hb: number) => 40 + ((168 - clamp(hb, 0, 168)) / 168) * 276;
   const yPc = (r: number) => 6 + ((-2 - clamp(r, -14, -2)) / 12) * 80;
   const maxMiss = Math.max(...vis.map((v) => v[2]));
-  const yMax = clamp(Math.max(6000, maxMiss * 1.15), 6000, 40000);
+  const yMax = clamp(Math.max(6000, maxMiss * 1.15, fc ? fc.q90M * 1.05 : 0), 6000, 40000);
   const yMs = (v: number) => 70 - (Math.min(v, yMax) / yMax) * 62;
   const pcP = vis.map((v) => [xp(e.tca - v[0]), yPc(v[1]), v[1]] as const);
   const msP = vis.map((v) => [xp(e.tca - v[0]), yMs(v[2])] as const);
@@ -223,7 +237,21 @@ export function buildHistory(e: ReplayEvent, s: KnownState, T: number): HistoryV
     const d = lastTwo[1][1] - lastTwo[0][1];
     trend = (d > 0.3 ? 'Pc rising' : d < -0.3 ? 'Pc falling' : 'Pc steady') + ' · miss ' + (lastTwo[1][2] < lastTwo[0][2] ? 'shrinking' : 'growing');
   }
+  let fan: FanView | null = null;
+  if (fc) {
+    const x0 = xp(Math.max(0, e.tca - T));
+    const y0 = yMs(fc.missM);
+    const top = yMs(fc.q90M);
+    fan = {
+      cone: 'M' + x0.toFixed(1) + ',' + y0.toFixed(1) + 'L316,' + top.toFixed(1) + 'L316,' + yMs(fc.q10M).toFixed(1) + 'Z',
+      median: 'M' + x0.toFixed(1) + ',' + y0.toFixed(1) + 'L316,' + yMs(fc.q50M).toFixed(1),
+      clipY: yMs(1000).toFixed(1),
+      label: 'likely final ' + rangeTxt(fc.q10M, fc.q90M),
+      tip: forecastLine(fc).tip,
+    };
+  }
   return {
+    fan,
     rtn: buildRtn(e, s, xp),
     pcPts: pcP.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '),
     pcDots: pcP.filter((p) => p[2] < PC_ACTION).map((p) => dotPath(p[0], p[1], 2.2)).join(''),
@@ -258,7 +286,7 @@ export function buildRtn(e: ReplayEvent, s: KnownState, xp: (hoursBefore: number
   return { r: line(0), t: line(1), n: line(2), maxTxt: top >= 1000 ? top / 1000 + ' km' : top + ' m' };
 }
 
-function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | null, mission: Mission | undefined): EventHeader {
+function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | null, mission: Mission | undefined, fc: MissForecast | null): EventHeader {
   const resolved = s.phase === 'resolved';
   const appr = approvedAt(ctx, e.id);
   let status: string;
@@ -288,6 +316,7 @@ function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | nu
     tcaTxt: dh(e.tca - ctx.T),
     msgs: String(s.k + 1),
     status,
+    forecast: fc ? forecastLine(fc) : null,
   };
 }
 
@@ -513,14 +542,24 @@ function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: CoaOption): Mo
   };
 }
 
-/** The feasible option the operator picked, else the first feasible one. */
+/** The feasible option the operator picked, else the first in display order (robust first). */
 export function pickOption(plan: Plan | null, key: OptionKey): CoaOption | null {
   if (!plan) return null;
-  const feasible = plan.c.opts.filter((o) => o.feasible);
+  const feasible = orderedFeasible(plan.c.opts);
   return feasible.find((o) => o.key === key) ?? feasible[0] ?? null;
 }
 
-export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: OptionKey, facts: WorkspaceFacts, mission?: Mission): WorkspaceView {
+/** Same Δv and direction: the minimum-Δv burn already meets the robust target. */
+const sameBurn = (a: CoaOption, b: CoaOption) => a.dv === b.dv && a.alpha === b.alpha && a.beta === b.beta;
+
+function optionSub(o: CoaOption, all: CoaOption[], robustMissM: number | undefined): string {
+  if (o.key === 'coa4') return 'keeps ≥ 1 km at the pessimistic end' + (robustMissM != null ? ' (target ' + Math.round(robustMissM).toLocaleString('en-US') + ' m)' : '');
+  const robust = all.find((x) => x.key === 'coa4');
+  if (o.key === 'coa1' && robust && sameBurn(o, robust)) return dirShort(o.alpha) + ' · same burn: already robust';
+  return dirShort(o.alpha);
+}
+
+export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: OptionKey, facts: WorkspaceFacts, mission?: Mission, forecast?: Forecast | null): WorkspaceView {
   if (!e) return { kind: 'empty', text: 'Select an event from the queue, the timeline or the run digest.' };
   const st = stateAt(e, ctx.T, ctx.replay.runH);
   if (!isKnown(st)) return { kind: 'empty', text: 'Event #' + e.id + ' has not been reported yet. Its first message arrives in ' + dh(e.m[0][0] - ctx.T) + '.' };
@@ -529,17 +568,18 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
   const stored = approvedAt(ctx, e.id) != null ? ctx.dec.approvedPlan[e.id] : undefined;
   const plan = live && stored && e.coa[String(stored.key)] ? planAt(e, stored.key, ctx.T, ctx.budget) : live;
   const opt = pickOption(plan, stored ? stored.opt : optKey);
-  const header = buildHeader(ctx, e, st, plan, mission);
-  const hist = buildHistory(e, st, ctx.T);
+  const fc = forecastAt(forecast, e, st);
+  const header = buildHeader(ctx, e, st, plan, mission, fc);
+  const hist = buildHistory(e, st, ctx.T, fc);
   if (plan && opt) {
     const appr = approvedAt(ctx, e.id);
-    const optsAll = plan.c.opts.filter((o) => o.feasible);
+    const optsAll = orderedFeasible(plan.c.opts);
     const opts: OptionsView = {
       basis: 'planned at message ' + (plan.key + 1) + ', ' + Math.round(plan.age) + ' h ago',
       rows: optsAll.map((o) => ({
         key: o.key,
         name: OPTION_NAMES[o.key],
-        dir: dirShort(o.alpha),
+        dir: optionSub(o, optsAll, plan.c.robustMissM),
         dvTxt: o.dv.toFixed(1) + ' mm/s',
         pcAfter: sci(o.pcAfter),
         pcAfterTitle: odds(o.pcAfter) ?? undefined,

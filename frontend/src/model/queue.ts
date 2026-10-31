@@ -1,5 +1,7 @@
 // Queue panel: Decide, Watch and Passed tabs.
 
+import type { Forecast } from '../data/types';
+import { pctTxt, forecastAt } from './forecast';
 import { clamp, dh, mTxt, pcOdds, pcTxt } from './format';
 import { PC_ACTION } from './replay';
 import { type Chip, type KnownRow, type NeedRow, type RunCtx, type Snapshot, chipFor } from './run';
@@ -30,6 +32,8 @@ export interface QueueRow {
   col1Color: string;
   col2: string;
   on: boolean;
+  /** Native hover title for the row. */
+  title: string | undefined;
   /** Decide tab only: time left to the deadline on a 48 h scale. */
   urgency: { w: string; tone: Urgency } | null;
   changed: boolean;
@@ -46,14 +50,17 @@ export interface QueueView {
 /** Full length of the Decide tab's urgency bar, hours. */
 export const URGENCY_SCALE_H = 48;
 
-export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: number | null, changed: Set<number> = new Set()): QueueView {
+export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: number | null, changed: Set<number> = new Set(), forecast: Forecast | null = null): QueueView {
   const T = ctx.T;
   const tabs: QueueTabView[] = [
     { key: 'needs', label: 'Decide', count: snap.needs.length, on: tab === 'needs' },
     { key: 'watch', label: 'Watch', count: snap.watching.length, on: tab === 'watch' },
     { key: 'passed', label: 'Passed', count: snap.passed.length, on: tab === 'passed' },
   ];
-  const list: KnownRow[] = tab === 'needs' ? snap.needs : tab === 'watch' ? snap.watching : snap.passed;
+  // Watch ranks by forecast risk of ending Critical when forecast.json is present, else by Pc.
+  const pCrit = new Map(snap.watching.map((x) => [x.e.id, forecastAt(forecast, x.e, x.s)?.cell.pCritical ?? null]));
+  const byRisk = forecast ? [...snap.watching].sort((a, b) => (pCrit.get(b.e.id) ?? -1) - (pCrit.get(a.e.id) ?? -1) || b.s.last[1] - a.s.last[1]) : snap.watching;
+  const list: KnownRow[] = tab === 'needs' ? snap.needs : tab === 'watch' ? byRisk : snap.passed;
   const rows = list.map((x): QueueRow => {
     let col1 = '';
     let col1Color: string = C.ink;
@@ -77,8 +84,15 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
         col1Color = plan.left < 24 ? C.risk : C.ink;
       }
     } else if (tab === 'watch') {
-      col1 = mTxt(x.s.last[2]);
-      col2 = 'TCA ' + dh(x.e.tca - T);
+      const p = pCrit.get(x.e.id);
+      if (forecast && p != null) {
+        col1 = pctTxt(p);
+        col1Color = p >= 0.5 ? C.risk : p >= 0.1 ? C.hidden : C.slate;
+        col2 = mTxt(x.s.last[2]);
+      } else {
+        col1 = mTxt(x.s.last[2]);
+        col2 = 'TCA ' + dh(x.e.tca - T);
+      }
     } else {
       col1 = 'final ' + pcTxt(x.s.last[1]);
       col1Color = x.s.last[1] >= PC_ACTION ? C.overdue : C.slate;
@@ -97,6 +111,7 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
       col1Color,
       col2,
       on: sel === x.e.id,
+      title: tab === 'watch' && forecast ? 'Closest approach in ' + dh(x.e.tca - T) + '. Forecast chance of ending Critical, from the latest miss and time left.' : undefined,
       urgency,
       changed: changed.has(x.e.id),
     };
@@ -104,8 +119,8 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
   return {
     tabs,
     rows,
-    col: tab === 'needs' ? 'Decide within' : tab === 'watch' ? 'Miss' : 'Final Pc',
-    meta: tab === 'needs' ? 'soonest deadline first' : tab === 'watch' ? snap.quiet + ' quiet events hidden' : 'most recent first',
+    col: tab === 'needs' ? 'Decide within' : tab === 'watch' ? (forecast ? 'P(final Crit.)' : 'Miss') : 'Final Pc',
+    meta: tab === 'needs' ? 'soonest deadline first' : tab === 'watch' ? (forecast ? 'forecast risk first · ' : '') + snap.quiet + ' quiet hidden' : 'most recent first',
     empty: rows.length === 0,
   };
 }

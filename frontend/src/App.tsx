@@ -12,7 +12,7 @@ import { loadConsoleData } from './data/source';
 import type { ConsoleData, OptionKey } from './data/types';
 import type { QueueTab } from './model/queue';
 import { initialSelection } from './model/replay';
-import { type Decisions, NO_DECISIONS } from './model/run';
+import { DEFAULT_OPTION, type Decisions, NO_DECISIONS } from './model/run';
 import { type UiState, approve, buildView, defer } from './model/view';
 
 const PLAY_MS = 1200;
@@ -67,7 +67,7 @@ function reducer(s: State, a: Action): State {
     case 'tab':
       return { ...s, ui: { ...s.ui, tab: a.tab } };
     case 'pick':
-      return { ...s, modal: false, ui: { ...s.ui, sel: a.id, opt: 'coa1', tab: a.tab ?? s.ui.tab } };
+      return { ...s, modal: false, ui: { ...s.ui, sel: a.id, opt: DEFAULT_OPTION, tab: a.tab ?? s.ui.tab } };
     case 'opt':
       return { ...s, ui: { ...s.ui, opt: a.opt } };
     case 'modal':
@@ -81,7 +81,7 @@ function reducer(s: State, a: Action): State {
 }
 
 function initState(): State {
-  return { status: 'loading', data: null, playing: false, modal: false, flash: false, attempt: 0, ui: { run: 0, tab: 'needs', sel: null, opt: 'coa1', budget: readBudget(), dec: NO_DECISIONS } };
+  return { status: 'loading', data: null, playing: false, modal: false, flash: false, attempt: 0, ui: { run: 0, tab: 'needs', sel: null, opt: DEFAULT_OPTION, budget: readBudget(), dec: NO_DECISIONS } };
 }
 
 /** Brings the workspace into view when a selection is made from further down the page. */

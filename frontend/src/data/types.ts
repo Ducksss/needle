@@ -30,7 +30,7 @@ export type Rtn = [r: number, t: number, n: number];
 /** One CDM: [arrival hours from replay start, log10 Pc (floor -30), miss distance m]. */
 export type Cdm = [arrivalH: number, risk: number, missM: number];
 
-export type OptionKey = 'coa1' | 'coa2' | 'coa3';
+export type OptionKey = 'coa1' | 'coa2' | 'coa3' | 'coa4';
 
 export interface CoaOption {
   key: OptionKey;
@@ -61,6 +61,8 @@ export interface Coa {
   ell: { a: number; b: number; deg: number };
   hbrEff: number;
   pcModelOk: boolean;
+  /** Nominal post-burn miss that keeps the forecast 10th percentile at or above 1 km (coa4's target), m. */
+  robustMissM?: number;
   wait: [hoursAfterCdm: number, dvMmS: number | null][];
   opts: CoaOption[];
 }
@@ -93,8 +95,33 @@ export interface Metrics {
   replay?: { events?: number; escalated?: number; coaMessages?: number; pcModelWithin01?: number; medianWaitRatio24h?: number };
 }
 
+export interface ForecastCell {
+  n: number;
+  ratioQ10: number;
+  ratioQ50: number;
+  ratioQ90: number;
+  pUnder1km: number;
+  pCritical: number;
+  pooled: boolean;
+}
+
+/** contracts/README.md § forecast.json: how far the miss can still move before closest approach. */
+export interface Forecast {
+  /** Lead-time bin edges, days; null is open-ended. */
+  leadEdgesDays: (number | null)[];
+  /** Current-miss bin edges, m; null is open-ended. */
+  missEdgesM: (number | null)[];
+  quantiles: number[];
+  /** cells[leadBin][missBin]. */
+  cells: ForecastCell[][];
+  robustRatioQ10: number[];
+  validation: { heldOutEvents: number; coverage10to90: number; coverageByLeadBin?: Record<string, number> };
+}
+
 export interface ConsoleData {
   fleet: Fleet;
   replay: Replay;
   metrics: Metrics | null;
+  /** Optional: the console shows no forecast without it. */
+  forecast?: Forecast | null;
 }

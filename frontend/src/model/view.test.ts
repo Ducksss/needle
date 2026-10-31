@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { realData } from '../test/fixtures';
 import { replayFacts } from './facts';
 import { initialSelection } from './replay';
-import { NO_DECISIONS } from './run';
+import { DEFAULT_OPTION, NO_DECISIONS } from './run';
 import { type UiState, approve, buildView, defer } from './view';
 
 const data = realData();
 const start = initialSelection(data.replay.events, data.replay.runH, data.replay.runs);
-const ui0: UiState = { run: start.run, tab: 'needs', sel: start.sel, opt: 'coa1', budget: 10, dec: NO_DECISIONS };
+const ui0: UiState = { run: start.run, tab: 'needs', sel: start.sel, opt: DEFAULT_OPTION, budget: 10, dec: NO_DECISIONS };
 
 describe('buildView', () => {
   it('opens on a Decide event with a burn plan', () => {
@@ -57,7 +57,7 @@ describe('buildView', () => {
     const ui1 = { ...ui0, dec: deferred };
     const approved = approve(ui1, buildView(data, ui1));
     expect(approved.approved[ui0.sel!]).toBe(ui0.run + 1);
-    expect(approved.log[1].text).toMatch(/^Approved #\d+: recommended, \d+\.\d mm\/s/);
+    expect(approved.log[1].text).toMatch(/^Approved #\d+: recommended \(robust\), \d+\.\d mm\/s/);
     const after = buildView(data, { ...ui1, dec: approved });
     expect(after.ws.kind === 'event' && after.ws.header.chip.label).toBe('APPROVED');
     expect(after.kpis.find((k) => k.label === 'Approved')?.v).toBe('1');

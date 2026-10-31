@@ -182,4 +182,13 @@ export function changedSincePrev(ctx: RunCtx, snap: Snapshot): Set<number> {
   return out;
 }
 
-export const OPTION_NAMES: Record<OptionKey, string> = { coa1: 'Recommended', coa2: 'More margin', coa3: 'Wait 24 h' };
+export const OPTION_NAMES: Record<OptionKey, string> = { coa4: 'Recommended (robust)', coa1: 'Minimum Δv', coa2: 'More margin', coa3: 'Wait 24 h' };
+
+/** Display and default order: the robust option first when the planner produced one. */
+export const OPTION_ORDER: OptionKey[] = ['coa4', 'coa1', 'coa2', 'coa3'];
+export const DEFAULT_OPTION: OptionKey = 'coa4';
+
+/** Feasible options in display order. */
+export function orderedFeasible<T extends { key: OptionKey; feasible: boolean }>(opts: T[]): T[] {
+  return opts.filter((o) => o.feasible).sort((a, b) => OPTION_ORDER.indexOf(a.key) - OPTION_ORDER.indexOf(b.key));
+}

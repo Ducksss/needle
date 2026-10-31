@@ -1,11 +1,20 @@
 // Test helpers: the committed static data, and small synthetic events.
 
 import fleetRaw from '../../public/data/fleet.json?raw';
+import forecastRaw from '../../public/data/forecast.json?raw';
 import replayRaw from '../../public/data/replay.json?raw';
-import type { Cdm, Coa, ConsoleData, Fleet, Replay, ReplayEvent } from '../data/types';
+import type { Cdm, Coa, ConsoleData, Fleet, Forecast, ForecastCell, Replay, ReplayEvent } from '../data/types';
 
 export const realReplay = (): Replay => JSON.parse(replayRaw) as Replay;
-export const realData = (): ConsoleData => ({ fleet: JSON.parse(fleetRaw) as Fleet, replay: realReplay(), metrics: null });
+export const realForecast = (): Forecast => JSON.parse(forecastRaw) as Forecast;
+export const realData = (): ConsoleData => ({ fleet: JSON.parse(fleetRaw) as Fleet, replay: realReplay(), metrics: null, forecast: realForecast() });
+
+const cell = (over: Partial<ForecastCell> = {}): ForecastCell => ({ n: 100, ratioQ10: 0.6, ratioQ50: 1, ratioQ90: 1.8, pUnder1km: 0.15, pCritical: 0.15, pooled: false, ...over });
+
+/** Two lead bins (under and over 2 days) by two miss bins (under and over 2 km). */
+export function forecastOf(cells: ForecastCell[][] = [[cell({ pCritical: 0.9 }), cell()], [cell({ pCritical: 0.5 }), cell({ pCritical: 0.02 })]]): Forecast {
+  return { leadEdgesDays: [0, 2, null], missEdgesM: [0, 2000, null], quantiles: [0.1, 0.5, 0.9], cells, robustRatioQ10: [0.9, 0.6], validation: { heldOutEvents: 2529, coverage10to90: 0.799 } };
+}
 
 export function coa(over: Partial<Coa> = {}): Coa {
   return {

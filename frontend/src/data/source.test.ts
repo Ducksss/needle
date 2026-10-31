@@ -3,7 +3,7 @@ import { dataUrls, loadConsoleData } from './source';
 
 describe('dataUrls', () => {
   it('reads the static copies when no API is set', () => {
-    expect(dataUrls(undefined, '/')).toEqual({ mode: 'static', fleet: '/data/fleet.json', replay: '/data/replay.json', metrics: '/data/metrics.json' });
+    expect(dataUrls(undefined, '/')).toEqual({ mode: 'static', fleet: '/data/fleet.json', replay: '/data/replay.json', metrics: '/data/metrics.json', forecast: '/data/forecast.json' });
     expect(dataUrls('  ', '/needle').replay).toBe('/needle/data/replay.json');
   });
 
@@ -13,6 +13,7 @@ describe('dataUrls', () => {
       fleet: 'http://localhost:8000/api/fleet',
       replay: 'http://localhost:8000/api/replay',
       metrics: 'http://localhost:8000/api/metrics',
+      forecast: '/data/forecast.json',
     });
   });
 });

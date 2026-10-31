@@ -1,8 +1,11 @@
+import { useId } from 'react';
 import type { CostOfWaitingView, EncounterPlaneView, HistoryView } from '../model/workspace';
+import { TipCard } from './Hover';
 
 const MONO = 'IBM Plex Mono, monospace';
 
 export function MessageHistory({ h }: { h: HistoryView }) {
+  const fanTip = useId();
   return (
     <figure className="ws-cell b-bottom b-right">
       <figcaption>
@@ -28,8 +31,22 @@ export function MessageHistory({ h }: { h: HistoryView }) {
         <path d={h.pcDots} fill="#0F172A" />
         <path d={h.pcHot} fill="#C2410C" />
       </svg>
+      <span className="chart-note">Pc is not forecast: it swings by orders of magnitude.</span>
       <span className="caps">Miss distance</span>
-      <svg viewBox="0 0 320 84" className="chart" role="img" aria-label="Miss distance for each message received so far">
+      <div className="fan-wrap">
+      <svg viewBox="0 0 320 84" className="chart" role="img" aria-label={'Miss distance for each message received so far' + (h.fan ? ', with the forecast band to closest approach: ' + h.fan.label : '')}>
+        {h.fan && (
+          <>
+            <defs>
+              <clipPath id={fanTip + '-below'}>
+                <rect x="0" y={h.fan.clipY} width="320" height="84" />
+              </clipPath>
+            </defs>
+            <path d={h.fan.cone} fill="#64748B" fillOpacity="0.14" stroke="#94A3B8" strokeOpacity="0.6" strokeWidth="0.8" />
+            <path d={h.fan.cone} fill="#C2410C" fillOpacity="0.22" clipPath={`url(#${fanTip}-below)`} />
+            <path d={h.fan.median} fill="none" stroke="#334155" strokeWidth="1.4" strokeDasharray="4 3" />
+          </>
+        )}
         <line x1="40" x2="316" y1={h.y5} y2={h.y5} stroke="#B45309" strokeDasharray="3 3" />
         <line x1="40" x2="316" y1={h.y1} y2={h.y1} stroke="#C2410C" strokeDasharray="3 3" />
         <line x1="40" x2="316" y1="70" y2="70" stroke="#E3E8EE" />
@@ -49,6 +66,16 @@ export function MessageHistory({ h }: { h: HistoryView }) {
         <polyline points={h.missPts} fill="none" stroke="#0F172A" strokeWidth="1.6" strokeLinejoin="round" />
         <path d={h.missDots} fill="#0F172A" />
       </svg>
+      </div>
+      {h.fan && (
+        <div className="fan-row">
+          <span className="fan-key" aria-hidden="true" />
+          <span className="tw help fan-label" tabIndex={0} aria-describedby={fanTip}>
+            <span className="dotted">{h.fan.label}</span>
+            <TipCard id={fanTip} title="Forecast at closest approach" lines={h.fan.tip} side={{ edge: 'right', px: 0 }} />
+          </span>
+        </div>
+      )}
       <div className="rtn-head">
         <span className="caps">Relative position (r, t, n)</span>
         <span className="rtn-key" aria-hidden="true">
