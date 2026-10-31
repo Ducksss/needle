@@ -103,6 +103,8 @@ About 9 in 10 events that end Critical are already flagged 2 days out. All 18 ev
 
 The physics Pc model (encounter plane, full covariance, object sizes) reproduces ESA's own Pc within 0.02 orders of magnitude for 20 of the 23 Pc-confirmed test events.
 
+**Judges:** everything needed to score our predictions with your own scripts (test data, predictions, held-out labels, a reference scorer) is in [`submission/`](submission/README.md).
+
 Files: [`artifacts/test_event_predictions.csv`](artifacts/test_event_predictions.csv) (one row per test event, with probabilities) and [`artifacts/event_metrics.json`](artifacts/event_metrics.json). The earlier per-message scores on test rows are kept in the methodology's appendix; they are not the task's score.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -132,6 +134,8 @@ The repo has three segments that meet only through [`contracts/README.md`](contr
 | [`contracts/`](contracts/README.md) | Data shapes and API endpoints every segment codes against |
 | [`artifacts/`](artifacts/) | Built JSON and CSV outputs |
 | [`docs/brand/`](docs/brand/README.md) | Logo, lockups, cover and brand guide |
+| [`docs/pitch/`](docs/pitch/demo-script.md) | Spoken demo walkthrough for judges, with likely questions |
+| [`submission/`](submission/README.md) | Test data, our predictions, held-out labels and a scorer for judges |
 
 ### Prerequisites
 
