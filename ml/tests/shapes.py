@@ -5,7 +5,7 @@ MISSION_KEYS = {"mid", "label", "alt", "inc", "evTrain", "evTest", "pc", "hidden
 PC_EVENT_KEYS = {"id", "sat", "obj", "risk", "miss", "tca", "speed", "r", "t", "n", "sr", "st", "sn"}
 
 REPLAY_KEYS = {"runs", "runH", "windowH", "note", "events"}
-REPLAY_EVENT_KEYS = {"id", "sat", "mi", "obj", "inc", "tca", "m", "coa"}
+REPLAY_EVENT_KEYS = {"id", "sat", "mi", "obj", "inc", "tca", "m", "rtn", "coa"}
 COA_KEYS = {"risk", "miss", "tca", "relSpeed", "crossDeg", "altKm", "m2", "ell", "hbrEff", "pcModelOk", "wait", "opts"}
 ELL_KEYS = {"a", "b", "deg"}
 OPT_KEYS = {"key", "feasible", "dv", "alpha", "beta", "leadH", "pcAfter", "missAfter",

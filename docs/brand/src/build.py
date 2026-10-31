@@ -138,7 +138,7 @@ border-radius:8px;background:rgba(11,18,32,0.88);font:400 12.5px/1 'IBM Plex Mon
 <div class="call"><b>#891</b> · ESA-02 vs debris<br>Pc 1.3e-3 (1 in 780) · miss 503 m<br>burn 7.0 mm/s retrograde</div>
 <div class="stats">
 <div class="stat"><b>186 → 23</b><span>Critical alerts that are Pc-confirmed (ESA test set)</span></div>
-<div class="stat"><b>0.992</b><span>Critical recall on 24,484 scored rows</span></div>
+<div class="stat"><b>150 / 167</b><span>events that end Critical, flagged 2 days ahead</span></div>
 <div class="stat"><b>1.25×</b><span>median Δv cost of waiting 24 h to burn</span></div>
 </div>
 <div class="foot"><span>AUTONOMOUS SG 2026 · AIRBUS CHALLENGE #1</span><span>{len(dots):,} ESA TEST EVENTS · LATEST MESSAGE</span></div>
