@@ -1,0 +1,40 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { dataUrls, loadConsoleData } from './source';
+
+describe('dataUrls', () => {
+  it('reads the static copies when no API is set', () => {
+    expect(dataUrls(undefined, '/')).toEqual({ mode: 'static', fleet: '/data/fleet.json', replay: '/data/replay.json', metrics: '/data/metrics.json' });
+    expect(dataUrls('  ', '/needle').replay).toBe('/needle/data/replay.json');
+  });
+
+  it('reads the API when VITE_API_URL is set', () => {
+    expect(dataUrls('http://localhost:8000/', '/')).toEqual({
+      mode: 'api',
+      fleet: 'http://localhost:8000/api/fleet',
+      replay: 'http://localhost:8000/api/replay',
+      metrics: 'http://localhost:8000/api/metrics',
+    });
+  });
+});
+
+describe('loadConsoleData', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const respond = (missing: string[]) =>
+    vi.fn(async (url: string) => {
+      if (missing.some((m) => url.endsWith(m))) return new Response('not found', { status: 404 });
+      return new Response(JSON.stringify({ url }), { status: 200 });
+    });
+
+  it('treats a missing metrics.json as optional', async () => {
+    vi.stubGlobal('fetch', respond(['metrics.json']));
+    const data = await loadConsoleData(dataUrls(undefined, '/'));
+    expect(data.metrics).toBeNull();
+    expect(data.replay).toEqual({ url: '/data/replay.json' });
+  });
+
+  it('fails when the replay cannot be read', async () => {
+    vi.stubGlobal('fetch', respond(['replay.json']));
+    await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/replay.json: HTTP 404');
+  });
+});

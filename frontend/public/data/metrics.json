@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-10-31T14:40:00+08:00",
+  "source": "ml/legacy/predict.py and ml/legacy/replay.py runs on 2026-10-31; the ML segment regenerates this file",
+  "test": {
+    "rows": 24484,
+    "tiers": ["Safe", "Elevated", "Critical"],
+    "methods": [
+      { "name": "Miss-distance rule only", "accuracy": 0.9544, "macroF1": 0.9518, "criticalRecall": 0.9591, "criticalPrecision": 1.0 },
+      { "name": "max_risk_estimate band + miss", "accuracy": 0.8081, "macroF1": 0.8415, "criticalRecall": 1.0, "criticalPrecision": 0.9279 },
+      { "name": "Regression Pc + miss", "accuracy": 0.9636, "macroF1": 0.9564, "criticalRecall": 0.982, "criticalPrecision": 0.9451 },
+      { "name": "Needle classifier + miss", "accuracy": 0.9712, "macroF1": 0.972, "criticalRecall": 0.9928, "criticalPrecision": 0.9875,
+        "confusion": [[15241, 514, 1], [148, 6326, 27], [0, 16, 2211]] }
+    ]
+  },
+  "physics": { "pcEvents": 23, "within002": 20 },
+  "replay": { "events": 280, "escalated": 24, "coaMessages": 119, "pcModelWithin01": 106, "medianWaitRatio24h": 1.25 }
+}
