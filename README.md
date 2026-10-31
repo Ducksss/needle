@@ -8,7 +8,7 @@ shields state facts that hold while the repo is private.
 [![Autonomous SG 2026][event-shield]][event-url]
 [![Airbus Challenge #1][challenge-shield]][challenge-url]
 [![ESA Kelvins CDM data][data-shield]][data-url]
-[![Critical recall 0.993][recall-shield]][results-url]
+[![Critical recall 0.992][recall-shield]][results-url]
 
 <!-- PROJECT LOGO -->
 <br />
@@ -91,15 +91,15 @@ What it adds over a distance alarm:
 
 ### Results
 
-Per-row tier predictions for `test_data` (24,484 rows). The model uses only the 13 columns the brief allows. Thresholds were chosen by event-grouped cross-validation on train; test labels were used once, for scoring. An independent re-run reproduced every number and a byte-identical predictions file.
+Per-row tier predictions for `test_data` (24,484 rows). The model uses only the 13 columns the brief allows. Its two decision thresholds were chosen on train only, by event-grouped 5-fold cross-validation over a 0.30 to 0.95 grid; test labels were used once, for scoring. Every number below was recomputed independently from the predictions file and the test labels.
 
 | Method | Row accuracy | Macro F1 | Critical recall | Critical precision |
 |---|---|---|---|---|
 | Miss-distance rule only | 0.954 | 0.952 | 0.959 | 1.000 |
 | `max_risk_estimate` band + miss | 0.808 | 0.842 | 1.000 | 0.928 |
-| **Needle classifier + miss** | **0.971** | **0.972** | **0.993** | **0.988** |
+| **Needle classifier + miss** | **0.975** | **0.976** | **0.992** | **0.990** |
 
-The gain comes from the 1,116 rows (4.6%) whose tier is set by Pc rather than miss distance. The model gets 85% of those right; the miss rule gets none. The cost is 514 Safe rows raised to Elevated.
+The gain comes from the 1,116 rows (4.6%) whose tier is set by Pc rather than miss distance. The model gets 73% of those right; the miss rule gets none. Total errors fall from 1,116 to 602, at the cost of 276 Safe rows raised to Elevated. `needle-ml build --grid legacy` reproduces the earlier thresholds (accuracy 0.971, Critical recall 0.993, 514 Safe rows raised).
 
 The physics Pc model (encounter plane, full covariance, object sizes) reproduces ESA's own Pc within 0.02 orders of magnitude for 20 of the 23 Pc-confirmed test events. It uses more columns than the brief's simplified list, so the scored predictions do not depend on it.
 
@@ -153,13 +153,13 @@ The repo has three segments that meet only through [`contracts/README.md`](contr
    ```sh
    export NEEDLE_DATA_DIR=/path/to/esa-csvs
    ```
-3. Rebuild the artifacts (optional; built copies are committed)
+3. Rebuild the artifacts (optional; built copies are committed; about 90 s)
    ```sh
-   cd ml && uv run needle-ml build --data "$NEEDLE_DATA_DIR" --out ../artifacts
+   cd ml && uv run needle-ml build
    ```
-4. Start the API
+4. Start the API. Installing `ml/` into it enables the on-demand Pc and burn endpoints.
    ```sh
-   cd api && uv run uvicorn needle_api.main:app --reload --port 8000
+   cd api && uv pip install -e ../ml && uv run uvicorn needle_api.main:app --reload --port 8000
    ```
 5. Start the console
    ```sh
@@ -202,8 +202,8 @@ curl http://localhost:8000/api/metrics
 - [x] Scored per-row tier predictions, independently verified
 - [x] Replay console design (A3+) with hover explanations
 - [x] Repo scaffold, data contract and brand
-- [ ] API service ([#1](https://github.com/Ducksss/needle/pull/1) in review)
-- [ ] `needle_ml` package with one-command artifact build
+- [x] `needle_ml` package with one-command artifact build ([#2](https://github.com/Ducksss/needle/pull/2))
+- [x] API service ([#1](https://github.com/Ducksss/needle/pull/1))
 - [ ] React console with the Next 24 h warnings view
 - [ ] Hosted demo
 - [ ] Pc dilution check with a "request tracking" action
@@ -263,7 +263,7 @@ Project Link: [https://github.com/Ducksss/needle](https://github.com/Ducksss/nee
 [challenge-url]: https://github.com/Ducksss/needle#about-the-project
 [data-shield]: https://img.shields.io/badge/data-ESA_Kelvins_CDM-475569?style=for-the-badge
 [data-url]: https://kelvins.esa.int/collision-avoidance-challenge/
-[recall-shield]: https://img.shields.io/badge/Critical_recall-0.993-F97316?style=for-the-badge
+[recall-shield]: https://img.shields.io/badge/Critical_recall-0.992-F97316?style=for-the-badge
 [results-url]: #results
 [product-cover]: docs/brand/needle-cover.png
 [product-screenshot]: docs/images/console-a3plus.png
