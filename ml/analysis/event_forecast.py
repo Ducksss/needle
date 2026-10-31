@@ -24,6 +24,7 @@ from needle_ml import data
 from needle_ml.tiers import TIERS, miss_band, pc_band, tier_code
 
 ARTIFACTS = Path(__file__).resolve().parents[2] / "artifacts"
+SUBMISSION = Path(__file__).resolve().parents[2] / "submission"
 LABELS_FILE = "challenge1_event_labels.xlsx"
 COLS = ["event_id", "time_to_tca", "risk", "max_risk_estimate", "miss_distance", "relative_speed",
         "relative_position_r", "relative_position_t", "relative_position_n", "c_object_type",
@@ -142,6 +143,22 @@ def main(write=False):
                             "p_safe": pt[:, 0].round(4), "p_elevated": pt[:, 1].round(4), "p_critical": pt[:, 2].round(4),
                             "model_tier": TIERS[dt], "pred_final_tier": TIERS[shipped]})
         out.to_csv(ARTIFACTS / "test_event_predictions.csv", index=False)
+
+        # judge files: the same test predictions, a per-row view, and the held-out events with their labels
+        SUBMISSION.mkdir(exist_ok=True)
+        out.to_csv(SUBMISSION / "test_event_predictions.csv", index=False)
+        rows = te[["event_id", "time_to_tca"]].reset_index(drop=True)
+        rows.insert(0, "row", np.arange(len(rows)))
+        rows = rows.merge(out[["event_id", "pred_final_tier", "p_safe", "p_elevated", "p_critical"]], on="event_id",
+                          how="left", validate="many_to_one")
+        rows.to_csv(SUBMISSION / "test_row_predictions.csv", index=False)
+        shipped_b = np.where((ypb == 2) | (persist == 2), 2, ypb)
+        heldout = pd.DataFrame({"event_id": xb.index, "final_tier": TIERS[yb], "final_message_under_2_days": final_late[b],
+                                "persistence_tier": TIERS[persist], "model_tier": TIERS[ypb],
+                                "pred_final_tier": TIERS[shipped_b], "p_safe": pb[:, 0].round(4),
+                                "p_elevated": pb[:, 1].round(4), "p_critical": pb[:, 2].round(4)})
+        heldout.sort_values("event_id").to_csv(SUBMISSION / "heldout_event_predictions.csv", index=False)
+        print(f"wrote submission/: {len(out):,} test events, {len(rows):,} test rows, {len(heldout):,} held-out train events")
         sgt = timezone(timedelta(hours=8))
         meta = {"generatedAt": datetime.now(sgt).isoformat(timespec="seconds"),
                 "task": "predict each event's final tier from messages with time_to_tca >= 2 days",
