@@ -1,0 +1,495 @@
+{
+  "generatedAt": "2026-10-31T16:58:31+08:00",
+  "source": "needle-ml build (ml/src/needle_ml)",
+  "test": {
+    "rows": 24484,
+    "tiers": [
+      "Safe",
+      "Elevated",
+      "Critical"
+    ],
+    "methods": [
+      {
+        "name": "Miss-distance rule only",
+        "accuracy": 0.9544,
+        "macroF1": 0.9518,
+        "criticalRecall": 0.9591,
+        "criticalPrecision": 1.0,
+        "confusion": [
+          [
+            15756,
+            0,
+            0
+          ],
+          [
+            1025,
+            5476,
+            0
+          ],
+          [
+            8,
+            83,
+            2136
+          ]
+        ]
+      },
+      {
+        "name": "max_risk_estimate band + miss",
+        "accuracy": 0.8081,
+        "macroF1": 0.8415,
+        "criticalRecall": 1.0,
+        "criticalPrecision": 0.9279,
+        "confusion": [
+          [
+            11222,
+            4526,
+            8
+          ],
+          [
+            0,
+            6336,
+            165
+          ],
+          [
+            0,
+            0,
+            2227
+          ]
+        ]
+      },
+      {
+        "name": "Regression Pc + miss",
+        "accuracy": 0.9636,
+        "macroF1": 0.9564,
+        "criticalRecall": 0.982,
+        "criticalPrecision": 0.9451,
+        "confusion": [
+          [
+            15640,
+            110,
+            6
+          ],
+          [
+            615,
+            5765,
+            121
+          ],
+          [
+            1,
+            39,
+            2187
+          ]
+        ]
+      },
+      {
+        "name": "Needle classifier + miss (legacy grid, t1=0.8 t2=0.7)",
+        "accuracy": 0.9712,
+        "macroF1": 0.972,
+        "criticalRecall": 0.9928,
+        "criticalPrecision": 0.9875,
+        "confusion": [
+          [
+            15241,
+            514,
+            1
+          ],
+          [
+            148,
+            6326,
+            27
+          ],
+          [
+            0,
+            16,
+            2211
+          ]
+        ]
+      },
+      {
+        "name": "Needle classifier + miss",
+        "accuracy": 0.9754,
+        "macroF1": 0.9756,
+        "criticalRecall": 0.9924,
+        "criticalPrecision": 0.9897,
+        "confusion": [
+          [
+            15479,
+            276,
+            1
+          ],
+          [
+            286,
+            6193,
+            22
+          ],
+          [
+            0,
+            17,
+            2210
+          ]
+        ]
+      }
+    ],
+    "thresholds": {
+      "selectedBy": "macro F1 on event-grouped 5-fold out-of-fold predictions, train only",
+      "grid": "wide",
+      "t1": 0.9,
+      "t2": 0.75,
+      "grids": {
+        "legacy": {
+          "grid": [
+            0.3,
+            0.4,
+            0.5,
+            0.6,
+            0.7,
+            0.8
+          ],
+          "t1": 0.8,
+          "t2": 0.7,
+          "oof": {
+            "accuracy": 0.9811,
+            "macroF1": 0.9787,
+            "criticalRecall": 0.9946,
+            "criticalPrecision": 0.9885,
+            "confusion": [
+              [
+                113822,
+                1989,
+                1
+              ],
+              [
+                883,
+                34176,
+                133
+              ],
+              [
+                0,
+                63,
+                11567
+              ]
+            ]
+          }
+        },
+        "wide": {
+          "grid": [
+            0.3,
+            0.35,
+            0.4,
+            0.45,
+            0.5,
+            0.55,
+            0.6,
+            0.65,
+            0.7,
+            0.75,
+            0.8,
+            0.85,
+            0.9,
+            0.95
+          ],
+          "t1": 0.9,
+          "t2": 0.75,
+          "oof": {
+            "accuracy": 0.9832,
+            "macroF1": 0.9806,
+            "criticalRecall": 0.9937,
+            "criticalPrecision": 0.9896,
+            "confusion": [
+              [
+                114741,
+                1070,
+                1
+              ],
+              [
+                1469,
+                33603,
+                120
+              ],
+              [
+                0,
+                73,
+                11557
+              ]
+            ]
+          }
+        }
+      }
+    },
+    "trainOutOfFold": [
+      {
+        "name": "Miss-distance rule only",
+        "accuracy": 0.9732,
+        "macroF1": 0.9678,
+        "criticalRecall": 0.9721,
+        "criticalPrecision": 1.0,
+        "confusion": [
+          [
+            115812,
+            0,
+            0
+          ],
+          [
+            4041,
+            31151,
+            0
+          ],
+          [
+            29,
+            296,
+            11305
+          ]
+        ]
+      },
+      {
+        "name": "max_risk_estimate band + miss",
+        "accuracy": 0.8222,
+        "macroF1": 0.8429,
+        "criticalRecall": 1.0,
+        "criticalPrecision": 0.9282,
+        "confusion": [
+          [
+            87793,
+            28012,
+            7
+          ],
+          [
+            0,
+            34299,
+            893
+          ],
+          [
+            0,
+            0,
+            11630
+          ]
+        ]
+      },
+      {
+        "name": "Regression Pc + miss",
+        "accuracy": 0.9763,
+        "macroF1": 0.9665,
+        "criticalRecall": 0.9856,
+        "criticalPrecision": 0.9529,
+        "confusion": [
+          [
+            115277,
+            481,
+            54
+          ],
+          [
+            2645,
+            32035,
+            512
+          ],
+          [
+            13,
+            154,
+            11463
+          ]
+        ]
+      }
+    ]
+  },
+  "physics": {
+    "pcEvents": 23,
+    "within002": 20,
+    "within01": 20,
+    "medianAbsErr": 0.003,
+    "model": "encounter plane, full CDM covariances, hard-body radius = mean object span",
+    "events": [
+      {
+        "id": 891,
+        "risk": -2.892,
+        "model": -2.896,
+        "err": -0.004,
+        "hbrSpan": 11.5,
+        "hbrEff": 11.55
+      },
+      {
+        "id": 1568,
+        "risk": -2.988,
+        "model": -3.83,
+        "err": -0.842,
+        "hbrSpan": 3.1,
+        "hbrEff": 8.07
+      },
+      {
+        "id": 1448,
+        "risk": -3.041,
+        "model": -3.041,
+        "err": 0.001,
+        "hbrSpan": 7.0,
+        "hbrEff": 7.0
+      },
+      {
+        "id": 2059,
+        "risk": -3.104,
+        "model": -3.107,
+        "err": -0.003,
+        "hbrSpan": 3.7,
+        "hbrEff": 3.72
+      },
+      {
+        "id": 2091,
+        "risk": -3.141,
+        "model": -3.141,
+        "err": 0.001,
+        "hbrSpan": 7.0,
+        "hbrEff": 6.99
+      },
+      {
+        "id": 1259,
+        "risk": -3.156,
+        "model": -3.978,
+        "err": -0.822,
+        "hbrSpan": 3.1,
+        "hbrEff": 7.89
+      },
+      {
+        "id": 1984,
+        "risk": -3.212,
+        "model": -3.202,
+        "err": 0.01,
+        "hbrSpan": 13.3,
+        "hbrEff": 13.14
+      },
+      {
+        "id": 1792,
+        "risk": -3.383,
+        "model": -3.395,
+        "err": -0.011,
+        "hbrSpan": 11.5,
+        "hbrEff": 11.65
+      },
+      {
+        "id": 868,
+        "risk": -3.512,
+        "model": -3.531,
+        "err": -0.019,
+        "hbrSpan": 11.5,
+        "hbrEff": 11.76
+      },
+      {
+        "id": 2117,
+        "risk": -3.52,
+        "model": -3.523,
+        "err": -0.003,
+        "hbrSpan": 3.5,
+        "hbrEff": 3.56
+      },
+      {
+        "id": 1832,
+        "risk": -3.562,
+        "model": -5.806,
+        "err": -2.245,
+        "hbrSpan": 1.3,
+        "hbrEff": 17.43
+      },
+      {
+        "id": 1140,
+        "risk": -3.566,
+        "model": -3.572,
+        "err": -0.006,
+        "hbrSpan": 11.5,
+        "hbrEff": 11.58
+      },
+      {
+        "id": 560,
+        "risk": -3.728,
+        "model": -3.725,
+        "err": 0.002,
+        "hbrSpan": 11.5,
+        "hbrEff": 11.47
+      },
+      {
+        "id": 512,
+        "risk": -3.835,
+        "model": -3.835,
+        "err": 0.0,
+        "hbrSpan": 1.5,
+        "hbrEff": 1.5
+      },
+      {
+        "id": 1833,
+        "risk": -3.855,
+        "model": -3.857,
+        "err": -0.002,
+        "hbrSpan": 1.4,
+        "hbrEff": 1.4
+      },
+      {
+        "id": 1166,
+        "risk": -3.857,
+        "model": -3.856,
+        "err": 0.001,
+        "hbrSpan": 7.0,
+        "hbrEff": 6.99
+      },
+      {
+        "id": 1084,
+        "risk": -3.862,
+        "model": -3.862,
+        "err": 0.0,
+        "hbrSpan": 3.7,
+        "hbrEff": 3.71
+      },
+      {
+        "id": 645,
+        "risk": -3.904,
+        "model": -3.905,
+        "err": -0.001,
+        "hbrSpan": 7.0,
+        "hbrEff": 7.01
+      },
+      {
+        "id": 1719,
+        "risk": -3.905,
+        "model": -3.92,
+        "err": -0.016,
+        "hbrSpan": 5.5,
+        "hbrEff": 5.65
+      },
+      {
+        "id": 207,
+        "risk": -3.924,
+        "model": -3.922,
+        "err": 0.002,
+        "hbrSpan": 14.9,
+        "hbrEff": 14.82
+      },
+      {
+        "id": 107,
+        "risk": -3.94,
+        "model": -3.937,
+        "err": 0.002,
+        "hbrSpan": 14.9,
+        "hbrEff": 14.82
+      },
+      {
+        "id": 1855,
+        "risk": -3.968,
+        "model": -3.97,
+        "err": -0.002,
+        "hbrSpan": 7.0,
+        "hbrEff": 7.01
+      },
+      {
+        "id": 989,
+        "risk": -3.985,
+        "model": -4.006,
+        "err": -0.021,
+        "hbrSpan": 7.0,
+        "hbrEff": 7.17
+      }
+    ]
+  },
+  "replay": {
+    "events": 280,
+    "escalated": 23,
+    "coaMessages": 119,
+    "pcModelWithin01": 106,
+    "medianWaitRatio24h": 1.25,
+    "waitRatioPairs": 107
+  }
+}
