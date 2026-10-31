@@ -62,7 +62,7 @@ describe('M2: a planned burn time that has passed', () => {
     expect(burnPassed(e, plan, planner.opt)).toBe(false);
     const stale = planner.opts.rows.filter((r) => r.passed);
     expect(stale.length).toBeGreaterThan(0);
-    expect(stale.every((r) => r.dir.endsWith('burn time passed'))).toBe(true);
+    expect(stale.every((r) => r.dir.endsWith('time passed'))).toBe(true);
     const staleOpt = e.coa[String(plan.key)].opts.find((o) => o.key === stale[0].key)!;
     const forced = buildView(data, { ...ui(22, 8783), opt: staleOpt.key });
     if (forced.ws.kind !== 'event' || !forced.ws.planner) throw new Error('expected a planner');
@@ -151,5 +151,20 @@ describe('minor fixes', () => {
     const snap = snapshot(runCtx(rp, 0, 10, NO_DECISIONS));
     expect(buildKpis(snap, 0).map((k) => k.d)).toEqual(['', '', '', '']);
     expect(buildDigest(snap, 0)).toMatchObject({ first: true, groups: [] });
+  });
+});
+
+describe('Next decision: a recommended burn above the budget says so', () => {
+  it('never recommends more than the budget without saying it is over budget', () => {
+    let seen = 0;
+    for (let run = 0; run < rp.runs; run++) {
+      const ctx = runCtx(rp, run, 10, NO_DECISIONS);
+      const text = buildNext(snapshot(ctx), 10, null, ctx).text;
+      const m = text.match(/Recommended burn: ([\d.]+) mm\/s \(([^)]*)\)/);
+      if (!m || Number(m[1]) <= 10) continue;
+      seen++;
+      expect(m[2]).toMatch(/over budget/);
+    }
+    expect(seen).toBeGreaterThan(0);
   });
 });

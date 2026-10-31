@@ -5,7 +5,7 @@ import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, s
 import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, PLAN_CUTOFF_H, TIER_TIP, bucketOf, burnAt, burnPassed, isKnown, planAt, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
 import { type ForecastCard, type MissForecast, forecastAt, forecastCard, forecastLine, rangeTxt } from './forecast';
 import { type Chip, type RunCtx, OPTION_NAMES, approvedAt, chipFor, isDeferredNow, orderedFeasible } from './run';
-import { BUCKET_COLOR, C, TONE, type Tone } from './theme';
+import { TONE, type Tone, missColor, pcColor } from './theme';
 
 export interface EventHeader {
   id: number;
@@ -18,6 +18,7 @@ export interface EventHeader {
   pc: string;
   odds: string | null;
   color: string;
+  missColor: string;
   miss: string;
   tcaLabel: string;
   tcaTxt: string;
@@ -81,6 +82,7 @@ export interface MsgRow {
   pcTitle: string | undefined;
   pcColor: string;
   miss: string;
+  missColor: string;
   tier: Tier;
   tierTone: Tone;
   tierTip: string;
@@ -278,7 +280,7 @@ export function buildHistory(e: ReplayEvent, s: KnownState, T: number, fc: MissF
     y5: yMs(5000).toFixed(1),
     y1L: (yMs(1000) + 3).toFixed(1),
     // When the axis is stretched by a far miss the two threshold lines sit close; keep their labels apart.
-    y5L: Math.min(yMs(5000) + 3, yMs(1000) + 3 - 9).toFixed(1),
+    y5L: Math.min(yMs(5000) + 3, yMs(1000) + 3 - 10.5).toFixed(1),
     nowX: xp(Math.max(0, e.tca - T)).toFixed(1),
     trend,
   };
@@ -332,8 +334,9 @@ function buildHeader(ctx: RunCtx, e: ReplayEvent, s: KnownState, plan: Plan | nu
     pcLabel: resolved ? 'Final Pc' : 'Pc',
     pc: pcTxt(s.last[1]),
     odds: pcOdds(s.last[1]),
-    color: resolved ? C.slate : (BUCKET_COLOR[s.bucket] ?? C.slate),
+    color: pcColor(s.last[1]),
     miss: mTxt(s.last[2]),
+    missColor: missColor(s.last[2]),
     tcaLabel: resolved ? 'Since TCA' : 'To TCA',
     tcaTxt: dh(e.tca - ctx.T),
     msgs: String(s.k + 1),
@@ -347,7 +350,7 @@ function buildOther(ctx: RunCtx, e: ReplayEvent, s: KnownState): { other: OtherV
     .map((v, i): MsgRow => {
       const t = tierOf(v);
       const b = bucketOf(v);
-      return { n: String(i + 1), before: dh(e.tca - v[0]), pc: pcTxt(v[1]), pcTitle: pcOdds(v[1]) ?? undefined, pcColor: BUCKET_COLOR[b] ?? C.slate, miss: mTxt(v[2]), tier: t, tierTone: TIER_TONE[t], tierTip: TIER_TIP[t], queue: QUEUE_NAME[b] };
+      return { n: String(i + 1), before: dh(e.tca - v[0]), pc: pcTxt(v[1]), pcTitle: pcOdds(v[1]) ?? undefined, pcColor: pcColor(v[1]), miss: mTxt(v[2]), missColor: missColor(v[2]), tier: t, tierTone: TIER_TONE[t], tierTip: TIER_TIP[t], queue: QUEUE_NAME[b] };
     })
     .reverse();
   const peak = Math.max(...vis.map((v) => v[1]));
@@ -598,9 +601,9 @@ export function pickOption(plan: Plan | null, key: OptionKey, e?: ReplayEvent): 
 const sameBurn = (a: CoaOption, b: CoaOption) => a.dv === b.dv && a.alpha === b.alpha && a.beta === b.beta;
 
 function optionSub(o: CoaOption, all: CoaOption[], robustMissM: number | undefined): string {
-  if (o.key === 'coa4') return 'keeps ≥ 1 km at the pessimistic end' + (robustMissM != null ? ' (target ' + Math.round(robustMissM).toLocaleString('en-US') + ' m)' : '');
+  if (o.key === 'coa4') return 'keeps ≥ 1 km at the pessimistic end' + (robustMissM != null ? ', target ' + mTxt(robustMissM) : '');
   const robust = all.find((x) => x.key === 'coa4');
-  if (o.key === 'coa1' && robust && sameBurn(o, robust)) return dirShort(o.alpha) + ' · same burn: already robust';
+  if (o.key === 'coa1' && robust && sameBurn(o, robust)) return dirShort(o.alpha) + ' · same as robust';
   return dirShort(o.alpha);
 }
 
@@ -631,7 +634,7 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
       rows: optsAll.map((o) => ({
         key: o.key,
         name: OPTION_NAMES[o.key],
-        dir: optionSub(o, optsAll, plan.c.robustMissM) + (burnPassed(e, plan, o) ? ' · burn time passed' : ''),
+        dir: optionSub(o, optsAll, plan.c.robustMissM) + (burnPassed(e, plan, o) ? ' · time passed' : ''),
         dvTxt: o.dv.toFixed(1) + ' mm/s',
         pcAfter: sci(o.pcAfter),
         pcAfterTitle: odds(o.pcAfter) ?? undefined,

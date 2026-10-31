@@ -47,7 +47,7 @@ export function Workspace({ ws, budget, onOpt, onReview, onDefer }: WorkspacePro
           </div>
           <div>
             <dt>Miss</dt>
-            <dd>{h.miss}</dd>
+            <dd style={{ color: h.missColor }}>{h.miss}</dd>
           </div>
           <div>
             <dt>{h.tcaLabel}</dt>
@@ -170,7 +170,9 @@ function MessagesReceived({ rows }: { rows: MsgRow[] }) {
             <span role="cell" style={{ color: r.pcColor }} title={r.pcTitle}>
               {r.pc}
             </span>
-            <span role="cell">{r.miss}</span>
+            <span role="cell" style={{ color: r.missColor }}>
+              {r.miss}
+            </span>
             <span role="cell">
               <Chip label={r.tier} tone={r.tierTone} title={r.tierTip} />
             </span>
@@ -234,14 +236,18 @@ function ForecastPanel({ f }: { f: ForecastCardView }) {
               Chance it ends under 1 km
               <small>{c.pUnder1kmBasis}</small>
             </dt>
-            <dd className="mono">{c.pUnder1km}</dd>
+            <dd className="mono" style={{ color: c.pUnder1kmColor }}>
+              {c.pUnder1km}
+            </dd>
           </div>
           <div>
             <dt>
               Chance it ends Critical
               <small>{c.pCriticalBasis}</small>
             </dt>
-            <dd className={'mono' + (c.pCriticalMissing ? ' fc-missing' : '')}>{c.pCritical}</dd>
+            <dd className={'mono' + (c.pCriticalMissing ? ' fc-missing' : '')} style={{ color: c.pCriticalColor }}>
+              {c.pCritical}
+            </dd>
           </div>
         </dl>
       </div>

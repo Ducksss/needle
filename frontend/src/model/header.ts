@@ -94,8 +94,11 @@ export function buildNext(snap: Snapshot, budget: number, sel: number | null = n
   const nowTxt = w0 != null ? w0.toFixed(1) + ' mm/s' : 'over 80 mm/s';
   // Recommend only an option whose burn time is still ahead.
   const rec = orderedFeasible(plan.c.opts).find((o) => !burnPassed(e, plan, o));
+  // The budget sets the deadline; the robust burn may cost more for margin, so say so and give the minimum.
+  const minDv = plan.c.opts.find((o) => o.key === 'coa1' && o.feasible && !burnPassed(e, plan, o))?.dv;
+  const over = !rec || rec.dv <= budget ? '' : rec.key === 'coa4' && minDv != null && minDv < rec.dv ? ', over budget for margin; minimum Δv ' + minDv.toFixed(1) + ' mm/s' : ', over budget';
   const burn = rec
-    ? 'Recommended burn: ' + rec.dv.toFixed(1) + ' mm/s (' + (rec.key === 'coa4' ? 'robust' : rec.key === 'coa1' ? 'minimum Δv' : rec.key === 'coa3' ? 'wait 24 h' : 'more margin') + ').'
+    ? 'Recommended burn: ' + rec.dv.toFixed(1) + ' mm/s (' + (rec.key === 'coa4' ? 'robust' : rec.key === 'coa1' ? 'minimum Δv' : rec.key === 'coa3' ? 'wait 24 h' : 'more margin') + over + ').'
     : 'The planned burn times have passed; the current window needs ' + nowTxt + '. Re-plan at the next message.';
   const tail = plan.overNow
     ? 'Already above the ' + budget + ' mm/s budget: decide now or accept a larger burn.'

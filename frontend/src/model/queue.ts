@@ -3,9 +3,9 @@
 import type { Forecast } from '../data/types';
 import { NOT_ENOUGH, forecastAt, pctTxt } from './forecast';
 import { clamp, dh, mTxt, pcOdds, pcTxt } from './format';
-import { PC_ACTION, PLAN_CUTOFF_H } from './replay';
+import { PLAN_CUTOFF_H } from './replay';
 import { type Chip, type KnownRow, type NeedRow, type RunCtx, type Snapshot, chipFor } from './run';
-import { BUCKET_COLOR, C } from './theme';
+import { C, missColor, pcColor } from './theme';
 
 export type QueueTab = 'needs' | 'watch' | 'passed';
 
@@ -31,6 +31,7 @@ export interface QueueRow {
   col1: string;
   col1Color: string;
   col2: string;
+  col2Color: string;
   on: boolean;
   /** Native hover title for the row. */
   title: string | undefined;
@@ -66,6 +67,7 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
     let col1 = '';
     let col1Color: string = C.ink;
     let col2 = '';
+    let col2Color: string = C.muted;
     let urgency: QueueRow['urgency'] = null;
     if (tab === 'needs') {
       const plan = (x as NeedRow).plan;
@@ -92,15 +94,17 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
       const p = pCrit.get(x.e.id);
       if (forecast) {
         col1 = p == null ? 'no history' : pctTxt(p);
-        col1Color = p == null ? C.faint : p >= 0.5 ? C.risk : p >= 0.1 ? C.hidden : C.slate;
+        col1Color = p == null ? C.muted : p >= 0.5 ? C.risk : p >= 0.2 ? C.hidden : C.slate;
         col2 = mTxt(x.s.last[2]);
+        col2Color = missColor(x.s.last[2]);
       } else {
         col1 = mTxt(x.s.last[2]);
+        col1Color = missColor(x.s.last[2]);
         col2 = 'TCA ' + dh(x.e.tca - T);
       }
     } else {
       col1 = 'final ' + pcTxt(x.s.last[1]);
-      col1Color = x.s.last[1] >= PC_ACTION ? C.overdue : C.slate;
+      col1Color = pcColor(x.s.last[1]);
       col2 = dh(T - x.e.tca) + ' ago';
     }
     const chip = chipFor(ctx, x.e, x.s);
@@ -111,10 +115,11 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
       chip: tab === 'needs' && chip.label === 'DECIDE' ? null : chip,
       pc: pcTxt(x.s.last[1]),
       pcTitle: pcOdds(x.s.last[1]) ?? undefined,
-      pcColor: BUCKET_COLOR[x.s.bucket] ?? C.slate,
+      pcColor: pcColor(x.s.last[1]),
       col1,
       col1Color,
       col2,
+      col2Color,
       on: sel === x.e.id,
       title:
         tab === 'watch' && forecast

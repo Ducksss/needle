@@ -26,6 +26,12 @@ export const BUCKET_COLOR: Record<string, string> = {
   quiet: C.faint,
 };
 
+/** Colour of a Pc value by its own band: Critical orange, Elevated amber, otherwise muted. */
+export const pcColor = (risk: number) => (risk >= -4 ? C.risk : risk >= -6 ? C.hidden : C.muted);
+
+/** Colour of a miss distance by its own band: under 1 km orange, 1 to 5 km amber, otherwise muted. */
+export const missColor = (m: number) => (m < 1000 ? C.risk : m <= 5000 ? C.hidden : C.muted);
+
 export interface Tone {
   bg: string;
   fg: string;

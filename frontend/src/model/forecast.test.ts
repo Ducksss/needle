@@ -39,7 +39,7 @@ describe('forecast lookup', () => {
     const s = stateAt(e, 41, 8);
     if (!isKnown(s)) throw new Error('unreported');
     const line = forecastLine(forecastAt(forecastOf(), e, s)!);
-    expect([line.median, line.range, line.cover, line.pUnder1km, line.pCritical]).toEqual(['1.5 km', '0.9–2.7 km', '8 in 10', '15%', '30%']);
+    expect([line.median, line.range, line.cover, line.pUnder1km, line.pCritical]).toEqual(['1.50 km', '900 m–2.70 km', '8 in 10', '15%', '30%']);
     expect(line.tip[0]).toBe('8 in 10 similar events ended inside this band (checked on 2,529 held-out events); n = 100.');
   });
 
@@ -76,8 +76,8 @@ describe('forecast lookup', () => {
 
   it('formats ranges and shares', () => {
     expect(rangeTxt(640, 980)).toBe('640–980 m');
-    expect(rangeTxt(640, 1200)).toBe('0.6–1.2 km');
-    expect(rangeTxt(40, 1200)).toBe('40 m–1.2 km');
+    expect(rangeTxt(640, 1200)).toBe('640 m–1.20 km');
+    expect(rangeTxt(1590, 10970)).toBe('1.59–10.97 km');
     expect(pctTxt(0.003)).toBe('under 1%');
     expect(inTen(0.799)).toBe('8 in 10');
   });
@@ -141,7 +141,7 @@ describe('robust burn option', () => {
       ['Minimum Δv', false],
       ['More margin', false],
     ]);
-    expect(v.ws.planner.opts.rows[0].dir).toBe('keeps ≥ 1 km at the pessimistic end (target 1,330 m)');
+    expect(v.ws.planner.opts.rows[0].dir).toBe('keeps ≥ 1 km at the pessimistic end, target 1.33 km');
     expect(v.dock.lanes.flatMap((l) => l.marks).map((m) => m.text)).toEqual(['2.0 mm/s']);
     expect(buildNext(snapshot(runCtx(data.replay, 0, 10, NO_DECISIONS)), 10).text).toMatch(/Recommended burn: 2\.0 mm\/s \(robust\)\.$/);
   });
@@ -151,7 +151,7 @@ describe('robust burn option', () => {
     const d2 = { ...data, replay: replayOf([ev(1, 300, [[0, -3.5, 400]], { coa: { '0': same } })]) };
     const v = buildView(d2, ui);
     if (v.ws.kind !== 'event' || !v.ws.planner) throw new Error('expected a planner');
-    expect(v.ws.planner.opts.rows[1].dir).toBe('Retrograde · same burn: already robust');
+    expect(v.ws.planner.opts.rows[1].dir).toBe('Retrograde · same as robust');
   });
 
   it('falls back to minimum Δv when there is no robust option', () => {

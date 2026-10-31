@@ -343,7 +343,7 @@ h2 {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 16px;
-  padding: 10px 14px;
+  padding: 10px 16px;
   border: 1px solid;
   border-radius: 10px;
 }
@@ -495,7 +495,7 @@ h2 {
 }
 
 .queue-top {
-  padding: 12px 14px 10px;
+  padding: 12px 16px 10px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -541,14 +541,14 @@ h2 {
   display: grid;
   grid-template-columns: 1fr 86px;
   gap: 8px;
-  padding: 8px 14px 4px;
+  padding: 8px 16px 4px;
 }
 
 .queue-list {
   flex: 1 1 0;
   min-height: 220px;
   overflow-y: auto;
-  padding: 0 6px 8px;
+  padding: 0 8px 8px;
 }
 
 .qrow {
@@ -942,7 +942,7 @@ h2 {
   transform: translateX(-50%);
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--faint);
+  color: var(--muted);
   white-space: nowrap;
 }
 
@@ -984,7 +984,7 @@ h2 {
   display: block;
   margin-top: 2px;
   font-size: 11px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .fc-numbers dd {
@@ -998,12 +998,12 @@ h2 {
 .fc-numbers dd.fc-missing {
   font-family: var(--sans);
   font-size: 15px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .fc-foot {
   font-size: 11px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 @media (max-width: 760px) {
@@ -1012,9 +1012,33 @@ h2 {
   }
 }
 
+.chart-wrap {
+  position: relative;
+  padding-top: 12px;
+}
+
+.cow .now-tag {
+  top: 0;
+}
+
+.now-tag {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  transform: translateX(-50%);
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--ink);
+  color: #ffffff;
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 12px;
+  cursor: help;
+}
+
 .chart-note {
   font-size: 11px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .fan-wrap {
@@ -1106,6 +1130,10 @@ h2 {
   font-family: var(--mono);
   font-size: 10px;
   white-space: nowrap;
+  /* A backing so the deadline line does not run through the text when the deadline is early. */
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.88);
 }
 
 .caption {
@@ -1123,7 +1151,7 @@ h2 {
 
 .opt-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 62px 54px 60px;
+  grid-template-columns: minmax(0, 1fr) 70px 58px 62px;
   gap: 6px;
 }
 
@@ -1149,7 +1177,7 @@ h2 {
 
 .opt:disabled {
   cursor: default;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .opt[aria-checked='true'] {
@@ -1260,7 +1288,7 @@ h2 {
 
 /* Context column */
 .side-card {
-  padding: 12px 14px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1288,7 +1316,7 @@ h2 {
 
 .key-hint {
   margin-left: auto;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .key {
@@ -1572,6 +1600,15 @@ h2 {
   background: #dc2626;
 }
 
+.sw-forecast {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: conic-gradient(var(--risk) 120deg, rgba(194, 65, 12, 0.14) 0);
+  -webkit-mask: radial-gradient(circle, transparent 2.5px, #000 3px);
+  mask: radial-gradient(circle, transparent 2.5px, #000 3px);
+}
+
 .sw-band {
   background: rgba(15, 23, 42, 0.06);
   border: 1px dashed rgba(15, 23, 42, 0.4);
@@ -1603,7 +1640,7 @@ h2 {
 
 .lane-name.empty {
   font-size: 10px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .strip-label {
@@ -1697,6 +1734,76 @@ h2 {
   background: var(--body);
 }
 
+.forecast-tag {
+  position: absolute;
+  top: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--risk);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.strip-note,
+.strip-note-gap {
+  height: 18px;
+}
+
+.strip-note {
+  margin: 0;
+  padding-top: 3px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The note sits above the playhead line so the line does not cross its text. */
+.strip-note span {
+  position: relative;
+  z-index: 1;
+  background: var(--card);
+}
+
+.fc-ring-host {
+  z-index: 3;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  cursor: help;
+}
+
+.fc-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  -webkit-mask: radial-gradient(circle, transparent 3.5px, #000 4px);
+  mask: radial-gradient(circle, transparent 3.5px, #000 4px);
+}
+
+.fc-ring.none {
+  border: 1.5px dashed var(--faint);
+  -webkit-mask: none;
+  mask: none;
+}
+
+.fc-ring-label {
+  position: absolute;
+  left: 16px;
+  top: -1px;
+  text-shadow:
+    0 0 2px #ffffff,
+    0 0 3px #ffffff;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--risk);
+  white-space: nowrap;
+}
+
 .decide-max {
   position: absolute;
   right: 0;
@@ -1746,6 +1853,8 @@ h2 {
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   background: #e2e8f0;
+  font-size: 10px;
+  line-height: 16px;
   cursor: pointer;
   overflow: hidden;
   text-align: left;
@@ -1816,6 +1925,7 @@ h2 {
 }
 
 .mark {
+  z-index: 2;
   height: 20px;
   cursor: help;
 }
@@ -1833,6 +1943,17 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   transform: translateX(6px);
+}
+
+.mark-pill.compact {
+  width: 16px;
+  height: 12px;
+  margin-top: 4px;
+  padding: 0;
+}
+
+.mark-pill.compact > span {
+  display: none;
 }
 
 .mark-short {
@@ -1887,17 +2008,34 @@ h2 {
   font-size: 11px;
   line-height: 18px;
   white-space: nowrap;
+  overflow: hidden;
+  vertical-align: middle;
+  max-width: 120px;
+  margin-left: 8px;
   animation: lapse-chip 2.6s ease-out forwards;
 }
 
+.orbit-card .lapse-chip {
+  margin-left: 0;
+}
+
+/* After fading, the chip collapses so it leaves no gap in the clock line or the orbit card header. */
 @keyframes lapse-chip {
   0%,
   70% {
     opacity: 1;
   }
 
+  94% {
+    opacity: 0;
+    max-width: 120px;
+  }
+
   100% {
     opacity: 0;
+    max-width: 0;
+    padding: 0;
+    margin: 0;
   }
 }
 
@@ -2002,6 +2140,11 @@ h2 {
     padding: 0;
     background: none;
     color: var(--slate);
+  }
+
+  /* The timeline clock already shows the skip; as static text it would crowd the orbit card header. */
+  .orbit-card .lapse-chip {
+    display: none;
   }
 }
 

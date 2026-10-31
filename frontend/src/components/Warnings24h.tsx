@@ -3,7 +3,7 @@ import type { WarningCount, WarningsView } from '../model/warnings';
 import { Chip } from './Chip';
 import { TipCard } from './Hover';
 
-const missColor = (m: number) => (m < 1000 ? 'var(--risk)' : m <= 5000 ? 'var(--hidden)' : undefined);
+import { missColor } from '../model/theme';
 
 /** Next 24 h warnings, sized for the right column: counts, insights, then every pass in the window. */
 export function Warnings24h({ w, onPick }: { w: WarningsView; onPick: (id: number) => void }) {
@@ -81,7 +81,7 @@ function Count({ c, right }: { c: WarningCount; right: boolean }) {
       <dt>
         <span>{c.label}</span>
       </dt>
-      <dd style={{ color: c.v ? c.color : 'var(--faint)' }}>{c.v}</dd>
+      <dd style={{ color: c.v ? c.color : 'var(--muted)' }}>{c.v}</dd>
       <TipCard id={id} title={c.label} lines={[c.tip]} side={{ edge: right ? 'right' : 'left', px: 0 }} />
     </div>
   );

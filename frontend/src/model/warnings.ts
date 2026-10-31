@@ -4,7 +4,7 @@
 import { at, dh, mTxt, pcOdds, pcTxt, plural } from './format';
 import { type KnownState, type Tier, PC_ACTION, PC_WATCH, TIER_TIP, isKnown, stateAt, tierOf } from './replay';
 import { type Chip, type RunCtx, type Snapshot, approvedAt, queueChip } from './run';
-import { BUCKET_COLOR, C, type Tone } from './theme';
+import { C, type Tone, pcColor } from './theme';
 import { TIER_TONE } from './workspace';
 
 export const WINDOW_H = 24;
@@ -115,7 +115,7 @@ export function buildWarnings(ctx: RunCtx, snap: Snapshot, sel: number | null): 
       missM: miss(x),
       pc: pcTxt(risk(x)),
       pcTitle: pcOdds(risk(x)) ?? undefined,
-      pcColor: BUCKET_COLOR[x.s.bucket] ?? C.slate,
+      pcColor: pcColor(risk(x)),
       tier,
       tierTone: TIER_TONE[tier],
       tierTip: TIER_TIP[tier],

@@ -116,6 +116,43 @@ for (const [width, height] of [
   await page.close();
 }
 
+// QA cases: #8783 approved at run 23 (B1), and #12126 at run 10 (M1).
+page = await open(1440, 1000);
+await setRun(page, 22);
+await page.locator('.ev-btn', { hasText: '#8783' }).click();
+await page.getByRole('button', { name: 'Review and approve' }).click();
+await page.getByRole('button', { name: 'Approve and queue upload' }).click();
+// Let the lapse chip fade so the shot shows the settled run.
+await page.waitForTimeout(2800);
+await page.mouse.move(5, 5);
+await shot(page, '18-approved-8783-run23.png', { fullPage: true });
+await setRun(page, 9);
+// #12126 sits in whichever queue tab its state puts it in at this run.
+for (const tab of ['Decide', 'Watch', 'Passed']) {
+  await page.getByRole('button', { name: new RegExp('^' + tab) }).click();
+  const row = page.locator('.qrow', { hasText: '#12126' });
+  if (await row.count()) {
+    await row.first().click();
+    break;
+  }
+}
+// Let the lapse chip fade so the shot shows the settled run.
+await page.waitForTimeout(2800);
+await page.mouse.move(5, 5);
+await shot(page, '19-12126-run10.png', { fullPage: true });
+await page.close();
+
+// Timeline forecast at Run 16 (Day 6): rings at each open event's closest approach and the dotted line reach Day 7 to 8.
+page = await open(1440, 1000, 2);
+await setRun(page, 15);
+await page.mouse.move(5, 5);
+await shot(page, '20-timeline-forecast-run16.png', { fullPage: true, clip: await pageBox(page, ['section[aria-label="Replay timeline"]']) });
+// Keyboard focus opens the same card as hover.
+await page.locator('.fc-ring-host').first().focus();
+await page.waitForTimeout(200);
+await shot(page, '20b-timeline-forecast-hover.png', { fullPage: true, clip: await pageBox(page, ['.fc-ring-host:focus', '.fc-ring-host:focus > .tt'], 30) });
+await page.close();
+
 // Forecast card: #37 at run 5 (Pc 5.0e-4, 2.91 km, 5d 22h out), a Watch event and a passed event.
 page = await open(1440, 1000, 2);
 const ws = ['section[aria-label="Workspace"] .ws-head', 'section[aria-label="Forecast at closest approach"]'];

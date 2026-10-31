@@ -1,7 +1,8 @@
 // Replay timeline dock: fleet density per run, one lane per satellite with Pc >= 1e-4 events, deadlines, burns and the 24 h band.
 
-import type { CoaOption, OptionKey, Replay, ReplayEvent } from '../data/types';
-import { at, clamp, dh, dirShort, mTxt, pcWithOdds, withOdds } from './format';
+import type { CoaOption, Forecast, OptionKey, Replay, ReplayEvent } from '../data/types';
+import { forecastAt, inTen, kmTxt, pctTxt, rangeTxt } from './forecast';
+import { at, clamp, dh, dirShort, mTxt, pcWithOdds, plural, withOdds } from './format';
 import { PC_ACTION, burnAt, burnPassed, isKnown, planOf, stateAt } from './replay';
 import { type RunCtx, DEFAULT_OPTION, OPTION_NAMES, approvedAt, queueChip } from './run';
 import { pickOption } from './workspace';
@@ -32,6 +33,8 @@ export interface DensityBar {
   w: string;
   h: string;
   current: boolean;
+  /** After the playhead: no actual counts are drawn, only the forecast. */
+  future: boolean;
   side: TipSide;
   title: string;
   l1: string;
@@ -74,6 +77,19 @@ export interface EventBar {
   tip: TipLine[];
   deadline: DeadlineMark | null;
   end: EndDot | null;
+  /** Forecast ring at closest approach for an open event, when forecast.json is present. */
+  forecast: ForecastRing | null;
+}
+
+export interface ForecastRing {
+  left: string;
+  /** Pc-aware chance of ending Critical; null with too little history. */
+  p: number | null;
+  /** "20%", shown when p >= 0.2. */
+  label: string | null;
+  side: TipSide;
+  title: string;
+  lines: string[];
 }
 
 export type MarkKind = 'approved' | 'proposed';
@@ -107,8 +123,10 @@ export interface Lane {
 export interface DockView {
   ticks: Tick[];
   density: DensityBar[];
-  /** Step line of the to-decide count per run, in a 100 × 34 view box, on its own scale. */
+  /** Step line of the to-decide count per run up to now, in a 100 × 34 view box, on its own scale. */
   decideLine: string;
+  /** Dotted step line after the playhead: expected passes ending Critical per 8 h window, on the same scale. */
+  forecastLine: string;
   decideMax: number;
   lanes: Lane[];
   playLeft: string;
@@ -185,7 +203,32 @@ export function decideCounts(ctx: RunCtx): number[] {
   return counts;
 }
 
-export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null, optKey: OptionKey, changed: Set<number> = new Set()): DockView {
+/** Hours to show the forecast ring and dotted line: only events reported by T, no look-ahead. */
+export interface FutureWindow {
+  start: number;
+  due: number;
+  expected: number;
+}
+
+/** Passes due in each 8 h window from T on, and the sum of their Pc-aware chances of ending Critical. */
+export function futureWindows(ctx: RunCtx, forecast: Forecast | null | undefined, until: number): FutureWindow[] {
+  const { replay, T } = ctx;
+  const out: FutureWindow[] = [];
+  for (let start = T; start < until; start += replay.runH) out.push({ start, due: 0, expected: 0 });
+  if (!forecast) return out;
+  for (const e of replay.events) {
+    if (e.tca <= T || e.tca >= until) continue;
+    const s = stateAt(e, T, replay.runH);
+    if (!isKnown(s)) continue;
+    const w = out[Math.floor((e.tca - T) / replay.runH)];
+    if (!w) continue;
+    w.due++;
+    w.expected += forecastAt(forecast, e, s)?.pCritical ?? 0;
+  }
+  return out;
+}
+
+export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null, optKey: OptionKey, changed: Set<number> = new Set(), forecast: Forecast | null = null): DockView {
   const { replay, T, run, budget } = ctx;
   const runH = replay.runH;
   const DOM = dockHours(replay);
@@ -197,28 +240,57 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
   const counts = densityCounts(replay);
   const maxO = Math.max(1, ...counts.map((c) => c[0]));
   const barW = ((runH / DOM) * 100 * 0.78).toFixed(3) + '%';
-  const decide = decideCounts(ctx);
-  const decideMax = Math.max(0, ...decide);
-  const density = counts.map(
-    (c, r): DensityBar => ({
+  // Up to now: actual open and to-decide counts. After the playhead: only the forecast from events already reported.
+  const decide = decideCounts(ctx).slice(0, run + 1);
+  const future = futureWindows(ctx, forecast, DOM);
+  const expMax = Math.max(0, ...future.map((w) => w.expected));
+  const decideMax = Math.max(0, ...decide, Math.ceil(expMax));
+  const clock = (h: number) => String(Math.round(h % 24)).padStart(2, '0') + ':00';
+  const density = counts.map((c, r): DensityBar => {
+    const side: TipSide = r > replay.runs * 0.625 ? { edge: 'right', px: 0 } : { edge: 'left', px: 0 };
+    if (r <= run) {
+      return {
+        run: r,
+        left: pctH(r * runH),
+        w: barW,
+        h: ((c[0] / maxO) * 100).toFixed(1) + '%',
+        current: r === run,
+        future: false,
+        side,
+        title: 'Run ' + (r + 1) + ' · ' + at(r * runH),
+        l1: c[0] + ' events open (grey bar, true scale)',
+        l2: decide[r] + ' to decide (orange line, scale 0 to ' + decideMax + '). Click to jump to this run.',
+      };
+    }
+    const w = future[r - run];
+    return {
       run: r,
       left: pctH(r * runH),
       w: barW,
-      h: ((c[0] / maxO) * 100).toFixed(1) + '%',
-      current: r === run,
-      side: r > replay.runs * 0.625 ? { edge: 'right', px: 0 } : { edge: 'left', px: 0 },
-      title: 'Run ' + (r + 1) + ' · ' + at(r * runH),
-      l1: c[0] + ' events open (grey bar, true scale)',
-      l2: decide[r] + ' to decide (orange line, scale 0 to ' + decideMax + '). Click to jump to this run.',
-    }),
-  );
+      h: '0%',
+      current: false,
+      future: true,
+      side,
+      title: at(r * runH) + '–' + clock((r + 1) * runH),
+      l1: w ? plural(w.due, 'pass', 'passes') + ' due, about ' + w.expected.toFixed(1) + ' expected to end Critical' : 'No forecast',
+      l2: 'Forecast from events already reported (dotted line). Click to jump to this run.',
+    };
+  });
+  const step = (runH / DOM) * 100;
   let decideLine = '';
+  let forecastLine = '';
   if (decideMax > 0) {
-    const step = (runH / DOM) * 100;
+    const yOf = (n: number) => (33 - (n / decideMax) * 29).toFixed(2);
     decide.forEach((n, r) => {
-      const y = (33 - (n / decideMax) * 29).toFixed(2);
-      decideLine += (r === 0 ? 'M' + (r * step).toFixed(3) + ' ' + y : 'V' + y) + 'H' + ((r + 1) * step).toFixed(3);
+      decideLine += (r === 0 ? 'M' + (r * step).toFixed(3) + ' ' + yOf(n) : 'V' + yOf(n)) + 'H' + ((r + 1) * step).toFixed(3);
     });
+    if (forecast) {
+      future.forEach((w, k) => {
+        const x0 = ((w.start / DOM) * 100).toFixed(3);
+        const x1 = ((Math.min(DOM, w.start + runH) / DOM) * 100).toFixed(3);
+        forecastLine += (k === 0 ? 'M' + x0 + ' ' + yOf(w.expected) : 'V' + yOf(w.expected)) + 'H' + x1;
+      });
+    }
   }
 
   const ticks: Tick[] = [];
@@ -291,6 +363,23 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
                 lines: ['After this, the cheapest burn needs more than ' + budget + ' mm/s.', 'Time left: ' + dh(pl.left) + '.', 'Read from the cost-of-waiting curve for message ' + (pl.key + 1) + '.'],
               }
             : null,
+        forecast: (() => {
+          const fc = done ? null : forecastAt(forecast, e, s);
+          if (!fc) return null;
+          const p = fc.pCritical;
+          return {
+            left: pctH(e.tca),
+            p,
+            label: p != null && p >= 0.2 ? pctTxt(p) : null,
+            side: sideOf(e.tca),
+            title: 'Forecast at closest approach · ' + at(e.tca),
+            lines: [
+              (p == null ? 'Chance it ends Critical: not enough history' : pctTxt(p) + ' chance it ends Critical') +
+                ' · likely final miss ' + kmTxt(fc.q50M) + ' (' + inTen(fc.coverage) + ': ' + rangeTxt(fc.q10M, fc.q90M) + ').',
+              'From its latest message seen at this run.',
+            ],
+          };
+        })(),
         end: done
           ? {
               left: pctH(e.tca),
@@ -357,7 +446,7 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
 
   const day = Math.floor(T / 24) + 1;
   const hh = String(T % 24).padStart(2, '0');
-  return { ticks, density, decideLine, decideMax, lanes, playLeft: pctH(T), playLabel: 'Day ' + day + ' · ' + hh + ':00', band: { left: pctH(T), w: wH(T, T + 24) } };
+  return { ticks, density, decideLine, forecastLine, decideMax, lanes, playLeft: pctH(T), playLabel: 'Day ' + day + ' · ' + hh + ':00', band: { left: pctH(T), w: wH(T, T + 24) } };
 }
 
 export function buildLegend(budget: number): LegendItem[] {
@@ -368,6 +457,7 @@ export function buildLegend(budget: number): LegendItem[] {
     { key: 'burn', label: 'proposed burn', name: 'Proposed burn', tip: 'The planner’s recommended option (robust when it has one), drawn at its burn time with its Δv. It aims for Pc below 1e-4 and a miss above 1 km; check the gate before approving. It waits for approval.' },
     { key: 'deadline', label: 'decision deadline', name: 'Decision deadline', tip: 'After this, the cheapest burn needs more than the ' + budget + ' mm/s Δv budget.' },
     { key: 'end', label: 'passed unmitigated', name: 'Red end dot', tip: 'Closest approach passed with Pc still at or above 1e-4 and no approved burn. Grey: passed below 1e-4. Teal: burn approved.' },
+    { key: 'forecast', label: 'forecast (chance it ends Critical)', name: 'Forecast', tip: 'Ring at each open event’s closest approach, filled to its chance of ending Critical (from the latest message seen at this run). In the strip, the dotted line after the playhead is the expected number of passes ending Critical per 8 h.' },
     { key: 'band', label: 'next 24 h', name: 'Next 24 h', tip: 'The window the Next 24 h panel counts: closest approach within the next 24 h (time_to_tca ≤ 1 day) of this run.' },
   ];
 }

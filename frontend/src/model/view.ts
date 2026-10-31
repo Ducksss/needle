@@ -87,7 +87,7 @@ export function buildView(data: ConsoleData, ui: UiState): ConsoleView {
     globe: buildGlobeScene({ missions: fleet.missions, events: replay.events, T: ctx.T, lapse, open: snap.open, sel: selRow, opt }),
     digest: buildDigest(snap, ui.run),
     log: buildLog(ui.dec.log, ui.run + 1),
-    dock: buildDock(ctx, ui.sel, selRow?.e.sat ?? null, ui.opt, changed),
+    dock: buildDock(ctx, ui.sel, selRow?.e.sat ?? null, ui.opt, changed, data.forecast ?? null),
     legend: buildLegend(ui.budget),
     warnings: buildWarnings(ctx, snap, ui.sel),
     facts,

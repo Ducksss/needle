@@ -51,7 +51,7 @@ export function Queue({ q, flash, run, onTab, onPick }: QueueProps) {
               </span>
               <span className="qrow-side">
                 <span style={{ color: r.col1Color }}>{r.col1}</span>
-                <span>{r.col2}</span>
+                <span style={{ color: r.col2Color }}>{r.col2}</span>
               </span>
               {r.urgency && (
                 <span className={'urgency urgency-' + r.urgency.tone} role="img" aria-label={'Decision deadline: ' + URGENCY_LABEL[r.urgency.tone]}>

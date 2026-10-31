@@ -3,6 +3,7 @@
 
 import type { Forecast, ForecastCell, ReplayEvent } from '../data/types';
 import { dh } from './format';
+import { C } from './theme';
 import { PC_ACTION, PC_WATCH, type KnownState } from './replay';
 
 /** Index of the bin holding v: edges[i] <= v < edges[i + 1], with null as an open upper edge. Clamped to the bins. */
@@ -68,13 +69,13 @@ export function forecastAt(f: Forecast | null | undefined, e: ReplayEvent, s: Kn
   };
 }
 
-/** Forecast distance, one decimal in km: "1.5 km", "640 m". */
-export const kmTxt = (m: number) => (m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m) + ' m');
+/** Forecast distance in the console's one miss format: m under 1 km, km with 2 decimals above. */
+export const kmTxt = (m: number) => (m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m');
 
-/** A range with one unit: "0.9–2.8 km" once the top reaches 1 km, "640–980 m" below; "40 m–1.2 km" when km would round the low end to 0.0. */
+/** A range in the same format, one unit when both ends share it: "1.59–10.97 km", "190–394 m", "640 m–1.25 km". */
 export function rangeTxt(lo: number, hi: number): string {
   if (hi < 1000) return Math.round(lo) + '–' + Math.round(hi) + ' m';
-  if (lo >= 100) return (lo / 1000).toFixed(1) + '–' + (hi / 1000).toFixed(1) + ' km';
+  if (lo >= 1000) return (lo / 1000).toFixed(2) + '–' + (hi / 1000).toFixed(2) + ' km';
   return kmTxt(lo) + '–' + kmTxt(hi);
 }
 
@@ -150,10 +151,15 @@ export interface ForecastCard {
   pCriticalBasis: string;
   /** True when the chance of ending Critical is missing for lack of history. */
   pCriticalMissing: boolean;
+  pUnder1kmColor: string;
+  pCriticalColor: string;
   footnote: string;
 }
 
 const PC_BAND_TXT = ['Pc below 1e-6', 'Pc 1e-6 to 1e-4', 'Pc ≥ 1e-4'];
+
+/** A forecast chance in risk orange from 50%, amber from 20%, otherwise ink. */
+export const chanceColor = (p: number | null) => (p == null ? C.muted : p >= 0.5 ? C.risk : p >= 0.2 ? C.hidden : C.ink);
 
 const pct = (x: number) => (x * 100).toFixed(2) + '%';
 
@@ -176,6 +182,8 @@ export function forecastCard(fc: MissForecast, toTcaH = fc.leadDays * 24): Forec
     pCritical: pCriticalTxt(fc),
     pCriticalBasis: fc.pCriticalN != null ? fc.pCriticalN.toLocaleString('en-US') + ' similar events at ' + PC_BAND_TXT[fc.pcBand] : 'too few past events at ' + PC_BAND_TXT[fc.pcBand],
     pCriticalMissing: fc.pCritical == null,
+    pUnder1kmColor: chanceColor(fc.cell.pUnder1km),
+    pCriticalColor: chanceColor(fc.pCritical),
     footnote:
       'Band and chance under 1 km: past events at the same lead time and distance. Chance it ends Critical: past events that also shared the Pc band. The band held ' +
       inTen(fc.coverage).replace(' in ', ' times in ') + ' on ' + fc.heldOut.toLocaleString('en-US') + ' held-out events. The brief scores predictions made 2+ days out; Needle updates this at every message.',
