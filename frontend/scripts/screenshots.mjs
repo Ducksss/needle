@@ -30,6 +30,8 @@ async function setRun(page, run) {
     },
     run,
   );
+  // Let the playhead's slide transition finish.
+  await page.waitForTimeout(700);
 }
 
 /** Page-coordinate box of the elements matched by each selector, merged. */
@@ -91,7 +93,8 @@ page = await open(1440, 1000, 2);
 const w24Run = Number(process.env.NEEDLE_W24_RUN ?? 31);
 await setRun(page, w24Run);
 await page.waitForTimeout(100);
-await shot(page, '06-next-24h.png', { fullPage: true, clip: await pageBox(page, ['section[aria-label="Next 24 h warnings"]', 'section[aria-label="Replay timeline"]']) });
+await shot(page, '06-next-24h.png', { fullPage: true, clip: await pageBox(page, ['section[aria-label="Next 24 h warnings"]']) });
+await shot(page, '06b-next-24h-band.png', { fullPage: true, clip: await pageBox(page, ['section[aria-label="Replay timeline"]']) });
 await page.close();
 
 page = await open(1440, 1000, 2);
@@ -99,6 +102,7 @@ await hoverShot(page, '.kpi >> nth=1', '07-hover-kpi.png');
 await hoverShot(page, '.legend .tw >> nth=4', '08-hover-legend.png');
 await hoverShot(page, '.ev-btn[aria-pressed="true"]', '09-hover-timeline-bar.png');
 await hoverShot(page, '.w24-count >> nth=1', '09b-hover-24h-count.png');
+await hoverShot(page, '.badge', '09c-hover-badge.png');
 await page.close();
 
 for (const [width, height] of [
