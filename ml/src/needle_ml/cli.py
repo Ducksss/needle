@@ -6,7 +6,9 @@ import sys
 import time
 from pathlib import Path
 
-from . import classifier, data, fleet, metrics, replay
+import numpy as np
+
+from . import classifier, data, fleet, forecast, metrics, replay
 
 ARTIFACTS_ENV = "NEEDLE_ARTIFACTS_DIR"
 
@@ -46,11 +48,17 @@ def build(data_path, out, grid="wide", skip_replay=False):
     log(f"physics: {phys['within002']} of {phys['pcEvents']} Pc events within 0.02 orders of ESA, "
         f"{phys['within01']} within 0.1, median |error| {phys['medianAbsErr']}")
 
+    # forecast ranges come from train events outside the replay, so the demo never sees its own outcomes
+    chosen, _ = replay.choose_events(tr, np.random.default_rng(replay.SEED))
+    fc = forecast.build(tr, exclude=chosen, log=log)
+    write_json(out / "forecast.json", fc, compact=False)
+    log(f"wrote forecast.json: held-out 10-90 coverage {fc['validation']['coverage10to90']}")
+
     if skip_replay:
         rp = json.loads((out / "replay.json").read_text())
         log("replay: skipped, counting the existing replay.json")
     else:
-        rp = replay.build(tr, fl, log=log)
+        rp = replay.build(tr, fl, fc=fc, log=log)
         write_json(out / "replay.json", rp)
         log(f"wrote replay.json ({time.time() - t0:.0f} s)")
     rs = replay.summary(rp)

@@ -122,7 +122,24 @@ The brief's 24-hour view uses `time_to_tca` windows, for example closest approac
 
 A day out, the Critical tier holds about 90% of the time. Pc ≥ 1e-4 on its own does not: it is rare and it swings. In the training histories, 141 of the 154 events that reached it fell back below it by their last message.
 
-## 9. Physics model checks (not part of the scores)
+## 9. Forecast range and robust burns
+
+The console forecasts each open event's final miss distance from its latest message, at every message, not only 2 days out. The data has no message more than 7 days before closest approach, so forecasts start about 7 days out. They narrow as closest approach nears.
+
+- **Table.** For train events outside the replay (12,649 events), take each event's latest message in every lead-time bin (under 1, 1 to 2, 2 to 3, 3 to 5, and over 5 days). Compare its miss with the final miss. Each cell, split by lead bin and current miss (under 1, 1 to 2, 2 to 5, over 5 km), stores:
+  - the 10th, 50th and 90th percentiles of final miss divided by current miss
+  - the share of events that end under 1 km
+  - the share that end Critical
+- **Calibration.** Fitted on 80% of those events, the 10th to 90th band covers **79.9%** of final outcomes on the other 20% (2,529 events). Each lead bin falls between 78.8% and 80.5%.
+- **What it shows.** For an event 1 to 2 km out:
+  - **2 to 3 days out:** the final miss lands between 0.68× and 1.79× the current miss, and 15% end under 1 km.
+  - **More than 5 days out:** the band is 0.53× to 6.6×, and 22% end under 1 km.
+  - **Under a day out:** it narrows to 0.97× to 1.04×.
+- **Robust burn (`coa4`).** The recommended burn targets a nominal post-burn miss of 1 km divided by the 10th-percentile shrink for the planning lead time, so the pessimistic outcome still clears 1 km. That is 1.02 km under a day out, 1.33 km at 2 to 3 days and 1.89 km beyond 5 days.
+  - In the replay, the minimum-Δv burn already meets this target in 86 of 118 escalation messages, because pushing Pc below 1e-4 usually opens the miss well past 1 km.
+  - Where it does not, the robust burn costs 0.37 mm/s more on average, and 4.5 mm/s at most.
+
+## 10. Physics model checks (not part of the scores)
 
 The console's Pc and burn planner use the full CDM: relative state, both covariances and object sizes. The UI labels them as the physics model.
 
@@ -130,14 +147,14 @@ The console's Pc and burn planner use the full CDM: relative state, both covaria
 - Its Clohessy-Wiltshire burn response matches two-body propagation.
 - For event 891, it plans 7.0 mm/s retrograde, which gives a 1,056 m miss and Pc 9.1e-5.
 
-## 10. Limitations
+## 11. Limitations
 
 - **One split.** The intervals cover sampling noise in the 20%, not variation across different splits.
 - **Critical is rare.** 167 held-out events; one more catch moves recall by 0.6 points.
 - **The model ties the baseline.** We report that plainly. The model's contribution is calibrated probabilities, not more catches.
 - **The operating point is a choice.** The thresholds maximise macro F1. A deployment that weights misses more heavily would lower the Critical threshold and accept more false alarms.
 
-## 11. Reproduce
+## 12. Reproduce
 
 From `ml/`, with the ESA CSVs and `challenge1_event_labels.xlsx` in `NEEDLE_DATA_DIR`:
 
