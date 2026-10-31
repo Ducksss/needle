@@ -3,7 +3,7 @@
 import type { CoaOption, Forecast, Mission, OptionKey, ReplayEvent } from '../data/types';
 import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, sci } from './format';
 import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, PLAN_CUTOFF_H, TIER_TIP, bucketOf, burnAt, burnPassed, isKnown, planAt, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
-import { type ForecastCard, type MissForecast, forecastAt, forecastCard, forecastLine, rangeTxt } from './forecast';
+import { type ForecastCard, type MissForecast, type PcOutlook, forecastAt, forecastCard, forecastLine, pcForecastAt, pcOutlookText, rangeTxt } from './forecast';
 import { type Chip, type RunCtx, OPTION_NAMES, approvedAt, chipFor, isDeferredNow, orderedFeasible } from './run';
 import { TONE, type Tone, missColor, pcColor } from './theme';
 
@@ -62,6 +62,22 @@ export interface HistoryView {
   /** Relative position against time to TCA; null until replay.json carries r, t, n. */
   rtn: RtnView | null;
   fan: FanView | null;
+  /** Pc outlook right of the now line; null for passed events or without pcForecast. */
+  pcFc: PcFanView | null;
+  /** The note under the Pc chart, with the sample behind the outlook when there is one. */
+  pcNote: { text: string; tip: string[] | null };
+}
+
+/** Pc outlook drawn in the 320 × 96 view box of the Pc chart. */
+export interface PcFanView {
+  /** Dashed ink line from the now point to closest approach at today's Pc plus ceilingDelta; null at the floor. */
+  ceiling: { d: string; x: number; y: number; alignEnd: boolean; below: boolean; tip: string[] } | null;
+  /** Soft grey wedge from the now point down to the chart floor at closest approach; at the floor, a band along it. */
+  fade: string;
+  /** "53% fall to ~0"; at the floor two lines, "95% stay too small" and "to compute", so it fits right of now. */
+  floorLabel: string[];
+  /** Ring at closest approach on the 1e-4 line, filled to the chance of ending at or above 1e-4. */
+  ring: { cx: number; cy: number; r: number; wedge: string; label: string | null };
 }
 
 export interface Fact {
@@ -240,7 +256,48 @@ const QUEUE_NAME: Record<Bucket, string> = {
 
 export const TIER_TONE: Record<Tier, Tone> = { CRITICAL: TONE.decide, ELEVATED: TONE.watch, SAFE: TONE.passed };
 
-export function buildHistory(e: ReplayEvent, s: KnownState, T: number, fc: MissForecast | null = null): HistoryView {
+export const PC_NOTE_OLD = 'Pc is not forecast: it swings by orders of magnitude.';
+export const PC_NOTE = 'Pc rarely rises; it often collapses as tracking improves.';
+
+/** Pie wedge from 12 o'clock, clockwise, for a share p of a circle. */
+function wedgePath(cx: number, cy: number, r: number, p: number): string {
+  if (p < 0.005) return '';
+  if (p > 0.995) return 'M' + (cx - r) + ',' + cy + 'a' + r + ',' + r + ' 0 1,0 ' + 2 * r + ',0a' + r + ',' + r + ' 0 1,0 ' + -2 * r + ',0Z';
+  const a = p * 2 * Math.PI;
+  const x = cx + r * Math.sin(a);
+  const y = cy - r * Math.cos(a);
+  return 'M' + cx + ',' + cy + 'L' + cx + ',' + (cy - r) + 'A' + r + ',' + r + ' 0 ' + (p > 0.5 ? 1 : 0) + ',1 ' + x.toFixed(2) + ',' + y.toFixed(2) + 'Z';
+}
+
+/** The Pc outlook from the now point to closest approach (x = 316), on the Pc chart's axis. */
+export function buildPcFan(po: PcOutlook, nowX: number, yPc: (r: number) => number): PcFanView {
+  const t = pcOutlookText(po);
+  const y0 = yPc(po.risk);
+  const FLOOR_Y = 86;
+  let ceiling: PcFanView['ceiling'] = null;
+  let fade = '';
+  if (po.pcBin !== 0 && po.cell.ceilingDelta != null) {
+    const yC = yPc(po.risk + po.cell.ceilingDelta);
+    // The label sits above the start of the line, or below it when that would leave the chart.
+    const below = Math.min(y0, yC) < 12;
+    ceiling = {
+      d: 'M' + nowX.toFixed(1) + ',' + y0.toFixed(1) + 'L316,' + yC.toFixed(1),
+      x: nowX > 272 ? 316 : nowX + 4,
+      y: below ? Math.max(y0, yC) + 3 : Math.min(y0, yC) - 3,
+      alignEnd: nowX > 272,
+      below,
+      tip: t.ceilingTip,
+    };
+    fade = 'M' + nowX.toFixed(1) + ',' + y0.toFixed(1) + 'L316,' + yC.toFixed(1) + 'L316,' + FLOOR_Y + 'Z';
+  } else {
+    fade = 'M' + nowX.toFixed(1) + ',' + (FLOOR_Y - 3) + 'L316,' + (FLOOR_Y - 3) + 'L316,' + FLOOR_Y + 'L' + nowX.toFixed(1) + ',' + FLOOR_Y + 'Z';
+  }
+  const floorLabel = po.pcBin === 0 ? [t.floor.replace(' to compute', ''), 'to compute'] : [t.floor];
+  const cy = yPc(PC_ACTION);
+  return { ceiling, fade, floorLabel, ring: { cx: 315, cy, r: 3.5, wedge: wedgePath(315, cy, 3.5, po.cell.pAtLeast1e4), label: t.atLeast1e4 } };
+}
+
+export function buildHistory(e: ReplayEvent, s: KnownState, T: number, fc: MissForecast | null = null, po: PcOutlook | null = null, pcForecastOn = false): HistoryView {
   const vis = e.m.slice(0, s.k + 1);
   const xp = (hb: number) => 40 + ((168 - clamp(hb, 0, 168)) / 168) * 276;
   const yPc = (r: number) => 6 + ((-2 - clamp(r, -14, -2)) / 12) * 80;
@@ -268,8 +325,11 @@ export function buildHistory(e: ReplayEvent, s: KnownState, T: number, fc: MissF
       tip: forecastLine(fc).tip,
     };
   }
+  const nowX = xp(Math.max(0, e.tca - T));
   return {
     fan,
+    pcFc: po ? buildPcFan(po, nowX, yPc) : null,
+    pcNote: pcForecastOn ? { text: PC_NOTE, tip: po ? pcOutlookText(po).noteTip : null } : { text: PC_NOTE_OLD, tip: null },
     rtn: buildRtn(e, s, xp),
     pcPts: pcP.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '),
     pcDots: pcP.filter((p) => p[2] < PC_ACTION).map((p) => dotPath(p[0], p[1], 2.2)).join(''),
@@ -281,7 +341,7 @@ export function buildHistory(e: ReplayEvent, s: KnownState, T: number, fc: MissF
     y1L: (yMs(1000) + 3).toFixed(1),
     // When the axis is stretched by a far miss the two threshold lines sit close; keep their labels apart.
     y5L: Math.min(yMs(5000) + 3, yMs(1000) + 3 - 10.5).toFixed(1),
-    nowX: xp(Math.max(0, e.tca - T)).toFixed(1),
+    nowX: nowX.toFixed(1),
     trend,
   };
 }
@@ -618,7 +678,7 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
   const opt = stored && plan ? (orderedFeasible(plan.c.opts).find((o) => o.key === stored.opt) ?? null) : pickOption(plan, optKey, e);
   const fc = forecastAt(forecast, e, st);
   const header = buildHeader(ctx, e, st, plan, mission);
-  const hist = buildHistory(e, st, ctx.T, fc);
+  const hist = buildHistory(e, st, ctx.T, fc, pcForecastAt(forecast, e, st), !!forecast?.pcForecast);
   const fcCard: ForecastCardView | null = !forecast
     ? null
     : fc

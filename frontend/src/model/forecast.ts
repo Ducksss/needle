@@ -1,7 +1,7 @@
-// Final-miss forecast (contracts/README.md § forecast.json): where an event's miss distance is likely to end up at
-// closest approach, from how similar train events moved. Pc is not forecast.
+// Forecasts at closest approach (contracts/README.md § forecast.json), from how similar train events moved: a band
+// for the final miss distance, and a Pc outlook (a ceiling and outcome chances, since Pc has no useful band).
 
-import type { Forecast, ForecastCell, ReplayEvent } from '../data/types';
+import type { Forecast, ForecastCell, PcForecastCell, ReplayEvent } from '../data/types';
 import { dh } from './format';
 import { C } from './theme';
 import { PC_ACTION, PC_WATCH, type KnownState } from './replay';
@@ -107,7 +107,7 @@ export function forecastLine(fc: MissForecast): ForecastLine {
     pCritical: pCriticalTxt(fc),
     tip: [
       inTen(fc.coverage) + ' similar events ended inside this band (checked on ' + fc.heldOut.toLocaleString('en-US') + ' held-out events); n = ' + fc.cell.n.toLocaleString('en-US') + '.',
-      'From the latest miss and the time left to closest approach (' + fc.leadDays.toFixed(1) + ' days). Pc is not forecast.',
+      'From the latest miss and the time left to closest approach (' + fc.leadDays.toFixed(1) + ' days).',
     ],
   };
 }
@@ -187,5 +187,68 @@ export function forecastCard(fc: MissForecast, toTcaH = fc.leadDays * 24): Forec
     footnote:
       'Band and chance under 1 km: past events at the same lead time and distance. Chance it ends Critical: past events that also shared the Pc band. The band held ' +
       inTen(fc.coverage).replace(' in ', ' times in ') + ' on ' + fc.heldOut.toLocaleString('en-US') + ' held-out events. The brief scores predictions made 2+ days out; Needle updates this at every message.',
+  };
+}
+
+/** pcForecast bin: 0 at the floor, then 1 below 1e-10, 2 for 1e-10 to 1e-6, 3 for 1e-6 to 1e-4, 4 at or above 1e-4. */
+export function pcBinOf(f: NonNullable<Forecast['pcForecast']>, risk: number): number {
+  return risk <= f.floorLog10 ? 0 : 1 + binOf([-Infinity, ...f.pcBinEdgesLog10, null], risk);
+}
+
+const PC_BIN_TXT = ['too small to compute', 'below 1e-10', 'from 1e-10 to 1e-6', 'from 1e-6 to 1e-4', 'at or above 1e-4'];
+
+export interface PcOutlook {
+  /** Days from the latest message to closest approach. */
+  leadDays: number;
+  pcBin: number;
+  cell: PcForecastCell;
+  /** The latest message's log10 Pc. */
+  risk: number;
+  /** "3 to 5 days": the lead-time bin the cell covers. */
+  leadTxt: string;
+  /** Share of held-out events that ended at or below the ceiling; null in an older forecast.json. */
+  ceilingHeld: number | null;
+}
+
+/** Pc outlook for an open event from the latest message seen by T, or null when it has passed or there is no pcForecast. */
+export function pcForecastAt(f: Forecast | null | undefined, e: ReplayEvent, s: KnownState): PcOutlook | null {
+  const pf = f?.pcForecast;
+  if (!f || !pf || s.phase !== 'open') return null;
+  const [arrivalH, risk] = s.last;
+  const leadDays = (e.tca - arrivalH) / 24;
+  if (leadDays < 0) return null;
+  const lb = binOf(f.leadEdgesDays, leadDays);
+  const pcBin = pcBinOf(pf, risk);
+  const cell = pf.cells[pcBin]?.[lb];
+  if (!cell) return null;
+  const lo = f.leadEdgesDays[lb] ?? 0;
+  const hi = f.leadEdgesDays[lb + 1];
+  const leadTxt = hi == null ? lo + '+ days' : lo === 0 ? 'under ' + hi + (hi === 1 ? ' day' : ' days') : lo + ' to ' + hi + ' days';
+  return { leadDays, pcBin, cell, risk, leadTxt, ceilingHeld: f.validation.pcForecast?.ceilingHeld ?? null };
+}
+
+export interface PcOutlookText {
+  /** "53% fall to ~0", or at the floor "99% stay too small to compute". */
+  floor: string;
+  /** "11% end ≥ 1e-4"; null under 1%. */
+  atLeast1e4: string | null;
+  ceilingTip: string[];
+  /** Hover card of the chart note: the sample behind the numbers. */
+  noteTip: string[];
+}
+
+export function pcOutlookText(po: PcOutlook): PcOutlookText {
+  const c = po.cell;
+  return {
+    floor: pctTxt(c.pFloor) + (po.pcBin === 0 ? ' stay too small to compute' : ' fall to ~0'),
+    atLeast1e4: c.pAtLeast1e4 < 0.01 ? null : Math.round(c.pAtLeast1e4 * 100) + '% end ≥ 1e-4',
+    ceilingTip: [
+      '9 in 10 similar events ended at or below this' + (po.ceilingHeld != null ? ' (held on ' + (po.ceilingHeld * 100).toFixed(1) + '% of held-out events).' : '.'),
+      'Drawn at today’s Pc ' + (c.ceilingDelta != null && c.ceilingDelta < 0 ? 'minus ' : 'plus ') + Math.abs(c.ceilingDelta ?? 0).toFixed(2) + ' orders of magnitude.',
+    ],
+    noteTip: [
+      'From ' + c.n.toLocaleString('en-US') + ' past events with Pc ' + PC_BIN_TXT[po.pcBin] + ', ' + (c.pooledOverLead ? 'pooled over all lead times.' : po.leadTxt + ' before closest approach.'),
+      pctTxt(c.pFloor) + ' ended too small to compute, ' + pctTxt(c.pBelow1e6) + ' below 1e-6 and ' + pctTxt(c.pAtLeast1e4) + ' at or above 1e-4.',
+    ],
   };
 }

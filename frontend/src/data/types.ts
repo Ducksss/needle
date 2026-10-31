@@ -119,7 +119,35 @@ export interface Forecast {
   pCriticalByPc?: { p: number | null; n: number; pooledOver?: string }[][][];
   /** Pc band edges, log10: below the first is band 0, between is band 1, at or above the last is band 2. */
   pcEdgesLog10?: number[];
-  validation: { heldOutEvents: number; coverage10to90: number; coverageByLeadBin?: Record<string, number> };
+  /** Pc outlook at closest approach (contracts/README.md § forecast.json, "pcForecast"). Absent in older files. */
+  pcForecast?: PcForecast;
+  validation: {
+    heldOutEvents: number;
+    coverage10to90: number;
+    coverageByLeadBin?: Record<string, number>;
+    pcForecast?: { ceilingHeld: number; ceilingSamples: number };
+  };
+}
+
+/** One pcForecast cell: how similar train events' Pc ended, from their Pc band and lead time. */
+export interface PcForecastCell {
+  n: number;
+  /** 90th percentile of final minus current log10 Pc; null at the floor. */
+  ceilingDelta: number | null;
+  /** Chance it ends too small to compute (Pc about 0). */
+  pFloor: number;
+  pBelow1e6: number;
+  pAtLeast1e4: number;
+  /** The cell pools across lead times. */
+  pooledOverLead: boolean;
+}
+
+export interface PcForecast {
+  /** Bin edges above the floor, log10: below the first is bin 1, ..., at or above the last is bin 4. Bin 0 is the floor. */
+  pcBinEdgesLog10: number[];
+  floorLog10: number;
+  /** cells[pcBin][leadBin], lead bins as leadEdgesDays. */
+  cells: PcForecastCell[][];
 }
 
 export interface ConsoleData {

@@ -1,10 +1,10 @@
 import { useId } from 'react';
 import type { CostOfWaitingView, EncounterPlaneView, HistoryView } from '../model/workspace';
-import { TipCard } from './Hover';
+import { Hover, TipCard } from './Hover';
 
 const MONO = 'IBM Plex Mono, monospace';
 
-const NOW_TIP = 'Current replay time. Dots to the left are messages received so far; the right is the future (forecast on the miss chart).';
+const NOW_TIP = 'Current replay time. Dots to the left are messages received so far; the right is the future (forecasts on the Pc and miss charts).';
 
 /** The "now" tag at the top of a chart's current-time line, in the playhead's colour, with a hover card. */
 function NowTag({ x, width, tip = NOW_TIP }: { x: string; width: number; tip?: string }) {
@@ -23,8 +23,13 @@ function NowTag({ x, width, tip = NOW_TIP }: { x: string; width: number; tip?: s
   );
 }
 
+/** Halo so outlook labels stay readable over the now line and the threshold lines. */
+const HALO = { stroke: '#ffffff', strokeWidth: 3, paintOrder: 'stroke' as const, strokeLinejoin: 'round' as const };
+
 export function MessageHistory({ h }: { h: HistoryView }) {
   const fanTip = useId();
+  const fadeId = useId();
+  const pf = h.pcFc;
   return (
     <figure className="ws-cell b-bottom b-right">
       <figcaption>
@@ -34,7 +39,34 @@ export function MessageHistory({ h }: { h: HistoryView }) {
       <span className="caps">Collision probability</span>
       <div className="chart-wrap">
       <NowTag x={h.nowX} width={320} />
-      <svg viewBox="0 0 320 96" className="chart" role="img" aria-label="Collision probability for each message received so far">
+      {pf?.ceiling && (
+        <Hover
+          className={'pc-ceil-tag' + (pf.ceiling.alignEnd ? ' end' : '') + (pf.ceiling.below ? ' below' : '')}
+          style={{ left: (pf.ceiling.x / 320) * 100 + '%', top: 'calc(12px + (100% - 12px) * ' + (pf.ceiling.y / 96).toFixed(3) + ')' }}
+          title="Ceiling"
+          lines={pf.ceiling.tip}
+          side={{ edge: pf.ceiling.alignEnd ? 'right' : 'left', px: 0 }}
+        >
+          ceiling
+        </Hover>
+      )}
+      <svg
+        viewBox="0 0 320 96"
+        className="chart"
+        role="img"
+        aria-label={'Collision probability for each message received so far' + (pf ? ', with the outlook to closest approach: ' + [pf.ceiling ? 'a ceiling' : null, pf.floorLabel.join(' '), pf.ring.label].filter(Boolean).join(', ') : '')}
+      >
+        {pf?.fade && (
+          <>
+            <defs>
+              <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="#94A3B8" stopOpacity="0.3" />
+                <stop offset="1" stopColor="#94A3B8" stopOpacity="0.04" />
+              </linearGradient>
+            </defs>
+            <path d={pf.fade} fill={`url(#${fadeId})`} />
+          </>
+        )}
         <line x1="40" x2="316" y1="19.3" y2="19.3" stroke="#C2410C" strokeDasharray="3 3" />
         <line x1="40" x2="316" y1="86" y2="86" stroke="#E3E8EE" />
         <text x="36" y="22" textAnchor="end" fontSize="9" fill="#C2410C" fontFamily={MONO}>
@@ -51,9 +83,34 @@ export function MessageHistory({ h }: { h: HistoryView }) {
         <polyline points={h.pcPts} fill="none" stroke="#0F172A" strokeWidth="1.6" strokeLinejoin="round" />
         <path d={h.pcDots} fill="#0F172A" />
         <path d={h.pcHot} fill="#C2410C" />
+        {pf && (
+          <>
+            {pf.ceiling && <path d={pf.ceiling.d} fill="none" stroke="#0F172A" strokeWidth="1.2" strokeDasharray="4 3" />}
+            <text x="312" y={82 - (pf.floorLabel.length - 1) * 10} textAnchor="end" fontSize="9" fill="#64748B" fontFamily={MONO} {...HALO}>
+              {pf.floorLabel.map((l, i) => (
+                <tspan key={i} x="312" dy={i ? 10 : 0}>
+                  {l}
+                </tspan>
+              ))}
+            </text>
+            <circle cx={pf.ring.cx} cy={pf.ring.cy} r={pf.ring.r} fill="rgba(194, 65, 12, 0.14)" stroke="#C2410C" strokeWidth="1" />
+            {pf.ring.wedge && <path d={pf.ring.wedge} fill="#C2410C" />}
+            {pf.ring.label && (
+              <text x="309" y="29" textAnchor="end" fontSize="9" fill="#C2410C" fontFamily={MONO} {...HALO}>
+                {pf.ring.label}
+              </text>
+            )}
+          </>
+        )}
       </svg>
       </div>
-      <span className="chart-note">Pc is not forecast: it swings by orders of magnitude.</span>
+      {h.pcNote.tip ? (
+        <Hover className="chart-note help" title="Pc outlook" lines={h.pcNote.tip}>
+          <span className="dotted">{h.pcNote.text}</span>
+        </Hover>
+      ) : (
+        <span className="chart-note">{h.pcNote.text}</span>
+      )}
       <span className="caps">Miss distance</span>
       <div className="fan-wrap chart-wrap">
       <NowTag x={h.nowX} width={320} />

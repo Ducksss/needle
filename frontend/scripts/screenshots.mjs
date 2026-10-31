@@ -221,6 +221,23 @@ await page.waitForTimeout(200);
 await shot(page, '12-globe-reduced-motion.png', { fullPage: true, clip: await pageBox(page, globe) });
 await page.close();
 
+// Pc outlook on the Pc chart at Run 5: #6341 (Pc at or above 1e-4), its ceiling card, and a Watch event at the floor.
+page = await open(1440, 1000, 2);
+const hist = ['figure.ws-cell:has(> .fan-wrap)'];
+const pcChart = async () => {
+  const b = await pageBox(page, hist);
+  return { ...b, height: Math.min(b.height, 260) };
+};
+await page.mouse.move(5, 5);
+await shot(page, '21-pc-forecast-6341.png', { fullPage: true, clip: await pcChart() });
+await hoverShot(page, '.pc-ceil-tag', '21b-pc-forecast-ceiling-hover.png');
+await page.getByRole('button', { name: /^Watch/ }).click();
+await page.locator('.qrow', { hasText: '#7546' }).click();
+await page.waitForTimeout(300);
+await page.mouse.move(5, 5);
+await shot(page, '21c-pc-forecast-floor-7546.png', { fullPage: true, clip: await pcChart() });
+await page.close();
+
 page = await open(375, 812, 2);
 await shot(page, '11-width-375-top.png');
 await page.locator('section[aria-label="Replay timeline"]').scrollIntoViewIfNeeded();
