@@ -92,6 +92,7 @@ export function approve(ui: UiState, view: ConsoleView): Decisions {
     ...ui.dec,
     approved: { ...ui.dec.approved, [id]: run1 },
     approvedTxt: { ...ui.dec.approvedTxt, [id]: what },
+    approvedPlan: { ...ui.dec.approvedPlan, [id]: { key: view.ws.planner.plan.key, opt: o.key } },
     log: [...ui.dec.log, entry],
   };
 }

@@ -318,7 +318,9 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
           lines: [ctx.dec.approvedTxt[e.id] ?? '', 'Simulated upload. Later messages are the real recorded ones, so they do not show the burn.'].filter(Boolean),
         });
       } else if (pl) {
-        const o: CoaOption | undefined = (sel === e.id ? pl.c.opts.find((x) => x.key === optKey) : undefined) ?? pl.c.opts[0];
+        // Same choice as the workspace planner: feasible options only.
+        const feasible = pl.c.opts.filter((x) => x.feasible);
+        const o: CoaOption | undefined = (sel === e.id ? feasible.find((x) => x.key === optKey) : undefined) ?? feasible[0];
         if (o) {
           const hB = T + (o.key === 'coa3' ? 24 : 0);
           marks.push({

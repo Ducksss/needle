@@ -20,5 +20,8 @@ export async function loadConsoleData(urls = dataUrls()): Promise<ConsoleData> {
     getJson<Replay>(urls.replay),
     getJson<Metrics>(urls.metrics).catch(() => null),
   ]);
+  // Fail into the error state, not a blank page, when a file parses but is not the contract shape.
+  if (!Array.isArray(fleet?.missions)) throw new Error(`${urls.fleet}: missing missions`);
+  if (!Array.isArray(replay?.events)) throw new Error(`${urls.replay}: missing events`);
   return { fleet, replay, metrics };
 }

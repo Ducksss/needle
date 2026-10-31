@@ -25,11 +25,14 @@ interface State {
   modal: boolean;
   /** The run changed by stepping, scrubbing or playback, so changed rows get a short highlight. */
   flash: boolean;
+  /** Bumped by Retry to load the data again. */
+  attempt: number;
 }
 
 type Action =
   | { type: 'loaded'; data: ConsoleData }
   | { type: 'failed' }
+  | { type: 'retry' }
   | { type: 'run'; run: number }
   | { type: 'tick' }
   | { type: 'play' }
@@ -51,6 +54,8 @@ function reducer(s: State, a: Action): State {
     }
     case 'failed':
       return { ...s, status: 'error' };
+    case 'retry':
+      return { ...s, status: 'loading', attempt: s.attempt + 1 };
     case 'run':
       return { ...s, playing: false, flash: true, ui: { ...s.ui, run: Math.max(0, Math.min(lastRun(s), a.run)) } };
     case 'tick':
@@ -66,7 +71,8 @@ function reducer(s: State, a: Action): State {
     case 'opt':
       return { ...s, ui: { ...s.ui, opt: a.opt } };
     case 'modal':
-      return { ...s, modal: a.open };
+      // Playback would move the run, and the plan under review, while the dialog is open.
+      return { ...s, modal: a.open, playing: a.open ? false : s.playing };
     case 'decide':
       return { ...s, modal: false, ui: { ...s.ui, dec: a.dec } };
     case 'budget':
@@ -75,7 +81,7 @@ function reducer(s: State, a: Action): State {
 }
 
 function initState(): State {
-  return { status: 'loading', data: null, playing: false, modal: false, flash: false, ui: { run: 0, tab: 'needs', sel: null, opt: 'coa1', budget: readBudget(), dec: NO_DECISIONS } };
+  return { status: 'loading', data: null, playing: false, modal: false, flash: false, attempt: 0, ui: { run: 0, tab: 'needs', sel: null, opt: 'coa1', budget: readBudget(), dec: NO_DECISIONS } };
 }
 
 /** Brings the workspace into view when a selection is made from further down the page. */
@@ -97,7 +103,7 @@ export function App() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [s.attempt]);
 
   useEffect(() => {
     if (!s.playing) return;
@@ -118,7 +124,12 @@ export function App() {
     return (
       <div className="page">
         <Header kpis={[]} budget={s.ui.budget} onBudget={(budget) => dispatch({ type: 'budget', budget })} />
-        <NextDecision next={{ tone: 'neutral', label: '', text: '', eventId: null, showing: false }} loading={s.status === 'error' ? 'error' : 'loading'} onOpen={pick} />
+        <NextDecision
+          next={{ tone: 'neutral', label: '', text: '', eventId: null, showing: false }}
+          loading={s.status === 'error' ? 'error' : 'loading'}
+          onOpen={pick}
+          onRetry={() => dispatch({ type: 'retry' })}
+        />
       </div>
     );
   }

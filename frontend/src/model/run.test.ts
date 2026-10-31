@@ -13,6 +13,13 @@ describe('snapshot on the committed replay', () => {
       expect(snap.quiet).toBeGreaterThanOrEqual(0);
       const ids = new Set([...snap.needs, ...snap.watching].map((r) => r.e.id));
       expect(ids.size).toBe(snap.needs.length + snap.watching.length);
+      const ctx = runCtx(rp, run, 10, NO_DECISIONS);
+      const needIds = new Set(snap.needs.map((r) => r.e.id));
+      const watchIds = new Set(snap.watching.map((r) => r.e.id));
+      for (const r of snap.open) {
+        const q = queueOf(ctx, r.e, r.s);
+        expect([q, needIds.has(r.e.id), watchIds.has(r.e.id)]).toEqual([q, q === 'Decide', q === 'Watch']);
+      }
     }
   });
 

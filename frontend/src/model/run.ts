@@ -14,11 +14,13 @@ export interface LogEntry {
 export interface Decisions {
   approved: Record<number, number>;
   approvedTxt: Record<number, string>;
+  /** The plan (CDM index) and option each approval was made on, so later plans cannot change an approved burn. */
+  approvedPlan: Record<number, { key: number; opt: OptionKey }>;
   deferred: Record<number, number>;
   log: LogEntry[];
 }
 
-export const NO_DECISIONS: Decisions = { approved: {}, approvedTxt: {}, deferred: {}, log: [] };
+export const NO_DECISIONS: Decisions = { approved: {}, approvedTxt: {}, approvedPlan: {}, deferred: {}, log: [] };
 
 export interface RunCtx {
   replay: Replay;

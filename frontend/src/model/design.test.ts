@@ -5,7 +5,7 @@ import { buildNext } from './header';
 import { buildQueue } from './queue';
 import { initialSelection, isKnown, rtnAt, stateAt } from './replay';
 import { NO_DECISIONS, changedSincePrev, runCtx, snapshot } from './run';
-import { buildView } from './view';
+import { approve, buildView } from './view';
 import { buildRtn, scaleBarM } from './workspace';
 
 describe('Decide tab', () => {
@@ -133,5 +133,55 @@ describe('relative position (brief update, 31 Oct)', () => {
     const start = initialSelection(data.replay.events, data.replay.runH, data.replay.runs);
     const v = buildView(data, { run: start.run, tab: 'needs', sel: start.sel, opt: 'coa1', budget: 10, dec: NO_DECISIONS });
     expect(v.ws.kind === 'event' && v.ws.hist.rtn).toBeNull();
+  });
+});
+
+describe('review fixes', () => {
+  it('keeps an approved burn on the plan it was approved on', () => {
+    const later = coa({ opts: coa().opts.map((o) => ({ ...o, dv: o.dv * 3 })) });
+    const e = ev(1, 300, [[0, -3.5, 400], [16, -3.4, 380]], { coa: { '0': coa(), '1': later } });
+    const data = { fleet: realData().fleet, replay: replayOf([e]), metrics: null };
+    const ui = { run: 0, tab: 'needs' as const, sel: 1, opt: 'coa2' as const, budget: 40, dec: NO_DECISIONS };
+    const dec = approve(ui, buildView(data, ui));
+    expect(dec.approvedPlan[1]).toEqual({ key: 0, opt: 'coa2' });
+    const v = buildView(data, { ...ui, run: 3, opt: 'coa1', dec });
+    if (v.ws.kind !== 'event' || !v.ws.planner) throw new Error('expected a planner');
+    expect(v.ws.planner.plan.key).toBe(0);
+    expect(v.ws.planner.opt.key).toBe('coa2');
+    expect(v.ws.planner.opts.locked).toBe(true);
+    const fresh = buildView(data, { ...ui, run: 3, dec: NO_DECISIONS });
+    expect(fresh.ws.kind === 'event' && fresh.ws.planner?.plan.key).toBe(1);
+  });
+
+  it('proposes only feasible options on the timeline', () => {
+    const c = coa();
+    c.opts[0] = { ...c.opts[0], feasible: false };
+    const e = ev(1, 300, [[0, -3.5, 400]], { coa: { '0': c } });
+    const marks = buildDock(runCtx(replayOf([e]), 0, 10, NO_DECISIONS), null, null, 'coa1').lanes.flatMap((l) => l.marks);
+    expect(marks.map((m) => m.text)).toEqual(['Proposed burn · 5.0 mm/s']);
+  });
+
+  it('names an over-80 window a day later, not an impossible one', () => {
+    const e = ev(1, 300, [[0, -3.5, 400]], { coa: { '0': coa({ wait: [[0, 2], [6, 3], [12, 4], [18, 5], [24, null], [30, 9]] }) } });
+    const data = { fleet: realData().fleet, replay: replayOf([e]), metrics: null };
+    const v = buildView(data, { run: 0, tab: 'needs', sel: 1, opt: 'coa1', budget: 40, dec: NO_DECISIONS });
+    expect(v.ws.kind === 'event' && v.ws.planner?.wc.caption).toMatch(/One day later: over 80 mm\/s\./);
+  });
+
+  it('keeps a Decide event without a plan in the Next decision bar', () => {
+    const e = ev(1, 50, [[20, -3.5, 400], [46, -3.4, 380]], { coa: { '0': coa() } });
+    const ctx = runCtx(replayOf([e]), 6, 10, NO_DECISIONS);
+    const next = buildNext(snapshot(ctx), 10, null);
+    expect(next.tone).toBe('decide');
+    expect(next.eventId).toBe(1);
+    expect(next.text).toMatch(/hand over to flight dynamics\.$/);
+  });
+
+  it('lists every passed event', () => {
+    const rp = realReplay();
+    const ctx = runCtx(rp, rp.runs - 1, 10, NO_DECISIONS);
+    const q = buildQueue(ctx, snapshot(ctx), 'passed', null);
+    expect(q.rows.length).toBe(q.tabs.find((t) => t.key === 'passed')!.count);
+    expect(q.rows.length).toBeGreaterThan(80);
   });
 });

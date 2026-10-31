@@ -465,6 +465,15 @@ h2 {
     flex: none;
     max-height: 420px;
   }
+
+  /* KPI cards anchor to the whole KPI row, so a KPI near the right edge keeps its card on screen. */
+  .kpis {
+    position: relative;
+  }
+
+  .kpi {
+    position: static;
+  }
 }
 
 /* Queue */
@@ -864,6 +873,11 @@ h2 {
   cursor: pointer;
   text-align: left;
   font-size: 12px;
+}
+
+.opt:disabled {
+  cursor: default;
+  color: var(--faint);
 }
 
 .opt[aria-checked='true'] {

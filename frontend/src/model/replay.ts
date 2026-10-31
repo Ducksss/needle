@@ -86,12 +86,23 @@ export interface Plan {
   overNow: boolean;
 }
 
-/** The latest burn plan for an open Decide event at time T, or null when there is none (or it is too late to plan). */
+/** Burns are planned up to this many hours before closest approach; after that, flight dynamics takes over. */
+export const PLAN_CUTOFF_H = 3;
+
+/**
+ * The latest burn plan for an open Decide event at time T. Null when there is none, or when closest approach is under
+ * 3 h away, so nothing can be approved past the planner's own window.
+ */
 export function planOf(e: ReplayEvent, s: EventState, T: number, budget: number): Plan | null {
   if (s.phase !== 'open' || s.bucket !== 'pc') return null;
+  if (T >= e.tca - PLAN_CUTOFF_H) return null;
   const ks = Object.keys(e.coa).map(Number).filter((k) => k <= s.k);
   if (!ks.length) return null;
-  const key = Math.max(...ks);
+  return planAt(e, Math.max(...ks), T, budget);
+}
+
+/** The plan computed at CDM index key, seen at time T. */
+export function planAt(e: ReplayEvent, key: number, T: number, budget: number): Plan {
   const c = e.coa[String(key)];
   const msgT = e.m[key][0];
   const age = T - msgT;
@@ -102,7 +113,7 @@ export function planOf(e: ReplayEvent, s: EventState, T: number, budget: number)
       break;
     }
   }
-  const endRel = e.tca - msgT - 3;
+  const endRel = e.tca - msgT - PLAN_CUTOFF_H;
   const dlRel = firstOver == null ? endRel : firstOver;
   return { key, c, msgT, age, dlAbs: msgT + dlRel, left: msgT + dlRel - T, overNow: dlRel <= age };
 }

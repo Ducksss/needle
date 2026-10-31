@@ -1,5 +1,5 @@
 // Copies the ML artifacts (../artifacts/*.json) into public/data/ so a static build works without the API.
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,4 +20,8 @@ for (const f of files) {
   copyFileSync(join(src, f), join(dst, f));
   console.log(`sync-data: ${f} (${(statSync(join(dst, f)).size / 1024).toFixed(1)} KB)`);
 }
-if (!files.includes('metrics.json')) console.log('sync-data: no metrics.json; the console falls back to values computed from replay.json');
+// Mirror the artifact set: a copy whose artifact is gone would otherwise be served next to newer data.
+for (const f of readdirSync(dst).filter((f) => f.endsWith('.json') && !files.includes(f))) {
+  rmSync(join(dst, f));
+  console.log(`sync-data: removed stale ${f}`);
+}

@@ -43,8 +43,6 @@ export interface QueueView {
   empty: boolean;
 }
 
-/** The Passed tab shows the most recent 80. */
-export const PASSED_LIMIT = 80;
 /** Full length of the Decide tab's urgency bar, hours. */
 export const URGENCY_SCALE_H = 48;
 
@@ -55,7 +53,7 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
     { key: 'watch', label: 'Watch', count: snap.watching.length, on: tab === 'watch' },
     { key: 'passed', label: 'Passed', count: snap.passed.length, on: tab === 'passed' },
   ];
-  const list: KnownRow[] = tab === 'needs' ? snap.needs : tab === 'watch' ? snap.watching : snap.passed.slice(0, PASSED_LIMIT);
+  const list: KnownRow[] = tab === 'needs' ? snap.needs : tab === 'watch' ? snap.watching : snap.passed;
   const rows = list.map((x): QueueRow => {
     let col1 = '';
     let col1Color: string = C.ink;

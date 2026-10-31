@@ -1,11 +1,23 @@
 import type { NextDecision as Next } from '../model/header';
 
-export function NextDecision({ next, loading, onOpen }: { next: Next; loading?: string; onOpen: (id: number) => void }) {
+interface NextDecisionProps {
+  next: Next;
+  loading?: 'loading' | 'error';
+  onOpen: (id: number) => void;
+  onRetry?: () => void;
+}
+
+export function NextDecision({ next, loading, onOpen, onRetry }: NextDecisionProps) {
   if (loading) {
     return (
       <section aria-label="Next decision" className="next next-neutral">
         <span className="next-label">{loading === 'error' ? 'Data error' : 'Loading'}</span>
         <span className="next-text">{loading === 'error' ? 'Could not load the replay data.' : 'Loading the replay data.'}</span>
+        {loading === 'error' && onRetry && (
+          <button type="button" className="btn btn-dark" onClick={onRetry}>
+            Retry
+          </button>
+        )}
       </section>
     );
   }

@@ -61,6 +61,19 @@ export interface NextDecision {
 export function buildNext(snap: Snapshot, budget: number, sel: number | null = null): NextDecision {
   const urgent: NeedRow | undefined = snap.needs.find((x) => x.plan);
   if (!urgent || !urgent.plan) {
+    // Decide events with no plan are inside the last 3 h before closest approach.
+    const first = snap.needs[0];
+    if (first) {
+      return {
+        tone: 'decide',
+        label: 'Next decision',
+        text:
+          '#' + first.e.id + ' · ' + first.e.sat + ' vs ' + first.e.obj.toLowerCase() + ' · Pc ' + pcWithOdds(first.s.last[1]) +
+          '. Closest approach is under 3 h away and there is no burn plan: hand over to flight dynamics.',
+        eventId: first.e.id,
+        showing: sel === first.e.id,
+      };
+    }
     return { tone: 'clear', label: 'No decision due', text: snap.open.length + ' events open; none needs a decision at this run.', eventId: null, showing: false };
   }
   const { e, s, plan } = urgent;

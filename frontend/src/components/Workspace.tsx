@@ -90,7 +90,16 @@ function Options({ opts, onOpt, onReview, onDefer }: { opts: OptionsView; onOpt:
           <span>Miss after</span>
         </div>
         {opts.rows.map((o) => (
-          <button key={o.key} type="button" role="radio" aria-checked={o.on} className="opt-grid opt" onClick={() => onOpt(o.key)}>
+          <button
+            key={o.key}
+            type="button"
+            role="radio"
+            aria-checked={o.on}
+            className="opt-grid opt"
+            disabled={opts.locked && !o.on}
+            title={opts.locked && !o.on ? 'The approved option is fixed.' : undefined}
+            onClick={() => onOpt(o.key)}
+          >
             <span className="opt-name">
               <span>{o.name}</span>
               <span>{o.dir}</span>

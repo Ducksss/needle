@@ -2,7 +2,7 @@
 
 import type { CoaOption, Mission, OptionKey, ReplayEvent } from '../data/types';
 import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, sci } from './format';
-import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, TIER_TIP, bucketOf, isKnown, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
+import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, TIER_TIP, bucketOf, isKnown, planAt, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
 import { type Chip, type RunCtx, OPTION_NAMES, approvedAt, chipFor, isDeferredNow } from './run';
 import { BUCKET_COLOR, C, TONE, type Tone } from './theme';
 
@@ -137,6 +137,8 @@ export interface OptionsView {
   decision: string;
   canDefer: boolean;
   approved: boolean;
+  /** Approved: the options table shows the approved option and cannot change it. */
+  locked: boolean;
   reviewLabel: string;
 }
 
@@ -334,7 +336,7 @@ function buildOther(ctx: RunCtx, e: ReplayEvent, s: KnownState): { other: OtherV
     other = {
       title: s.peaked ? 'Why it was downgraded' : 'Why it is on watch',
       text: s.peaked
-        ? 'Tracking improved and Pc fell below 1e-4. In ESA’s training histories, 141 of 154 events that reached Pc 1e-4 fell back below it by their last message.'
+        ? 'Tracking improved and Pc fell below 1e-4.'
         : 'It meets a watch rule but not the action rule (Pc ≥ 1e-4). The planner runs automatically if a later message crosses it.',
       facts: [
         { k: 'Peak Pc so far', v: pcTxt(peak) },
@@ -367,9 +369,14 @@ function buildCostOfWaiting(ctx: RunCtx, plan: Plan, facts: WorkspaceFacts): Cos
   const dlRel = plan.dlAbs - plan.msgT;
   const wi = windowIndex(plan.c, plan.age);
   const wNow = waitDv(plan.c, wi);
-  const w24 = waitDv(plan.c, wi + 4);
+  const later = plan.c.wait[wi + 4];
   const nowTxt = wNow != null ? wNow.toFixed(1) : 'over 80';
-  const dayLater = w24 != null ? w24.toFixed(1) + ' mm/s' + (wNow ? ' (' + (w24 / wNow).toFixed(2) + '×)' : '') : 'not possible before closest approach';
+  // A missing window is past TCA − 3 h; a null Δv means the window needs over 80 mm/s.
+  const dayLater = !later
+    ? 'not possible before closest approach'
+    : later[1] == null
+      ? 'over 80 mm/s'
+      : later[1].toFixed(1) + ' mm/s' + (wNow ? ' (' + (later[1] / wNow).toFixed(2) + '×)' : '');
   const ticks: AxisTick[] = [];
   for (let h = 24; h < H - 4; h += 24) ticks.push({ x: X(h).toFixed(1), label: '+' + h + ' h' });
   const dlX = X(dlRel);
@@ -517,8 +524,11 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
   if (!e) return { kind: 'empty', text: 'Select an event from the queue, the timeline or the run digest.' };
   const st = stateAt(e, ctx.T, ctx.replay.runH);
   if (!isKnown(st)) return { kind: 'empty', text: 'Event #' + e.id + ' has not been reported yet. Its first message arrives in ' + dh(e.m[0][0] - ctx.T) + '.' };
-  const plan = planOf(e, st, ctx.T, ctx.budget);
-  const opt = pickOption(plan, optKey);
+  const live = planOf(e, st, ctx.T, ctx.budget);
+  // An approved burn stays the one approved, even when a later message brings a new plan.
+  const stored = approvedAt(ctx, e.id) != null ? ctx.dec.approvedPlan[e.id] : undefined;
+  const plan = live && stored && e.coa[String(stored.key)] ? planAt(e, stored.key, ctx.T, ctx.budget) : live;
+  const opt = pickOption(plan, stored ? stored.opt : optKey);
   const header = buildHeader(ctx, e, st, plan, mission);
   const hist = buildHistory(e, st, ctx.T);
   if (plan && opt) {
@@ -539,6 +549,7 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: Optio
       decision: appr != null ? 'Approved at run ' + appr + '.' : isDeferredNow(ctx, e.id) ? 'Deferred at this run; re-check after the next message.' : 'Not decided.',
       canDefer: appr == null,
       approved: appr != null,
+      locked: stored != null,
       reviewLabel: appr != null ? 'View approved plan' : 'Review and approve',
     };
     const planner: PlannerView = { plan, opt, wc: buildCostOfWaiting(ctx, plan, facts), bp: buildEncounterPlane(plan, opt), opts, modal: buildModal(ctx, e, plan, opt) };

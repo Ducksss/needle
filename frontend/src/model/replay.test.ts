@@ -87,6 +87,12 @@ describe('planOf', () => {
     expect(planOf(e2, stateAt(e2, 24, 8), 24, 10)?.dlAbs).toBe(26);
   });
 
+  it('has no plan once closest approach is under 3 h away', () => {
+    const near = ev(5, 50, [[20, -3.5, 400], [46, -3.4, 380]], { coa: { '0': coa() } });
+    expect(planOf(near, stateAt(near, 46.9, 8), 46.9, 10)).not.toBeNull();
+    expect(planOf(near, stateAt(near, 47, 8), 47, 10)).toBeNull();
+  });
+
   it('has no plan below the action threshold', () => {
     const e3 = ev(4, 120, [[20, -5, 400]], { coa: { '0': coa() } });
     expect(planOf(e3, stateAt(e3, 24, 8), 24, 10)).toBeNull();
@@ -97,6 +103,7 @@ describe('initialSelection', () => {
   it('opens on the first escalated event when its first plan arrives', () => {
     const rp = realReplay();
     const { run, sel } = initialSelection(rp.events, rp.runH, rp.runs);
+    expect(sel).toBe(6341);
     const e = rp.events.find((x) => x.id === sel)!;
     const k0 = Math.min(...Object.keys(e.coa).map(Number));
     expect(run).toBe(Math.ceil(e.m[k0][0] / rp.runH));
