@@ -52,6 +52,7 @@ def test_replay_shape(replay_json):
         assert set(e) == REPLAY_EVENT_KEYS and 0 <= e["mi"] < n_missions
         arrivals = [m[0] for m in e["m"]]
         assert all(len(m) == 3 for m in e["m"]) and arrivals == sorted(arrivals)
+        assert len(e["rtn"]) == len(e["m"]) and all(len(p) == 3 for p in e["rtn"])
         for k, c in e["coa"].items():
             assert 0 <= int(k) < len(e["m"]) and e["m"][int(k)][1] >= -4
             assert set(c) == COA_KEYS and c["opts"]
