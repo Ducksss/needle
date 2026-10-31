@@ -2,6 +2,29 @@
 
 Turn the working scripts in `legacy/` into a tested Python package that rebuilds every artifact from the ESA CSVs with one command.
 
+## Usage
+
+```bash
+export NEEDLE_DATA_DIR=/path/to/folder/with/train_data.csv
+uv run needle-ml build                  # writes ../artifacts (about 90 s)
+uv run needle-ml build --grid legacy    # test_predictions.csv with the legacy thresholds (t1 0.8, t2 0.7)
+uv run pytest                           # tests that need the CSVs skip when NEEDLE_DATA_DIR is unset
+```
+
+`--out` or `NEEDLE_ARTIFACTS_DIR` changes the output folder. `--skip-replay` keeps the existing `replay.json`.
+
+| Module | Ported from | What it does |
+|---|---|---|
+| `data.py` | all | CSV loading; the allowed column list (`ALLOWED`) and the full-CDM physics list |
+| `tiers.py` | `predict.py`, `fleet.py` | Brief tier rules and fleet buckets |
+| `physics.py` | `coa.py`, `replay.py`, `cwcheck.py` | Encounter-plane Pc, CW burn search, cost-of-waiting envelope, two-body check; `pc_from_cdm`, `plan_burns`. Imports only numpy |
+| `classifier.py` | `predict.py` | Allowed-column tier classifier, event-grouped out-of-fold threshold selection |
+| `fleet.py`, `replay.py` | same names | `fleet.json`, `replay.json` |
+| `metrics.py` | `coa.py` checks | Physics check against ESA `risk`; assembles `metrics.json` |
+| `cli.py` | | `needle-ml build` |
+
+`plan_burns(cdm, budget_mm_s)` searches to 80 mm/s like the replay and sets `feasible` to `dv <= budget_mm_s` (`None` marks all found options feasible). Options with no solution under 80 mm/s, or under 3 h lead, are left out. Missing CDM columns raise `ValueError`.
+
 ## Scope
 
 - `pyproject.toml` managed with uv, Python ≥ 3.11, package `needle_ml`, console script `needle-ml`.
