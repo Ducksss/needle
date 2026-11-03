@@ -18,19 +18,18 @@ A spoken walkthrough for judges at the table: about 3 minutes of talk and demo, 
 
 1. **Next decision bar (top).** "This is the one thing to decide now. The most urgent event, its Pc, and how long until the cheapest burn no longer fits our 10 mm/s budget."
 2. **Queue, Decide tab.** "Sorted by deadline, not by alarm volume. Watch holds events that are close but not dangerous. Passed holds what's done."
-3. **Workspace.**
-   - Message history: "Pc and miss distance for every message received so far, and relative position against time to closest approach."
+3. **Workspace.** The console opens on event #6341 at run 5.
+   - Forecast at closest approach: "Today it's 334 m. Our likely final distance is 378 m, and 8 out of 10 similar past events ended between 231 m and 2.08 km. That range held for 79.9% of held-out events. There's a 72% chance it ends under 1 km, and a 62% chance it ends Critical."
+   - Message history: "Pc and miss distance for every message so far. Right of the 'now' line is the forecast. For Pc, the dashed line is the worst likely value, 1 in 10,000. The shading shows a 53% chance the risk drops to almost zero, and the marker an 11% chance it's still high at closest approach."
    - Encounter plane: "Where the object passes now, and after the burn."
-   - Cost of waiting: "Each day we wait costs about 1.25 times the Δv. That curve sets the deadline."
+   - Cost of waiting: "Waiting a day costs a median 1.25 times the Δv. That curve sets the deadline."
 4. **Options, then Review and approve.**
    - "The planner proposes; the checks are deterministic; the operator approves."
    - Example to quote: event 891, Pc 1.3e-3 at 503 m. A 7.0 mm/s retrograde burn moves it to 1,056 m and Pc 9.1e-5.
    - "The recommended burn is sized so even the pessimistic forecast still clears 1 km. In most cases that costs nothing extra."
-5. **Timeline at the bottom: press Play.** "This is a replay of 280 real ESA message histories over 21 days of 8-hour screening runs. Events appear, escalate, get decided and pass."
+5. **Timeline at the bottom: press Play.** "This is a replay of 280 real ESA message histories over 21 days of 8-hour screening runs. Events appear, escalate, get decided and pass. The marker at the end of each open bar is the chance that event ends Critical."
 6. **Next 24 h panel.** "The brief's 24-hour warnings: what reaches closest approach in the next day, how many come within 1 km, and which of those actually matter."
 7. **Globe.** "Context only. The data has no orbits or clock times, so the orientation is illustrative."
-
-Before the demo, approve one burn and check that the timeline shows "Burn approved". A fix for that view is in progress.
 
 ## 4. Results (30 s)
 
@@ -56,7 +55,7 @@ Most late escalations are the miss distance dropping under 1 km in the final two
 A 900 m pass with tiny uncertainty and a 900 m pass with huge uncertainty are different risks. Pc folds in the uncertainty. Distance alone floods the queue: 163 of 186 test Criticals are distance-only.
 
 **Can you forecast Pc too?**
-Not usefully. It swings by orders of magnitude. Of 21 events at Pc ≥ 1e-4 two days out, only 3 stayed there. We forecast the miss distance with limits, and show the chance of ending Critical instead.
+Not as a single number, because it swings by orders of magnitude. We forecast three things instead: a worst likely value, the chance it drops to almost zero, and the chance it's still at or above 1e-4 at closest approach. On held-out events the worst likely value held 89.9% of the time over 4,355 forecasts. The predicted chance of dropping to almost zero averaged 75.5%, against 76.0% observed. Of events at Pc ≥ 1e-4 now, only about 1 in 10 are still that high at closest approach.
 
 **Why not plan seven days out?**
 The data starts about seven days out, and the forecast range is widest there. Waiting a day costs about 25% more Δv, so the decision deadline balances a cheaper burn now against more certainty later.
