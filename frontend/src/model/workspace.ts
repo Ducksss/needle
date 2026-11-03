@@ -5,7 +5,7 @@ import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, s
 import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, PLAN_CUTOFF_H, TIER_TIP, bucketOf, burnAt, burnPassed, isKnown, planAt, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
 import { type ForecastCard, type MissForecast, type PcOutlook, type PcOutlookKey, PC_NOTE, forecastAt, forecastCard, forecastLine, inTen, kmTxt, pcForecastAt, pcOutlookText, rangeTxt } from './forecast';
 import { type Chip, type RunCtx, approvedAt, chipFor, isDeferredNow } from './run';
-import { type OptChoice, type PlanKey, type PlanOption, type WindowOption, OPTION_NAMES, approvedOption, isWindow, meetsTargets, missedTarget, pickOption, planOptions, recommended, withWindow } from './options';
+import { type OptChoice, type PlanKey, type PlanOption, type WindowOption, OPTION_NAMES, approvedOption, approvedStart, isWindow, meetsTargets, missedTarget, pickOption, planOptions, recommended, withWindow } from './options';
 import { TONE, type Tone, missColor, pcColor } from './theme';
 
 export interface EventHeader {
@@ -667,7 +667,8 @@ function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: PlanOption, re
     burnPassed: !approved && passed,
     checks: buildGateChecks(e, plan, opt, ctx.budget),
   };
-  if (isWindow(opt)) return { ...common, ...windowModal(e, opt, objTxt) };
+  const apprRun = approvedAt(ctx, e.id);
+  if (isWindow(opt)) return { ...common, ...windowModal(e, opt, objTxt, apprRun != null ? approvedStart(e, opt, (apprRun - 1) * ctx.replay.runH) : opt.start) };
   const aheadTxt = 'arrive about ' + mTxt(opt.dT) + (opt.dT >= 0 ? ' earlier' : ' later') + ' along the track';
   return {
     ...common,
@@ -690,10 +691,11 @@ function buildModal(ctx: RunCtx, e: ReplayEvent, plan: Plan, opt: PlanOption, re
 }
 
 /** Modal fields for "Burn this window": the Δv and what follows from it, with targets instead of computed outcomes. */
-function windowModal(e: ReplayEvent, o: WindowOption, objTxt: string) {
+/** startH: when the burn can start, the window start or, once approved, the approval time if later. */
+function windowModal(e: ReplayEvent, o: WindowOption, objTxt: string, startH: number) {
   const notComputed = 'not computed for this window';
   return {
-    when: 'Anywhere in this window, ' + at(o.start) + '–' + at(o.end).slice(-5) + ', ' + Math.round(e.tca - o.end) + '–' + Math.round(e.tca - o.start) + ' h before closest approach',
+    when: 'Anywhere in this window, ' + at(startH) + '–' + at(o.end).slice(-5) + ', ' + Math.round(e.tca - o.end) + '–' + Math.round(e.tca - startH) + ' h before closest approach',
     dirLong: 'Not computed for this window; flight dynamics sets it',
     beta: notComputed,
     ...burnFacts(o.dv),
@@ -708,7 +710,11 @@ function windowModal(e: ReplayEvent, o: WindowOption, objTxt: string) {
 }
 
 /** When an option burns: its window for "Burn this window", else its planned burn time. */
-const burnWhen = (e: ReplayEvent, o: PlanOption) => (isWindow(o) ? at(o.start) + '–' + at(o.end).slice(-5) : at(burnAt(e, o)));
+/** When an approved burn happens, with the dock's rule: a window burn from the later of its start and the approval. */
+const approvedWhen = (e: ReplayEvent, o: PlanOption, approvedAtH: number) => {
+  const start = approvedStart(e, o, approvedAtH);
+  return isWindow(o) ? at(start) + '–' + at(o.end).slice(-5) : at(start);
+};
 
 /** Same Δv and direction: the minimum-Δv burn already meets the robust target. */
 const sameBurn = (a: PlanOption, b: PlanOption) => !isWindow(a) && !isWindow(b) && a.dv === b.dv && a.alpha === b.alpha && a.beta === b.beta;
@@ -751,15 +757,20 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: OptCh
     const listed = stored == null ? planOptions(e, plan) : planOptions(e, plan).filter((o) => !isWindow(o));
     const optsAll = isWindow(opt) && stored != null ? withWindow(listed, opt) : listed;
     const isApproved = (o: PlanOption) => appr != null && o.key === opt.key;
+    const apprAt = appr != null ? (appr - 1) * ctx.replay.runH : null;
     const opts: OptionsView = {
       basis: 'planned at message ' + (plan.key + 1) + ', ' + Math.round(plan.age) + ' h ago',
       rows: optsAll.map((o) => ({
         key: o.key,
         rec: appr == null && rec != null && o.key === rec.key,
         name: OPTION_NAMES[o.key],
+        // The approved row names its burn window once, by the same rule as the dock.
         dir:
-          optionSub(o, optsAll, plan) +
-          (isApproved(o) ? ' · approved for ' + burnWhen(e, o) : burnPassed(e, plan, o) ? ' · time passed' : !meetsTargets(o) ? ' · ' + missedTarget(o) : ''),
+          isApproved(o) && apprAt != null
+            ? isWindow(o)
+              ? 'approved for ' + approvedWhen(e, o, apprAt) + ' · direction not computed'
+              : optionSub(o, optsAll, plan) + ' · approved for ' + approvedWhen(e, o, apprAt)
+            : optionSub(o, optsAll, plan) + (burnPassed(e, plan, o) ? ' · time passed' : !meetsTargets(o) ? ' · ' + missedTarget(o) : ''),
         dvTxt: o.dv.toFixed(1) + ' mm/s',
         pcAfter: isWindow(o) ? '< 1e-4' : sci(o.pcAfter),
         pcAfterTitle: isWindow(o) ? 'Target, not a computed value' : (odds(o.pcAfter) ?? undefined),
@@ -775,7 +786,7 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: OptCh
       reviewLabel: appr != null ? 'View approved plan' : 'Review and approve',
     };
     const isRec = appr == null && rec != null && rec.key === opt.key;
-    const planner: PlannerView = { plan, opt, wc: buildCostOfWaiting(ctx, plan, facts, appr != null ? { run: appr, when: burnWhen(e, opt) } : null), bp: buildEncounterPlane(plan, opt), opts, modal: buildModal(ctx, e, plan, opt, isRec) };
+    const planner: PlannerView = { plan, opt, wc: buildCostOfWaiting(ctx, plan, facts, apprAt != null ? { run: appr!, when: approvedWhen(e, opt, apprAt) } : null), bp: buildEncounterPlane(plan, opt), opts, modal: buildModal(ctx, e, plan, opt, isRec) };
     return { kind: 'event', header, forecast: fcCard, hist, planner, other: null, msgRows: [] };
   }
   const { other, msgRows } = buildOther(ctx, e, st);

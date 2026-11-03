@@ -17,7 +17,16 @@ export function isReplayEvent(e: unknown): boolean {
   if (!Array.isArray(m) || !m.length || !m.every((c) => Array.isArray(c) && num(c[0]) && num(c[1]) && num(c[2]))) return false;
   return Object.entries(e.coa).every(([k, c]) => {
     const i = Number(k);
-    return Number.isInteger(i) && i >= 0 && i < m.length && isObj(c) && Array.isArray(c.opts) && Array.isArray(c.wait) && c.wait.every((w) => Array.isArray(w) && num(w[0]));
+    return (
+      Number.isInteger(i) &&
+      i >= 0 &&
+      i < m.length &&
+      isObj(c) &&
+      Array.isArray(c.opts) &&
+      c.opts.every((o) => isObj(o) && typeof o.key === 'string' && typeof o.feasible === 'boolean' && num(o.dv) && num(o.leadH)) &&
+      Array.isArray(c.wait) &&
+      c.wait.every((w) => Array.isArray(w) && num(w[0]) && (w[1] === null || num(w[1])))
+    );
   });
 }
 
@@ -72,7 +81,7 @@ export async function loadConsoleData(urls = dataUrls()): Promise<ConsoleData> {
   if (!Array.isArray(fleet?.missions)) throw new Error(`${urls.fleet}: missing missions`);
   const badMission = fleet.missions.findIndex((mm) => !isMission(mm));
   if (badMission >= 0) throw new Error(`${urls.fleet}: mission ${badMission} is not in the contract shape`);
-  if (!Array.isArray(replay?.events) || !num(replay.runs) || !num(replay.runH)) throw new Error(`${urls.replay}: missing events, runs or runH`);
+  if (!Array.isArray(replay?.events) || !num(replay.runs) || !num(replay.runH) || !num(replay.windowH)) throw new Error(`${urls.replay}: missing events, runs, runH or windowH`);
   const bad = replay.events.findIndex((e) => !isReplayEvent(e));
   if (bad >= 0) throw new Error(`${urls.replay}: event ${bad} is not in the contract shape`);
   return { fleet, replay, metrics, forecast };

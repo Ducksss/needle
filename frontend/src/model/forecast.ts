@@ -28,6 +28,8 @@ export interface MissForecast {
   cell: ForecastCell;
   /** Chance of ending Critical given the Pc band; null with too little history or an older forecast.json. */
   pCritical: number | null;
+  /** False when forecast.json has no usable Pc-conditioned table, so the chance is not available rather than thin. */
+  pCriticalAvailable: boolean;
   /** Past events behind that chance, and the Pc band they share. */
   pCriticalN: number | null;
   pcBand: 0 | 1 | 2;
@@ -58,6 +60,7 @@ export function forecastAt(f: Forecast | null | undefined, e: ReplayEvent, s: Kn
     leadDays,
     cell,
     pCritical: byPc ?? null,
+    pCriticalAvailable: f.pCriticalByPc != null,
     pCriticalN: byPcCell?.n ?? null,
     pcBand: band,
     missM,
@@ -85,14 +88,15 @@ export const inTen = (share: number) => Math.round(share * 10) + ' in 10';
 export const pctTxt = (p: number) => (p < 0.01 ? 'under 1%' : Math.round(p * 100) + '%');
 
 export const NOT_ENOUGH = 'not enough history';
+export const NOT_AVAILABLE = 'not available';
 
 /** One name for the forecast chance of ending in the brief's Critical tier, used on the card, ring, legend and queue. */
 export const CRIT_NAME = 'Chance it ends Critical';
 /** The Critical rule in plain words, for the hover cards. */
 export const CRIT_RULE = 'Critical means Pc at least 1e-4 or miss under 1 km at closest approach.';
 
-/** The Pc-conditioned chance of ending Critical, or "not enough history". */
-export const pCriticalTxt = (fc: MissForecast) => (fc.pCritical == null ? NOT_ENOUGH : pctTxt(fc.pCritical));
+/** The Pc-conditioned chance of ending Critical, "not enough history", or "not available" without the table. */
+export const pCriticalTxt = (fc: MissForecast) => (!fc.pCriticalAvailable ? NOT_AVAILABLE : fc.pCritical == null ? NOT_ENOUGH : pctTxt(fc.pCritical));
 
 /** How the miss band was checked: "Checked on forecasts for 2,529 past events kept out of training: held 79.9% of the time." */
 export const bandHeldTxt = (fc: MissForecast) =>
@@ -202,7 +206,11 @@ export function forecastCard(fc: MissForecast): ForecastCard {
     pUnder1km: pctTxt(fc.cell.pUnder1km),
     pUnder1kmBasis: fc.cell.n.toLocaleString('en-US') + ' similar past events',
     pCritical: pCriticalTxt(fc),
-    pCriticalBasis: fc.pCriticalN != null ? fc.pCriticalN.toLocaleString('en-US') + ' similar past events at this risk level' : 'too few past events at this risk level',
+    pCriticalBasis: !fc.pCriticalAvailable
+      ? 'not in this forecast file'
+      : fc.pCriticalN != null
+        ? fc.pCriticalN.toLocaleString('en-US') + ' similar past events at this risk level'
+        : 'too few past events at this risk level',
     pCriticalMissing: fc.pCritical == null,
     pUnder1kmColor: chanceColor(fc.cell.pUnder1km),
     pCriticalColor: chanceColor(fc.pCritical),

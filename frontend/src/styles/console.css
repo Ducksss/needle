@@ -1899,6 +1899,8 @@ h2 {
 
 .fc-ring-label {
   position: absolute;
+  /* The percentage is only a label: the ring itself takes the pointer. */
+  pointer-events: none;
   left: 16px;
   top: -1px;
   text-shadow:
@@ -2057,6 +2059,11 @@ h2 {
 
 .mark-pill.compact {
   padding: 0 5px;
+}
+
+/* A capsule with no room for its number is wider than a deadline tick's 12 px hit area, so part of it stays hoverable. */
+.mark-pill.blank {
+  min-width: 18px;
 }
 
 /* The pill body keeps its text's width but does not draw it; the text layer above does. While the pill is hovered or

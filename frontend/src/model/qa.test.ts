@@ -295,13 +295,34 @@ describe('QA pass 3: approved window burn, gate marks, missed targets', () => {
     const rows = v.ws.planner.opts.rows;
     expect(rows.map((r) => r.key)).toEqual(v0.ws.planner.opts.rows.map((r) => r.key));
     const win = rows.find((r) => r.key === 'win')!;
-    expect([win.on, win.passed, win.dir]).toEqual([true, false, 'anywhere in Day 8 06:18–12:18 · direction not computed · approved for Day 8 06:18–12:18']);
-    expect(v.ws.planner.wc.caption).toBe('Burn approved at run 23 for Day 8 06:18–12:18, so the decision deadline no longer applies.');
+    // One window everywhere, from the approval at run 23 (Day 8 08:00) to the window end, as on the dock.
+    expect([win.on, win.passed, win.dir]).toEqual([true, false, 'approved for Day 8 08:00–12:18 · direction not computed']);
+    expect(v.ws.planner.wc.caption).toBe('Burn approved at run 23 for Day 8 08:00–12:18, so the decision deadline no longer applies.');
+    expect(v.ws.planner.modal.when).toMatch(/^Anywhere in this window, Day 8 08:00–12:18, /);
+    const pill = v.dock.lanes.flatMap((l) => l.marks).find((m) => m.id === 8783 && m.kind === 'approved')!;
+    expect(pill.lines).toContain('Burn any time in Day 8 08:00–12:18.');
   });
 
   it('t-b: names the target an option misses', () => {
     const v = buildView(data, ui(32, 10384));
     if (v.ws.kind !== 'event' || !v.ws.planner) throw new Error('expected a planner');
     expect(v.ws.planner.opts.rows.find((r) => r.key === 'coa4')?.dir).toMatch(/ · misses the Pc target \(1\.0e-4 is not below 1e-4\)$/);
+  });
+});
+
+describe('CodeRabbit round 5 and QA pass 4 model items', () => {
+  it('names the missed target when no option still ahead meets both', () => {
+    // Every planned option sits exactly on the Pc threshold and the window is dearer, so nothing qualifies.
+    const opts = coa().opts.map((o) => ({ ...o, feasible: true, pcAfter: 1e-4 }));
+    const e = ev(1, 300, [[0, -3.5, 400]], { coa: { '0': { ...coa(), opts, wait: [[0, 20], [6, 20], [12, 20]] } } });
+    const ctx = runCtx(replayOf([e]), 0, 40, NO_DECISIONS);
+    expect(buildNext(snapshot(ctx), 40, null, ctx).text).toMatch(/No option still ahead meets both targets \(misses the Pc target \(1\.0e-4 is not below 1e-4\)\)/);
+  });
+
+  it('t3: says "not available" when the Pc-conditioned table is missing', () => {
+    const { pCriticalByPc: _drop, ...older } = data.forecast!;
+    const v = buildView({ ...data, forecast: older }, ui(4, 37));
+    if (v.ws.kind !== 'event' || v.ws.forecast?.kind !== 'open') throw new Error('expected a forecast card');
+    expect([v.ws.forecast.card.pCritical, v.ws.forecast.card.pCriticalBasis]).toEqual(['not available', 'not in this forecast file']);
   });
 });

@@ -1,8 +1,8 @@
 // Header KPIs and the Next decision strip.
 
 import { at, dh, pcWithOdds, sgn } from './format';
-import { OPTION_SHORT, recommended } from './options';
-import { PLAN_CUTOFF_H, waitDv, windowIndex } from './replay';
+import { OPTION_SHORT, missedTarget, planOptions, recommended } from './options';
+import { PLAN_CUTOFF_H, burnPassed, waitDv, windowIndex } from './replay';
 import { type NeedRow, type RunCtx, type Snapshot, isDeferredNow } from './run';
 import { C } from './theme';
 
@@ -98,9 +98,13 @@ export function buildNext(snap: Snapshot, budget: number, sel: number | null = n
   const rec = recommended(e, plan, budget);
   const overBudget = rec != null && rec.dv > budget;
   const over = overBudget ? ', over budget' : '';
+  // With no recommendation, say why: an option still ahead that misses a target, or every planned burn time gone by.
+  const ahead = planOptions(e, plan).find((o) => !burnPassed(e, plan, o));
   const burn = rec
     ? 'Recommended burn: ' + rec.dv.toFixed(1) + ' mm/s (' + OPTION_SHORT[rec.key] + over + ').'
-    : 'The planned burn times have passed; the current window needs ' + nowTxt + '. Re-plan at the next message.';
+    : ahead
+      ? 'No option still ahead meets both targets (' + missedTarget(ahead) + '); the current window needs ' + nowTxt + '. Re-plan at the next message.'
+      : 'The planned burn times have passed; the current window needs ' + nowTxt + '. Re-plan at the next message.';
   // Never "to stay inside the budget" beside a recommendation that is over it.
   const tail = plan.overNow
     ? 'Already above the ' + budget + ' mm/s budget: decide now or accept a larger burn.'

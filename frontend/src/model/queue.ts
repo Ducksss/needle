@@ -1,7 +1,7 @@
 // Queue panel: Decide, Watch and Passed tabs.
 
 import type { Forecast } from '../data/types';
-import { CRIT_NAME, CRIT_RULE, NOT_ENOUGH, forecastAt, pctTxt } from './forecast';
+import { CRIT_NAME, CRIT_RULE, NOT_AVAILABLE, NOT_ENOUGH, forecastAt, pctTxt } from './forecast';
 import { clamp, dh, mTxt, pcOdds, pcTxt } from './format';
 import { PLAN_CUTOFF_H } from './replay';
 import { type Chip, type KnownRow, type NeedRow, type RunCtx, type Snapshot, chipFor } from './run';
@@ -98,7 +98,7 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
     } else if (tab === 'watch') {
       const p = pCrit.get(x.e.id);
       if (forecast) {
-        col1 = p == null ? 'no history' : pctTxt(p);
+        col1 = p == null ? (forecast.pCriticalByPc ? 'no history' : 'n/a') : pctTxt(p);
         col1Color = p == null ? C.muted : p >= 0.5 ? C.risk : p >= 0.2 ? C.hidden : C.slate;
         col2 = mTxt(x.s.last[2]);
         col2Color = missColor(x.s.last[2]);
@@ -133,7 +133,7 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
       on: sel === x.e.id,
       title:
         tab === 'watch' && forecast
-          ? 'Closest approach in ' + dh(x.e.tca - T) + '. ' + CRIT_NAME + ': ' + (pCrit.get(x.e.id) == null ? NOT_ENOUGH + '.' : 'forecast from the latest Pc band, miss and time left.') + ' ' + CRIT_RULE
+          ? 'Closest approach in ' + dh(x.e.tca - T) + '. ' + CRIT_NAME + ': ' + (pCrit.get(x.e.id) == null ? (forecast?.pCriticalByPc ? NOT_ENOUGH : NOT_AVAILABLE) + '.' : 'forecast from the latest Pc band, miss and time left.') + ' ' + CRIT_RULE
           : undefined,
       urgency,
       changed: changed.has(x.e.id),

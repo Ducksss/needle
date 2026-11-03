@@ -47,6 +47,7 @@ export function Queue({ q, flash, run, onTab, onPick }: QueueProps) {
                   {r.sat} · {r.obj} · Pc{' '}
                   <span className="mono" style={{ color: r.pcColor, fontWeight: critWeight(r.pcColor) }} title={r.pcTitle}>
                     {r.pc}
+                    {r.pcTitle && <span className="sr-only">, {r.pcTitle}</span>}
                   </span>
                 </span>
               </span>

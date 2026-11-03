@@ -24,7 +24,7 @@ describe('loadConsoleData', () => {
 
   const CELL = { n: 100, ratioQ10: 0.6, ratioQ50: 1, ratioQ90: 1.8, pUnder1km: 0.15, pCritical: 0.15, pooled: false };
   const FORECAST = { leadEdgesDays: [0, null], missEdgesM: [0, null], cells: [[CELL]], validation: { coverage10to90: 0.8, heldOutEvents: 10 } };
-  const BODY: Record<string, object> = { 'fleet.json': { missions: [] }, 'replay.json': { runs: 64, runH: 8, events: [] }, 'metrics.json': {}, 'forecast.json': FORECAST };
+  const BODY: Record<string, object> = { 'fleet.json': { missions: [] }, 'replay.json': { runs: 64, runH: 8, windowH: 504, events: [] }, 'metrics.json': {}, 'forecast.json': FORECAST };
   const respond = (missing: string[], body = BODY) =>
     vi.fn(async (url: string) => {
       if (missing.some((m) => url.endsWith(m))) return new Response('not found', { status: 404 });
@@ -37,7 +37,7 @@ describe('loadConsoleData', () => {
     const data = await loadConsoleData(dataUrls(undefined, '/'));
     expect(data.fleet).toEqual({ url: '/data/fleet.json', missions: [] });
     expect(data.metrics).toBeNull();
-    expect(data.replay).toEqual({ url: '/data/replay.json', runs: 64, runH: 8, events: [] });
+    expect(data.replay).toEqual({ url: '/data/replay.json', runs: 64, runH: 8, windowH: 504, events: [] });
     expect(data.forecast).toEqual({ url: '/data/forecast.json', ...FORECAST });
   });
 
@@ -55,15 +55,28 @@ describe('loadConsoleData', () => {
 
   it('fails when a file parses but is not the contract shape', async () => {
     vi.stubGlobal('fetch', respond([], { ...BODY, 'replay.json': { runs: 64 } }));
-    await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/replay.json: missing events, runs or runH');
+    await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/replay.json: missing events, runs, runH or windowH');
   });
 
   it('fails into the error state when an event lacks its object type or has a malformed plan', async () => {
     const good = { id: 1, sat: 'ESA-01', mi: 0, obj: 'Debris', inc: 97, tca: 30, m: [[10, -5, 900]], coa: {} };
-    for (const bad of [{ ...good, obj: undefined }, { ...good, coa: { '0': { opts: [] } } }, { ...good, coa: { '3': { opts: [], wait: [] } } }]) {
-      vi.stubGlobal('fetch', respond([], { ...BODY, 'replay.json': { runs: 64, runH: 8, events: [good, bad] } }));
+    const opt = { key: 'coa1', feasible: true, dv: 2, leadH: 20 };
+    for (const bad of [
+      { ...good, obj: undefined },
+      { ...good, coa: { '0': { opts: [] } } },
+      { ...good, coa: { '3': { opts: [], wait: [] } } },
+      { ...good, coa: { '0': { opts: [opt], wait: [[0, '2']] } } },
+      { ...good, coa: { '0': { opts: [null], wait: [[0, 2]] } } },
+      { ...good, coa: { '0': { opts: [{ ...opt, feasible: 'yes' }], wait: [[0, null]] } } },
+    ]) {
+      vi.stubGlobal('fetch', respond([], { ...BODY, 'replay.json': { runs: 64, runH: 8, windowH: 504, events: [good, bad] } }));
       await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/replay.json: event 1 is not in the contract shape');
     }
+  });
+
+  it('fails into the error state when the replay lacks its window length', async () => {
+    vi.stubGlobal('fetch', respond([], { ...BODY, 'replay.json': { runs: 64, runH: 8, events: [] } }));
+    await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/replay.json: missing events, runs, runH or windowH');
   });
 
   it('fails into the error state when a fleet mission lacks its altitude', async () => {
@@ -73,7 +86,7 @@ describe('loadConsoleData', () => {
 
   it('fails into the error state when one event lacks its messages', async () => {
     const good = { id: 1, sat: 'ESA-01', mi: 0, obj: 'Debris', inc: 97, tca: 30, m: [[10, -5, 900]], coa: {} };
-    vi.stubGlobal('fetch', respond([], { ...BODY, 'replay.json': { runs: 64, runH: 8, events: [good, { ...good, id: 2, m: undefined }] } }));
+    vi.stubGlobal('fetch', respond([], { ...BODY, 'replay.json': { runs: 64, runH: 8, windowH: 504, events: [good, { ...good, id: 2, m: undefined }] } }));
     await expect(loadConsoleData(dataUrls(undefined, '/'))).rejects.toThrow('/data/replay.json: event 1 is not in the contract shape');
   });
 });

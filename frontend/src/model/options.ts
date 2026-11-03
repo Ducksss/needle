@@ -5,7 +5,7 @@
 
 import type { CoaOption, OptionKey, ReplayEvent } from '../data/types';
 import { mTxt, sci } from './format';
-import { type Plan, PC_ACTION, burnPassed, waitDv } from './replay';
+import { type Plan, PC_ACTION, burnAt, burnPassed, waitDv } from './replay';
 import { orderedFeasible } from './run';
 
 /** Cost-of-waiting window length, hours. */
@@ -98,6 +98,12 @@ export function pickOption(plan: Plan | null, choice: OptChoice, e: ReplayEvent,
   const picked = choice === 'rec' ? undefined : live.find((o) => o.key === choice);
   return picked ?? rec ?? live[0] ?? all.find((o) => o.key === choice) ?? all[0] ?? null;
 }
+
+/**
+ * When an approved burn happens, in replay hours: a window burn from the later of its window start and the approval
+ * time, since it cannot happen before it was approved; any other option at its planned burn time.
+ */
+export const approvedStart = (e: ReplayEvent, o: PlanOption, approvedAtH: number) => (isWindow(o) ? Math.max(o.start, approvedAtH) : burnAt(e, o));
 
 /** The option an approval recorded, rebuilt from the plan it was approved on. */
 export function approvedOption(e: ReplayEvent, plan: Plan, stored: { opt: PlanKey; wi?: number }): PlanOption | null {

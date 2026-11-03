@@ -58,9 +58,13 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
     return () => ro.disconnect();
   }, []);
   const px = (pct: string) => (parseFloat(pct) / 100) * trackW;
+  // The playhead label is centred on the playhead but kept inside the track, so on the last runs it stops at the right
+  // edge instead of running out of the card.
+  const playLabelHalf = (playLabel.length * MONO10_CH + 14) / 2;
+  const playLabelX = Math.min(px(dock.playLeft), trackW - playLabelHalf);
   const nearPlayhead = (left: string, label: string) => {
-    const lo = px(left) + 4 - px(dock.playLeft);
-    return lo + label.length * MONO10_CH > -50 && lo < 50;
+    const lo = px(left) + 4 - playLabelX;
+    return lo + label.length * MONO10_CH > -playLabelHalf - 2 && lo < playLabelHalf + 2;
   };
 
   // The forecast tag sits right of the current run's bar, clear of the "max" label; shorter, or left off, when the
@@ -91,7 +95,13 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
     const full = m.text.length * PILL_CH + 18;
     const short = m.short.length * PILL_CH + 12;
     const text = !narrow && full <= room ? m.text : !narrow || short <= room ? m.short : '';
-    return { text, short: text !== m.text, passive: px(m.left) < px(dock.playLeft) - 1 && m.kind === 'approved' };
+    // A blank capsule reaches just past the deadline tick and forecast ring it sits under (both stay on top), so its
+    // right end can still be hovered. A passive one takes no pointer, so it keeps its minimum width and leaves the ring
+    // in view.
+    const passive = px(m.left) < px(dock.playLeft) - 1 && m.kind === 'approved';
+    const under = !b || passive ? [] : [b.forecast ? px(b.forecast.left) + 7 : -Infinity, b.deadline ? px(b.deadline.left) + 6 : -Infinity].filter((v) => v > start && v < start + 40);
+    const blankW = Math.max(18, Math.min(Math.max(...under, -Infinity) - start + 8, trackW - 8 - start));
+    return { text, short: text !== m.text, passive, blankW };
   };
 
   // The density strip is one tab stop: arrow keys move between runs and show that run's card; Enter jumps to it.
@@ -216,8 +226,11 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
             <div key={ln.sat} className={'lane' + (ln.empty ? ' empty' : '')} style={{ height: ln.h }}>
               {ln.bars.map((b) => {
                 const lit = flash && b.changed;
-                // A label that would be cut to "#1" is left off; the bar's card and aria-label still name the event.
-                const fits = (px(b.w) * parseFloat(b.kw)) / 100 >= b.label.length * MONO10_CH + 10;
+                // A label that would be cut to "#1", or that a passive approved pill would sit on, is left off; the bar's
+                // card and aria-label still name the event.
+                const labelEnd = px(b.left) + b.label.length * MONO10_CH + 10;
+                const onLabel = ln.marks.some((m) => m.id === b.id && pillFit(m, ln.bars).passive && px(m.left) + 6 < labelEnd);
+                const fits = !onLabel && (px(b.w) * parseFloat(b.kw)) / 100 >= b.label.length * MONO10_CH + 10;
                 return <Bar key={lit ? b.id + ':' + run : b.id} b={b} lit={lit} fits={fits} onPick={onPick} />;
               })}
               {ln.marks.map((m) => (
@@ -226,7 +239,7 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
             </div>
           ))}
           <div className="playhead" style={{ left: dock.playLeft }} />
-          <span className="playhead-label" style={{ left: dock.playLeft }}>
+          <span className="playhead-label" style={{ left: ((playLabelX / trackW) * 100).toFixed(3) + '%' }}>
             {playLabel}
           </span>
         </div>
@@ -295,15 +308,17 @@ interface PillFit {
   short: boolean;
   /** Burn behind the clock: drawn on its bar without taking the pointer. */
   passive: boolean;
+  /** Width of a blank capsule, px. */
+  blankW: number;
 }
 
 function Mark({ m, fit }: { m: LaneMark; fit: PillFit }) {
-  const cls = 'mark-pill mark-' + m.kind + (fit.short ? ' compact' : '');
+  const cls = 'mark-pill mark-' + m.kind + (fit.short ? ' compact' : '') + (fit.text ? '' : ' blank');
   return (
     <>
       <Hover className={'mark' + (fit.passive ? ' passive' : '')} focusable={!fit.passive} style={{ left: m.left, top: m.top }} title={m.title} lines={m.lines} side={m.side}>
         {/* The body keeps the text's width; the visible text is the layer below. */}
-        <span className={cls}>
+        <span className={cls} style={fit.text ? undefined : { width: fit.blankW }}>
           <span className="mark-sizer">{fit.text || ' '}</span>
         </span>
       </Hover>
