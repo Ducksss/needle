@@ -5,7 +5,7 @@ import { at, clamp, dh, dirLong, dirShort, dotPath, mTxt, odds, pcOdds, pcTxt, s
 import { type Bucket, type KnownState, type Plan, type Tier, PC_ACTION, PC_WATCH, PLAN_CUTOFF_H, TIER_TIP, bucketOf, burnAt, burnPassed, isKnown, planAt, planOf, rtnAt, stateAt, tierOf, waitDv, windowIndex } from './replay';
 import { type ForecastCard, type MissForecast, type PcOutlook, type PcOutlookKey, PC_NOTE, forecastAt, forecastCard, forecastLine, inTen, kmTxt, pcForecastAt, pcOutlookText, rangeTxt } from './forecast';
 import { type Chip, type RunCtx, approvedAt, chipFor, isDeferredNow } from './run';
-import { type OptChoice, type PlanKey, type PlanOption, type WindowOption, OPTION_NAMES, approvedOption, isWindow, meetsTargets, pickOption, planOptions, recommended } from './options';
+import { type OptChoice, type PlanKey, type PlanOption, type WindowOption, OPTION_NAMES, approvedOption, isWindow, meetsTargets, missedTarget, pickOption, planOptions, recommended, withWindow } from './options';
 import { TONE, type Tone, missColor, pcColor } from './theme';
 
 export interface EventHeader {
@@ -200,6 +200,8 @@ export interface GateCheck {
   ok: boolean;
   title: string;
   detail: string;
+  /** Not computed, so neither a pass nor a caution: shown with a neutral mark. */
+  info?: boolean;
 }
 
 export interface ModalView {
@@ -476,8 +478,9 @@ function buildOther(ctx: RunCtx, e: ReplayEvent, s: KnownState): { other: OtherV
   return { other, msgRows };
 }
 
-/** approvedRun: the run of an approved burn, when the deadline no longer applies. */
-function buildCostOfWaiting(ctx: RunCtx, plan: Plan, facts: WorkspaceFacts, approvedRun: number | null = null): CostOfWaitingView {
+/** approved: the run and burn time of an approved burn, when the deadline no longer applies. */
+function buildCostOfWaiting(ctx: RunCtx, plan: Plan, facts: WorkspaceFacts, approved: { run: number; when: string } | null = null): CostOfWaitingView {
+  const approvedRun = approved?.run ?? null;
   const budget = ctx.budget;
   const w = plan.c.wait;
   const H = w.length ? w[w.length - 1][0] + 6 : 6;
@@ -527,7 +530,7 @@ function buildCostOfWaiting(ctx: RunCtx, plan: Plan, facts: WorkspaceFacts, appr
     dlW: approvedRun != null ? '0' : Math.max(0, X(H) - X(dlRel)).toFixed(1),
     caption:
       approvedRun != null
-        ? 'Burn approved at run ' + approvedRun + ', so the decision deadline no longer applies. The current window needs ' + nowTxt + ' mm/s.'
+        ? 'Burn approved at run ' + approvedRun + ' for ' + approved?.when + ', so the decision deadline no longer applies.'
         : plan.overNow
           ? 'Past the ' + budget + ' mm/s deadline since ' + at(plan.dlAbs) + '. The current window needs ' + (wNow != null ? wNow.toFixed(1) + ' mm/s.' : 'over 80 mm/s.')
           : 'Burn in the current window: ' + nowTxt + ' mm/s. One day from now: ' + dayLater + '. Budget holds until ' + at(plan.dlAbs) + ', in ' + dh(plan.left) + '.',
@@ -622,8 +625,8 @@ export function buildGateChecks(e: ReplayEvent, plan: Plan, opt: PlanOption, bud
       : { ok: true, title: 'Plan computed ' + Math.round(plan.age) + ' h ago.', detail: inNow ? 'Burn falls in the current window (' + nowTxt + ').' : 'Burn in ' + dh(burnAt(e, opt) - T) + '.' };
   const target = 'Target of this window’s Δv; the after value is not computed here.';
   return [
-    isWindow(opt) ? { ok: true, title: 'Pc after burn below 1e-4.', detail: target } : { ok: opt.pcAfter < 1e-4, title: 'Pc after burn below 1e-4.', detail: sci(opt.pcAfter) + '.' },
-    isWindow(opt) ? { ok: true, title: 'Miss after burn above 1 km.', detail: target } : { ok: opt.missAfter > 1000, title: 'Miss after burn above 1 km.', detail: mTxt(opt.missAfter) + '.' },
+    isWindow(opt) ? { ok: false, info: true, title: 'Pc after burn below 1e-4.', detail: target } : { ok: opt.pcAfter < 1e-4, title: 'Pc after burn below 1e-4.', detail: sci(opt.pcAfter) + '.' },
+    isWindow(opt) ? { ok: false, info: true, title: 'Miss after burn above 1 km.', detail: target } : { ok: opt.missAfter > 1000, title: 'Miss after burn above 1 km.', detail: mTxt(opt.missAfter) + '.' },
     {
       ok: cev.pcModelOk,
       title: cev.pcModelOk ? 'Model reproduces ESA’s Pc for this message.' : 'Model calibrated to ESA’s Pc.',
@@ -704,6 +707,9 @@ function windowModal(e: ReplayEvent, o: WindowOption, objTxt: string) {
   };
 }
 
+/** When an option burns: its window for "Burn this window", else its planned burn time. */
+const burnWhen = (e: ReplayEvent, o: PlanOption) => (isWindow(o) ? at(o.start) + '–' + at(o.end).slice(-5) : at(burnAt(e, o)));
+
 /** Same Δv and direction: the minimum-Δv burn already meets the robust target. */
 const sameBurn = (a: PlanOption, b: PlanOption) => !isWindow(a) && !isWindow(b) && a.dv === b.dv && a.alpha === b.alpha && a.beta === b.beta;
 
@@ -726,7 +732,7 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: OptCh
   const stored = approvedAt(ctx, e.id) != null ? ctx.dec.approvedPlan[e.id] : undefined;
   // That holds even when the planner stops producing a plan (the Pc falls below 1e-4, or closest approach is under 3 h).
   const plan = stored && st.phase === 'open' && e.coa[String(stored.key)] ? planAt(e, stored.key, ctx.T, ctx.budget) : live;
-  const opt = stored && plan ? approvedOption(e, plan, stored) : pickOption(plan, optKey, e);
+  const opt = stored && plan ? approvedOption(e, plan, stored) : pickOption(plan, optKey, e, ctx.budget);
   const fc = forecastAt(forecast, e, st);
   const header = buildHeader(ctx, e, st, plan, mission);
   const hist = buildHistory(e, st, ctx.T, fc, pcForecastAt(forecast, e, st), !!forecast?.pcForecast);
@@ -739,24 +745,27 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: OptCh
         : null;
   if (plan && opt) {
     const appr = approvedAt(ctx, e.id);
-    const rec = recommended(e, plan);
-    // Once approved the table shows the approved option; a window option appears only when it is the one approved.
-    const listed = planOptions(e, plan).filter((o) => !isWindow(o) || stored == null);
-    const sameWindow = (o: PlanOption) => isWindow(o) && isWindow(opt) && o.wi === opt.wi;
-    const optsAll = isWindow(opt) && !listed.some(sameWindow) ? [...listed.filter((o) => !isWindow(o)), opt] : listed;
+    const rec = recommended(e, plan, ctx.budget);
+    // Once approved the table shows the approved option in its usual place; a window option appears only when it is the
+    // one approved.
+    const listed = stored == null ? planOptions(e, plan) : planOptions(e, plan).filter((o) => !isWindow(o));
+    const optsAll = isWindow(opt) && stored != null ? withWindow(listed, opt) : listed;
+    const isApproved = (o: PlanOption) => appr != null && o.key === opt.key;
     const opts: OptionsView = {
       basis: 'planned at message ' + (plan.key + 1) + ', ' + Math.round(plan.age) + ' h ago',
       rows: optsAll.map((o) => ({
         key: o.key,
         rec: appr == null && rec != null && o.key === rec.key,
         name: OPTION_NAMES[o.key],
-        dir: optionSub(o, optsAll, plan) + (burnPassed(e, plan, o) ? ' · time passed' : !meetsTargets(o) ? ' · misses a target' : ''),
+        dir:
+          optionSub(o, optsAll, plan) +
+          (isApproved(o) ? ' · approved for ' + burnWhen(e, o) : burnPassed(e, plan, o) ? ' · time passed' : !meetsTargets(o) ? ' · ' + missedTarget(o) : ''),
         dvTxt: o.dv.toFixed(1) + ' mm/s',
         pcAfter: isWindow(o) ? '< 1e-4' : sci(o.pcAfter),
         pcAfterTitle: isWindow(o) ? 'Target, not a computed value' : (odds(o.pcAfter) ?? undefined),
         missAfter: isWindow(o) ? '> 1 km' : mTxt(o.missAfter),
         on: o.key === opt.key,
-        passed: burnPassed(e, plan, o),
+        passed: !isApproved(o) && burnPassed(e, plan, o),
       })),
       decision: appr != null ? 'Approved at run ' + appr + '.' : isDeferredNow(ctx, e.id) ? 'Deferred at this run; re-check after the next message.' : 'Not decided.',
       canDefer: appr == null && !isDeferredNow(ctx, e.id),
@@ -766,7 +775,7 @@ export function buildWorkspace(ctx: RunCtx, e: ReplayEvent | null, optKey: OptCh
       reviewLabel: appr != null ? 'View approved plan' : 'Review and approve',
     };
     const isRec = appr == null && rec != null && rec.key === opt.key;
-    const planner: PlannerView = { plan, opt, wc: buildCostOfWaiting(ctx, plan, facts, appr ?? null), bp: buildEncounterPlane(plan, opt), opts, modal: buildModal(ctx, e, plan, opt, isRec) };
+    const planner: PlannerView = { plan, opt, wc: buildCostOfWaiting(ctx, plan, facts, appr != null ? { run: appr, when: burnWhen(e, opt) } : null), bp: buildEncounterPlane(plan, opt), opts, modal: buildModal(ctx, e, plan, opt, isRec) };
     return { kind: 'event', header, forecast: fcCard, hist, planner, other: null, msgRows: [] };
   }
   const { other, msgRows } = buildOther(ctx, e, st);

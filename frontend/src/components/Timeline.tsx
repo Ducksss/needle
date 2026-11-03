@@ -69,15 +69,16 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
   const room = trackW - px(dock.playLeft) - px(dock.density[run]?.w ?? '0%') - 4 - 48;
   const forecastTag = room >= FORECAST_LONG.length * MONO10_CH ? FORECAST_LONG : room >= 8 * MONO10_CH ? 'forecast' : null;
 
-  // A burn pill starts at its burn time, but never before the end of its bar's known part, so it never covers the bar.
-  // It may use the room up to the next forecast ring, deadline tick or bar in its row, and the lane's right edge. When the
-  // full pill does not fit it becomes a capsule as wide as that room allows (4 to 16 px). Ticks, rings and bars sit above
-  // pills, so they stay hoverable even where a capsule touches them. The card gives the time and Δv.
+  // A burn pill sits at its burn time and is never moved, so an approved burn stays at its burn window. Its text takes
+  // the room up to the next forecast ring, deadline tick or bar in its row and the lane's right edge: "9.5 mm/s" where
+  // that fits, else the number alone. At 1440 and 1024 the number is always shown; on narrow screens it is left off
+  // where even it does not fit. The text is drawn in its own layer above ticks and bars, with a halo, and lets the pointer
+  // through, so ticks and bars stay hoverable under it. A burn already behind the clock sits on its bar and lets the bar
+  // take the pointer; the bar's card carries the approval.
   const narrow = window.matchMedia('(max-width: 899px)').matches;
   const pillFit = (m: LaneMark, bars: EventBar[]): PillFit => {
     const b = bars.find((x) => x.id === m.id);
-    const base = px(m.left) + 6;
-    const start = Math.max(base, b ? px(b.left) + (px(b.w) * parseFloat(b.kw)) / 100 + 2 : base);
+    const start = px(m.left) + 6;
     // A mark at or just behind the pill start still blocks it, since the pill would sit on top of it.
     const ends = !b
       ? []
@@ -87,8 +88,10 @@ export function Timeline({ dock, T, runH, lapse, flash, legend, clock, run, runs
           ...bars.filter((x) => x.top === b.top && x.id !== b.id).map((x) => px(x.left) - 3),
         ].filter((v) => v > start - 16);
     const room = Math.min(trackW - 8, ...ends) - start;
-    const w = (narrow ? m.short : m.text).length * PILL_CH + 18;
-    return w <= room ? { shift: start - base, compact: false, room } : { shift: start - base, compact: true, room: Math.max(4, Math.min(16, room)) };
+    const full = m.text.length * PILL_CH + 18;
+    const short = m.short.length * PILL_CH + 12;
+    const text = !narrow && full <= room ? m.text : !narrow || short <= room ? m.short : '';
+    return { text, short: text !== m.text, passive: px(m.left) < px(dock.playLeft) - 1 && m.kind === 'approved' };
   };
 
   // The density strip is one tab stop: arrow keys move between runs and show that run's card; Enter jumps to it.
@@ -286,23 +289,30 @@ function Bar({ b, lit, fits, onPick }: { b: EventBar; lit: boolean; fits: boolea
 }
 
 interface PillFit {
-  /** px to move the pill right so it starts after its bar's known part. */
-  shift: number;
-  /** No room for the full pill before the next mark: draw a small capsule. */
-  compact: boolean;
-  /** Width the pill may take, px: up to the next mark or the lane edge; the capsule's own width when compact. */
-  room: number;
+  /** Text shown: the full Δv, the number alone, or nothing (narrow screens, no room). */
+  text: string;
+  /** Compact padding for the number alone or an empty capsule. */
+  short: boolean;
+  /** Burn behind the clock: drawn on its bar without taking the pointer. */
+  passive: boolean;
 }
 
 function Mark({ m, fit }: { m: LaneMark; fit: PillFit }) {
-  const left = fit.shift > 0 ? 'calc(' + m.left + ' + ' + fit.shift.toFixed(1) + 'px)' : m.left;
+  const cls = 'mark-pill mark-' + m.kind + (fit.short ? ' compact' : '');
   return (
-    <Hover className="mark" style={{ left, top: m.top, maxWidth: fit.compact ? undefined : fit.room }} title={m.title} lines={m.lines} side={m.side}>
-      <span className={'mark-pill mark-' + m.kind + (fit.compact ? ' compact' : '')} style={fit.compact ? { width: fit.room } : undefined}>
-        <span className="mark-long">{m.text}</span>
-        <span className="mark-short">{m.short}</span>
-      </span>
-    </Hover>
+    <>
+      <Hover className={'mark' + (fit.passive ? ' passive' : '')} focusable={!fit.passive} style={{ left: m.left, top: m.top }} title={m.title} lines={m.lines} side={m.side}>
+        {/* The body keeps the text's width; the visible text is the layer below. */}
+        <span className={cls}>
+          <span className="mark-sizer">{fit.text || ' '}</span>
+        </span>
+      </Hover>
+      {fit.text && (
+        <span className={cls + ' mark-text'} style={{ left: m.left, top: m.top }} aria-hidden="true">
+          {fit.text}
+        </span>
+      )}
+    </>
   );
 }
 

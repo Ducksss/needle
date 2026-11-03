@@ -149,8 +149,8 @@ export function ApprovalModal({ m, clock, onClose, onApprove }: ApprovalModalPro
             <ul className="checks">
               {m.checks.map((c) => (
                 <li key={c.title}>
-                  <span className="check-icon" role="img" style={{ background: c.ok ? 'var(--ok)' : 'var(--hidden)' }} aria-label={c.ok ? 'Passed' : 'Caution'}>
-                    {c.ok ? '✓' : '!'}
+                  <span className="check-icon" role="img" style={{ background: c.info ? 'var(--muted)' : c.ok ? 'var(--ok)' : 'var(--hidden)' }} aria-label={c.info ? 'Not computed' : c.ok ? 'Passed' : 'Caution'}>
+                    {c.info ? '–' : c.ok ? '✓' : '!'}
                   </span>
                   <span>
                     <span style={{ fontWeight: 600 }}>{c.title}</span> <span style={{ color: 'var(--muted)' }}>{c.detail}</span>

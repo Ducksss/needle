@@ -165,7 +165,8 @@ describe('review fixes', () => {
   });
 
   it('proposes only feasible options on the timeline', () => {
-    const c = coa();
+    // The current window costs more than coa2, so "Burn this window" is not offered and coa2 is the proposal.
+    const c = coa({ wait: [[0, 6], [6, 7], [12, 9]] });
     c.opts[0] = { ...c.opts[0], feasible: false };
     const e = ev(1, 300, [[0, -3.5, 400]], { coa: { '0': c } });
     const marks = buildDock(runCtx(replayOf([e]), 0, 10, NO_DECISIONS), null, null, 'coa1').lanes.flatMap((l) => l.marks);

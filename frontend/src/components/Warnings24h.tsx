@@ -3,7 +3,7 @@ import type { WarningCount, WarningsView } from '../model/warnings';
 import { Chip } from './Chip';
 import { TipCard } from './Hover';
 
-import { missColor } from '../model/theme';
+import { critWeight, missColor } from '../model/theme';
 
 /** Next 24 h warnings, sized for the right column: counts, insights, then every pass in the window. */
 export function Warnings24h({ w, onPick }: { w: WarningsView; onPick: (id: number) => void }) {
@@ -54,8 +54,8 @@ export function Warnings24h({ w, onPick }: { w: WarningsView; onPick: (id: numbe
               </span>
               <span className="w24-line">
                 <span className="mono w24-sub w24-nums">
-                  <span style={{ color: missColor(r.missM), fontWeight: r.missM < 1000 ? 600 : undefined }}>{r.miss}</span> · Pc{' '}
-                  <span style={{ color: r.pcColor }} title={r.pcTitle}>
+                  <span style={{ color: missColor(r.missM), fontWeight: critWeight(missColor(r.missM)) }}>{r.miss}</span> · Pc{' '}
+                  <span style={{ color: r.pcColor, fontWeight: critWeight(r.pcColor) }} title={r.pcTitle}>
                     {r.pc}
                   </span>
                 </span>

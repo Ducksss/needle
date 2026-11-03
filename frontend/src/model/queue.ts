@@ -5,7 +5,7 @@ import { CRIT_NAME, CRIT_RULE, NOT_ENOUGH, forecastAt, pctTxt } from './forecast
 import { clamp, dh, mTxt, pcOdds, pcTxt } from './format';
 import { PLAN_CUTOFF_H } from './replay';
 import { type Chip, type KnownRow, type NeedRow, type RunCtx, type Snapshot, chipFor } from './run';
-import { C, missColor, pcColor } from './theme';
+import { C, critWeight, missColor, pcColor } from './theme';
 
 export type QueueTab = 'needs' | 'watch' | 'passed';
 
@@ -32,6 +32,9 @@ export interface QueueRow {
   col1Color: string;
   col2: string;
   col2Color: string;
+  /** Semibold for a Pc or miss value in the Critical band. */
+  col1Weight?: number;
+  col2Weight?: number;
   on: boolean;
   /** Native hover title for the row. */
   title: string | undefined;
@@ -68,6 +71,8 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
     let col1Color: string = C.ink;
     let col2 = '';
     let col2Color: string = C.muted;
+    let col1Weight: number | undefined;
+    let col2Weight: number | undefined;
     let urgency: QueueRow['urgency'] = null;
     if (tab === 'needs') {
       const plan = (x as NeedRow).plan;
@@ -97,14 +102,17 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
         col1Color = p == null ? C.muted : p >= 0.5 ? C.risk : p >= 0.2 ? C.hidden : C.slate;
         col2 = mTxt(x.s.last[2]);
         col2Color = missColor(x.s.last[2]);
+        col2Weight = critWeight(col2Color);
       } else {
         col1 = mTxt(x.s.last[2]);
         col1Color = missColor(x.s.last[2]);
+        col1Weight = critWeight(col1Color);
         col2 = 'TCA ' + dh(x.e.tca - T);
       }
     } else {
       col1 = 'final ' + pcTxt(x.s.last[1]);
       col1Color = pcColor(x.s.last[1]);
+      col1Weight = critWeight(col1Color);
       col2 = dh(T - x.e.tca) + ' ago';
     }
     const chip = chipFor(ctx, x.e, x.s);
@@ -118,8 +126,10 @@ export function buildQueue(ctx: RunCtx, snap: Snapshot, tab: QueueTab, sel: numb
       pcColor: pcColor(x.s.last[1]),
       col1,
       col1Color,
+      col1Weight,
       col2,
       col2Color,
+      col2Weight,
       on: sel === x.e.id,
       title:
         tab === 'watch' && forecast

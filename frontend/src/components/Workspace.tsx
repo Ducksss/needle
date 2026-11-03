@@ -5,6 +5,7 @@ import { CostOfWaiting, EncounterPlane, MessageHistory } from './Charts';
 import { Chip } from './Chip';
 import { CRIT_NAME } from '../model/forecast';
 import { Hover } from './Hover';
+import { critWeight } from '../model/theme';
 
 interface WorkspaceProps {
   ws: WorkspaceView;
@@ -44,12 +45,12 @@ export function Workspace({ ws, budget, onOpt, onReview, onDefer }: WorkspacePro
         <dl className="ws-stats">
           <div>
             <dt>{h.pcLabel}</dt>
-            <dd style={{ color: h.color }}>{h.pc}</dd>
+            <dd style={{ color: h.color, fontWeight: critWeight(h.color) }}>{h.pc}</dd>
             {h.odds && <dd className="odds">{h.odds}</dd>}
           </div>
           <div>
             <dt>Miss</dt>
-            <dd style={{ color: h.missColor }}>{h.miss}</dd>
+            <dd style={{ color: h.missColor, fontWeight: critWeight(h.missColor) }}>{h.miss}</dd>
           </div>
           <div>
             <dt>{h.tcaLabel}</dt>
@@ -187,10 +188,10 @@ function MessagesReceived({ rows }: { rows: MsgRow[] }) {
               {r.n}
             </span>
             <span role="cell">{r.before}</span>
-            <span role="cell" style={{ color: r.pcColor }} title={r.pcTitle}>
+            <span role="cell" style={{ color: r.pcColor, fontWeight: critWeight(r.pcColor) }} title={r.pcTitle}>
               {r.pc}
             </span>
-            <span role="cell" style={{ color: r.missColor }}>
+            <span role="cell" style={{ color: r.missColor, fontWeight: critWeight(r.missColor) }}>
               {r.miss}
             </span>
             <span role="cell">

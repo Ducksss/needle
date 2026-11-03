@@ -2056,18 +2056,54 @@ h2 {
 }
 
 .mark-pill.compact {
-  width: 16px;
-  height: 12px;
-  margin-top: 4px;
-  padding: 0;
+  padding: 0 5px;
 }
 
-.mark-pill.compact > span {
-  display: none;
+/* The pill body keeps its text's width but does not draw it; the text layer above does. While the pill is hovered or
+   focused its body is raised over that layer, so it draws its own text. */
+.mark-sizer {
+  visibility: hidden;
 }
 
-.mark-short {
-  display: none;
+.mark:hover .mark-sizer,
+.mark:focus-within .mark-sizer {
+  visibility: visible;
+}
+
+/* Pill text, above ticks, rings and bars, with a halo in the pill's colour so a tick line does not run through the
+   glyphs. It lets the pointer through to whatever is under it. */
+.mark-text {
+  position: absolute;
+  z-index: 5;
+  background: transparent;
+  border-color: transparent;
+  pointer-events: none;
+}
+
+.mark-proposed.mark-text {
+  text-shadow:
+    0 0 2px #f5f3ff,
+    0 0 2px #f5f3ff,
+    0 0 3px #f5f3ff;
+}
+
+.mark-approved.mark-text {
+  text-shadow:
+    0 0 2px #ccfbf1,
+    0 0 2px #ccfbf1,
+    0 0 3px #ccfbf1;
+}
+
+/* A burn behind the clock sits on its bar and lets the bar take the pointer. */
+.mark.passive {
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* An open hover card sits above every bar, tick, ring and pill in the dock. */
+.dock-track .tw:hover,
+.dock-track .tw:focus-within {
+  z-index: 10;
 }
 
 .mark-approved {
@@ -2203,14 +2239,6 @@ h2 {
 
   .lane-names {
     flex-basis: 56px;
-  }
-
-  .mark-long {
-    display: none;
-  }
-
-  .mark-short {
-    display: inline;
   }
 
   .scrub label {

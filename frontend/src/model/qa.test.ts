@@ -6,9 +6,9 @@ import { buildLog } from './digest';
 import { buildDock } from './dock';
 import { buildKpis, buildNext } from './header';
 import { buildQueue } from './queue';
-import { burnAt, burnPassed, isKnown, planOf, stateAt } from './replay';
+import { burnAt, burnPassed, isKnown, planOf, stateAt, waitDv } from './replay';
 import { NO_DECISIONS, chipFor, runCtx, snapshot } from './run';
-import { DEFAULT_OPTION } from './options';
+import { DEFAULT_OPTION, recommended } from './options';
 import { approve, buildView, defer, queueTabFor } from './view';
 import { SMALL_RING } from './workspace';
 import { buildDigest } from './digest';
@@ -187,17 +187,38 @@ describe('minor fixes', () => {
 
 describe('Next decision: a recommended burn above the budget says so', () => {
   it('never recommends more than the budget without saying it is over budget', () => {
-    let seen = 0;
+    for (const budget of [5, 10]) {
+      for (let run = 0; run < rp.runs; run++) {
+        const ctx = runCtx(rp, run, budget, NO_DECISIONS);
+        const text = buildNext(snapshot(ctx), budget, null, ctx).text;
+        const m = text.match(/Recommended burn: ([\d.]+) mm\/s \(([^)]*)\)/);
+        if (!m || Number(m[1]) <= budget) continue;
+        expect(m[2]).toMatch(/over budget/);
+        expect(text).not.toMatch(/to stay inside/);
+      }
+    }
+  });
+
+  it('R3: recommends a burn inside the budget whenever the current window fits it', () => {
+    let checked = 0;
     for (let run = 0; run < rp.runs; run++) {
       const ctx = runCtx(rp, run, 10, NO_DECISIONS);
-      const text = buildNext(snapshot(ctx), 10, null, ctx).text;
-      const m = text.match(/Recommended burn: ([\d.]+) mm\/s \(([^)]*)\)/);
-      if (!m || Number(m[1]) <= 10) continue;
-      seen++;
-      expect(m[2]).toMatch(/over budget/);
-      expect(text).not.toMatch(/to stay inside/);
+      for (const n of snapshot(ctx).needs) {
+        if (!n.plan) continue;
+        const w = waitDv(n.plan.c, Math.floor(n.plan.age / 6));
+        if (w == null || w > 10) continue;
+        checked++;
+        expect(recommended(n.e, n.plan, 10)!.dv).toBeLessThanOrEqual(10);
+      }
     }
-    expect(seen).toBeGreaterThan(0);
+    expect(checked).toBeGreaterThan(50);
+    // #11548: the window costs 9.0 mm/s at run 26 and 10.0 at runs 27 and 35, against 11.0 to 12.5 for Robust.
+    for (const [run, dv] of [[25, 9], [26, 10], [34, 10]]) {
+      const ctx = runCtx(rp, run, 10, NO_DECISIONS);
+      const n = snapshot(ctx).needs.find((x) => x.e.id === 11548)!;
+      const rec = recommended(n.e, n.plan!, 10)!;
+      expect([rec.key, rec.dv]).toEqual(['win', dv]);
+    }
   });
 });
 
@@ -241,7 +262,7 @@ describe('QA pass 2: workspace captions', () => {
     const v = buildView(data, ui(4, 6341, { dec }));
     if (v.ws.kind !== 'event' || !v.ws.planner) throw new Error('expected a planner');
     expect(v.ws.planner.wc.deadline).toBeNull();
-    expect(v.ws.planner.wc.caption).toMatch(/^Burn approved at run 5, so the decision deadline no longer applies\./);
+    expect(v.ws.planner.wc.caption).toMatch(/^Burn approved at run 5 for Day \d+ \d\d:\d\d(–\d\d:\d\d)?, so the decision deadline no longer applies\.$/);
   });
 
   it('t7: says when the 1 km ring is tiny', () => {
@@ -256,5 +277,31 @@ describe('QA pass 2: workspace captions', () => {
       }
     }
     expect(small).toBeGreaterThan(0);
+  });
+});
+
+describe('QA pass 3: approved window burn, gate marks, missed targets', () => {
+  it('R4 and R6: the approved window keeps its place and reads as approved; its targets are not ticked', () => {
+    const u = ui(22, 8783);
+    const v0 = buildView(data, u);
+    if (v0.ws.kind !== 'event' || !v0.ws.planner) throw new Error('expected a planner');
+    expect(v0.ws.planner.modal.checks.slice(0, 2).map((c) => [c.ok, c.info])).toEqual([
+      [false, true],
+      [false, true],
+    ]);
+    const dec = approve(u, v0);
+    const v = buildView(data, ui(24, 8783, { dec }));
+    if (v.ws.kind !== 'event' || !v.ws.planner) throw new Error('expected a planner');
+    const rows = v.ws.planner.opts.rows;
+    expect(rows.map((r) => r.key)).toEqual(v0.ws.planner.opts.rows.map((r) => r.key));
+    const win = rows.find((r) => r.key === 'win')!;
+    expect([win.on, win.passed, win.dir]).toEqual([true, false, 'anywhere in Day 8 06:18–12:18 · direction not computed · approved for Day 8 06:18–12:18']);
+    expect(v.ws.planner.wc.caption).toBe('Burn approved at run 23 for Day 8 06:18–12:18, so the decision deadline no longer applies.');
+  });
+
+  it('t-b: names the target an option misses', () => {
+    const v = buildView(data, ui(32, 10384));
+    if (v.ws.kind !== 'event' || !v.ws.planner) throw new Error('expected a planner');
+    expect(v.ws.planner.opts.rows.find((r) => r.key === 'coa4')?.dir).toMatch(/ · misses the Pc target \(1\.0e-4 is not below 1e-4\)$/);
   });
 });

@@ -103,7 +103,7 @@ export interface LaneMark {
   left: string;
   side: TipSide;
   text: string;
-  /** Pill text on narrow screens. */
+  /** Short pill text: the Δv number alone, for narrow screens and tight gaps. */
   short: string;
   title: string;
   lines: string[];
@@ -412,20 +412,26 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
         const ao = ap && e.coa[String(ap.key)] ? approvedOption(e, planAt(e, ap.key, T, budget), ap) : null;
         // A window burn can happen any time in its window, but not before it was approved.
         const hA = !ao ? (appr - 1) * runH : isWindow(ao) ? Math.max(burnAt(e, ao), (appr - 1) * runH) : burnAt(e, ao);
+        const when = ao && isWindow(ao) ? 'any time in ' + at(hA) + '–' + at(ao.end).slice(-5) : at(hA);
+        const dv = ao ? ao.dv.toFixed(1) : null;
         marks.push({
           id: e.id,
           kind: 'approved',
           top: y - 1,
           left: pctH(hA),
           side: sideOf(hA, { edge: 'left', px: 6 }),
-          text: 'approved',
-          short: 'approved',
+          text: dv ? '✓ ' + dv + ' mm/s' : 'approved',
+          short: dv ? '✓ ' + dv : '✓',
           title: 'Burn approved · run ' + appr,
-          lines: [ctx.dec.approvedTxt[e.id] ?? '', 'Simulated upload. Later messages are the real recorded ones, so they do not show the burn.'].filter(Boolean),
+          lines: [ctx.dec.approvedTxt[e.id] ?? '', 'Burn ' + when + '.', 'Simulated upload. Later messages are the real recorded ones, so they do not show the burn.'].filter(Boolean),
         });
+        // Once the burn time is behind the clock the pill sits on the bar and lets the bar take the pointer, so the
+        // bar's card carries the approval too.
+        const bar = bars.find((b) => b.id === e.id);
+        bar?.tip.splice(bar.tip.length - 1, 0, { t: 'Burn approved at run ' + appr + ' for ' + when + (dv ? ' (' + dv + ' mm/s)' : '') + '.', c: '#99F6E4' });
       } else if (pl) {
         // Same choice as the workspace planner, drawn at the option's own burn time.
-        const o = pickOption(pl, sel === e.id ? optKey : DEFAULT_OPTION, e);
+        const o = pickOption(pl, sel === e.id ? optKey : DEFAULT_OPTION, e, budget);
         if (o) {
           const hB = burnAt(e, o);
           const passed = burnPassed(e, pl, o);
@@ -442,7 +448,7 @@ export function buildDock(ctx: RunCtx, sel: number | null, selSat: string | null
             left: pctH(hB),
             side: sideOf(hB, { edge: 'left', px: 6 }),
             text: passed ? 'time passed' : o.dv.toFixed(1) + ' mm/s',
-            short: passed ? 'passed' : o.dv.toFixed(1) + ' mm/s',
+            short: passed ? 'passed' : o.dv.toFixed(1),
             title: 'Proposed burn · ' + OPTION_NAMES[o.key] + ' · ' + when,
             lines: [
               isWindow(o)
@@ -470,8 +476,8 @@ export function buildLegend(budget: number): LegendItem[] {
     { key: 'bar', label: 'known', name: 'Event bar', tip: 'From the event’s first message to now. Each event is its own stream of messages, about one every 8 h. Faded: closest approach has passed.' },
     { key: 'pc', label: 'Pc ≥ 1e-4', name: 'Orange stretch', tip: 'Time when the latest message had Pc at or above 1e-4, the action threshold. In the open-events strip, the orange line is the count to decide at each run, on its own scale.' },
     { key: 'ahead', label: 'to closest approach', name: 'Dashed outline', tip: 'Time left until closest approach. Those messages have not arrived yet.' },
-    { key: 'burn', label: 'proposed burn', name: 'Proposed burn', tip: 'For the selected event, the option picked in the workspace; for the others, the planner’s recommended option (robust when it has one, which can cost more Δv than the minimum). Drawn at its burn time with its Δv. It aims for Pc below 1e-4 and a miss above 1 km; check the gate before approving. It waits for approval.' },
-    { key: 'approved', label: 'approved burn', name: 'Approved burn', tip: 'Teal pill at the approved burn time. The upload is simulated, so later messages, which are the real recorded ones, do not show the burn.' },
+    { key: 'burn', label: 'proposed burn', name: 'Proposed burn', tip: 'For the selected event, the option picked in the workspace; for the others, the recommended option (still ahead, meeting Pc below 1e-4 and a miss above 1 km, inside the budget when any option is). Drawn at its burn time with its Δv: “9.5 mm/s” where it fits, else the number alone. It waits for approval.' },
+    { key: 'approved', label: 'approved burn', name: 'Approved burn', tip: 'Teal pill at the approved burn time with its Δv (“✓ 9.5 mm/s”). Once that time is behind the clock it sits on the event bar; the bar’s card gives the approval. The upload is simulated, so later messages, which are the real recorded ones, do not show the burn.' },
     { key: 'deadline', label: 'decision deadline', name: 'Decision deadline', tip: 'After this, the cheapest burn needs more than the ' + budget + ' mm/s Δv budget.' },
     { key: 'end', label: 'closest approach passed', name: 'End dot', tip: 'Red: passed with Pc still at or above 1e-4 and no approved burn (unmitigated). Grey: passed below 1e-4. Teal: a burn was approved.' },
     { key: 'forecast', label: 'forecast (chance it ends Critical)', name: 'Forecast', tip: 'Ring at each open event’s closest approach, filled to its chance it ends Critical (from the latest message seen at this run). ' + CRIT_RULE + ' In the strip, the dotted line after the playhead is the expected number of passes ending Critical per 8 h.' },

@@ -1,5 +1,6 @@
 import type { QueueTab, QueueView } from '../model/queue';
 import { Chip } from './Chip';
+import { critWeight } from '../model/theme';
 
 interface QueueProps {
   q: QueueView;
@@ -44,14 +45,14 @@ export function Queue({ q, flash, run, onTab, onPick }: QueueProps) {
                 </span>
                 <span className="qrow-sub">
                   {r.sat} · {r.obj} · Pc{' '}
-                  <span className="mono" style={{ color: r.pcColor }} title={r.pcTitle}>
+                  <span className="mono" style={{ color: r.pcColor, fontWeight: critWeight(r.pcColor) }} title={r.pcTitle}>
                     {r.pc}
                   </span>
                 </span>
               </span>
               <span className="qrow-side">
-                <span style={{ color: r.col1Color }}>{r.col1}</span>
-                <span style={{ color: r.col2Color }}>{r.col2}</span>
+                <span style={{ color: r.col1Color, fontWeight: r.col1Weight }}>{r.col1}</span>
+                <span style={{ color: r.col2Color, fontWeight: r.col2Weight }}>{r.col2}</span>
               </span>
               {r.urgency && (
                 <span className={'urgency urgency-' + r.urgency.tone} role="img" aria-label={'Decision deadline: ' + URGENCY_LABEL[r.urgency.tone]}>

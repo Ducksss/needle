@@ -3,6 +3,7 @@ import type { GlobeScene } from '../model/globe';
 import { GlobeCanvas } from './GlobeCanvas';
 import type { Lapse } from '../model/lapse';
 import { LapseChip } from './Timeline';
+import { critWeight } from '../model/theme';
 
 export function OrbitContext({ g, lapse }: { g: GlobeScene; lapse: Lapse | null }) {
   return (
@@ -55,7 +56,7 @@ export function SinceLastRun({ d, onPick }: { d: DigestView; onPick: (id: number
                 </span>{' '}
                 <span style={{ color: 'var(--muted)' }}>{it.sat}</span>
               </span>
-              <span className="mono" style={{ color: it.vColor }} title={it.title}>
+              <span className="mono" style={{ color: it.vColor, fontWeight: critWeight(it.vColor) }} title={it.title}>
                 {it.v}
                 {it.title && <span className="sr-only">, {it.title}</span>}
               </span>

@@ -4,6 +4,7 @@
 // invent one: direction, Pc after and miss after are shown as targets, not computed values.
 
 import type { CoaOption, OptionKey, ReplayEvent } from '../data/types';
+import { mTxt, sci } from './format';
 import { type Plan, PC_ACTION, burnPassed, waitDv } from './replay';
 import { orderedFeasible } from './run';
 
@@ -47,33 +48,53 @@ export function windowOption(e: ReplayEvent, plan: Plan, wi = Math.floor(Math.ma
   return { key: 'win', window: true, feasible: true, dv, leadH: e.tca - start, wi, start, end: start + WINDOW_H };
 }
 
-/** Feasible options in display order. "Burn this window" follows Robust once no option planned at the message is still ahead. */
+/** The list with the window option placed after Robust, the position it always takes in the table. */
+export function withWindow(list: PlanOption[], win: WindowOption): PlanOption[] {
+  const rest = list.filter((o) => !isWindow(o));
+  const i = rest.findIndex((o) => o.key !== 'coa4');
+  return [...rest.slice(0, i < 0 ? rest.length : i), win, ...rest.slice(i < 0 ? rest.length : i)];
+}
+
+/**
+ * Feasible options in display order. "Burn this window" follows Robust whenever its Δv is below every option still ahead,
+ * which includes the case where every option planned at the message has passed.
+ */
 export function planOptions(e: ReplayEvent, plan: Plan): PlanOption[] {
   const feasible: PlanOption[] = orderedFeasible(plan.c.opts);
-  const atMessage = plan.c.opts.some((o) => o.feasible && o.key !== 'coa3' && !burnPassed(e, plan, o));
-  const win = atMessage ? null : windowOption(e, plan);
+  const win = windowOption(e, plan);
   if (!win) return feasible;
-  const i = feasible.findIndex((o) => o.key !== 'coa4');
-  return [...feasible.slice(0, i < 0 ? feasible.length : i), win, ...feasible.slice(i < 0 ? feasible.length : i)];
+  const ahead = feasible.filter((o) => !burnPassed(e, plan, o));
+  return ahead.every((o) => win.dv < o.dv) ? withWindow(feasible, win) : feasible;
 }
 
 /** The option meets both targets: Pc after below 1e-4 and the miss after over 1 km. The window option meets them by construction. */
 export const meetsTargets = (o: PlanOption) => isWindow(o) || (o.pcAfter < Math.pow(10, PC_ACTION) && o.missAfter > 1000);
 
-/** The first option still ahead that meets both targets: Robust, then this window, then the others. */
-export function recommended(e: ReplayEvent, plan: Plan): PlanOption | null {
-  return planOptions(e, plan).find((o) => !burnPassed(e, plan, o) && meetsTargets(o)) ?? null;
+/** The target an option misses, in words, or null when it meets both. */
+export function missedTarget(o: PlanOption): string | null {
+  if (isWindow(o) || meetsTargets(o)) return null;
+  if (!(o.pcAfter < Math.pow(10, PC_ACTION))) return 'misses the Pc target (' + sci(o.pcAfter) + ' is not below 1e-4)';
+  return 'misses the miss target (' + mTxt(o.missAfter) + ' is not above 1 km)';
+}
+
+/**
+ * The first option still ahead that meets both targets and fits the budget, in the order Robust, this window, then the
+ * others. When none fits the budget, the cheapest option still ahead that meets both targets.
+ */
+export function recommended(e: ReplayEvent, plan: Plan, budget: number): PlanOption | null {
+  const ok = planOptions(e, plan).filter((o) => !burnPassed(e, plan, o) && meetsTargets(o));
+  return ok.find((o) => o.dv <= budget) ?? [...ok].sort((a, b) => a.dv - b.dv)[0] ?? null;
 }
 
 /**
  * The option the operator picked if it is still ahead, else the recommended one. Options whose burn time has passed are
  * skipped while another is still ahead.
  */
-export function pickOption(plan: Plan | null, choice: OptChoice, e: ReplayEvent): PlanOption | null {
+export function pickOption(plan: Plan | null, choice: OptChoice, e: ReplayEvent, budget: number): PlanOption | null {
   if (!plan) return null;
   const all = planOptions(e, plan);
   const live = all.filter((o) => !burnPassed(e, plan, o));
-  const rec = recommended(e, plan);
+  const rec = recommended(e, plan, budget);
   const picked = choice === 'rec' ? undefined : live.find((o) => o.key === choice);
   return picked ?? rec ?? live[0] ?? all.find((o) => o.key === choice) ?? all[0] ?? null;
 }

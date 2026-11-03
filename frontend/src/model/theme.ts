@@ -26,6 +26,9 @@ export const BUCKET_COLOR: Record<string, string> = {
   quiet: C.faint,
 };
 
+/** Critical-band Pc and miss values are also semibold, so they read apart from Elevated without relying on colour. */
+export const critWeight = (color: string) => (color === C.risk ? 600 : undefined);
+
 /** Colour of a Pc value by its own band: Critical orange, Elevated amber, otherwise muted. */
 export const pcColor = (risk: number) => (risk >= -4 ? C.risk : risk >= -6 ? C.hidden : C.muted);
 
