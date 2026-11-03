@@ -28,7 +28,7 @@ The colours match the console's tokens. Each one has one meaning in the product.
 | Hot orange | `#F97316` | The satellite dot; Pc ≥ 1e-4 in charts |
 | Risk | `#C2410C` | Risk text and Decide chips |
 | Watch blue | `#2563EB` | Distance-only alerts |
-| Hidden amber | `#B45309` | Pc ≥ 1e-6 while far apart |
+| Elevated amber | `#A16207` | Elevated values: Pc 1e-6 to 1e-4, miss 1 to 5 km; Pc ≥ 1e-6 while far apart. Reads apart from Risk (ΔE76 30) and passes AA on white (4.9:1) |
 | Action violet | `#6D28D9` | Proposed burns and approve actions |
 | Deadline red | `#DC2626` | Decision deadlines and unmitigated passes |
 
